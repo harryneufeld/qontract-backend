@@ -1,0 +1,6 @@
+@Qontracts.Backend_HostAddress = http://localhost:5003
+
+GET {{Qontracts.Backend_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
