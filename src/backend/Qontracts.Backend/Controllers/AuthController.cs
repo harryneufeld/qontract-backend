@@ -136,5 +136,37 @@ namespace Qontracts.Backend.Controllers
 
             return Unauthorized(new { message = "Invalid token." });
         }
+
+        [HttpPost("logout-all")]
+        [Authorize]
+        public async Task<IActionResult> LogoutAllDevices()
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (Guid.TryParse(userIdClaim, out var userId))
+            {
+                await _authService.RevokeAllUserTokens(userId);
+                return Ok(new { message = "All devices logged out successfully." });
+            }
+
+            return Unauthorized(new { message = "Invalid token." });
+        }
+
+        [HttpGet("me")]
+        [Authorize]
+        public async Task<IActionResult> GetMe()
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (Guid.TryParse(userIdClaim, out var userId))
+            {
+                var (success, message, profile) = await _authService.GetProfile(userId);
+                if (!success)
+                {
+                    return NotFound(new { message });
+                }
+                return Ok(profile);
+            }
+
+            return Unauthorized(new { message = "Invalid token." });
+        }
     }
 }
