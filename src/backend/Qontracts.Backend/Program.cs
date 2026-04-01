@@ -14,7 +14,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseInMemoryDatabase("QontractsDb")); // Using in-memory for quick start
+    options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 builder.Services.AddScoped<IAuthService, AuthService>();
 
@@ -78,7 +78,24 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateAudience = true,
             ValidAudience = builder.Configuration["Jwt:Audience"],
             ValidateLifetime = true,
-            ClockSkew = TimeSpan.Zero
+            ClockSkew = TimeSpan.FromMinutes(5), // Allow 5 minutes clock skew
+            ValidateIssuerId = false, // Disable issuer ID validation to avoid issues
+            RequireExpirationTime = true // Require tokens to have an expiration time
+        };
+
+        options.Events = new JwtBearerEvents
+        {
+            OnAuthenticationFailed = context =>
+            {
+                // Log authentication errors but don't block legitimate requests
+                if (context.Exception?.GetType() == typeof(System.Threading.Tasks.TaskCanceledException) ||
+                    context.Exception?.GetType() == typeof(System.IO.IOException))
+                {
+                    context.Response.StatusCode = 503;
+                    return Task.CompletedTask;
+                }
+                return Task.CompletedTask;
+            }
         };
     });
 

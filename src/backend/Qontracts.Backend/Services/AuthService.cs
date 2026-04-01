@@ -23,6 +23,26 @@ namespace Qontracts.Backend.Services
 
         public async Task<(bool Success, string Message)> Register(UserRegisterDto userRegisterDto)
         {
+            if (string.IsNullOrWhiteSpace(userRegisterDto.Username))
+            {
+                return (false, "Username is required.");
+            }
+
+            if (string.IsNullOrWhiteSpace(userRegisterDto.Email))
+            {
+                return (false, "Email is required.");
+            }
+
+            if (string.IsNullOrWhiteSpace(userRegisterDto.Password))
+            {
+                return (false, "Password is required.");
+            }
+
+            if (userRegisterDto.Password.Length < 8)
+            {
+                return (false, "Password must be at least 8 characters.");
+            }
+
             if (await _context.Users.AnyAsync(u => u.Username == userRegisterDto.Username))
             {
                 return (false, "Username already exists.");
@@ -37,11 +57,16 @@ namespace Qontracts.Backend.Services
 
             var user = new User
             {
+                Id = Guid.NewGuid(),
                 Username = userRegisterDto.Username,
                 Email = userRegisterDto.Email,
                 PasswordHash = passwordHash,
                 PasswordSalt = passwordSalt,
-                Role = "User" // Default role
+                Role = "User",
+                FirstName = null,
+                LastName = null,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
             };
 
             _context.Users.Add(user);
@@ -52,6 +77,16 @@ namespace Qontracts.Backend.Services
 
         public async Task<(bool Success, string Message, AuthResponseDto? Response)> Login(UserLoginDto userLoginDto)
         {
+            if (string.IsNullOrWhiteSpace(userLoginDto.Username))
+            {
+                return (false, "Username is required.", null);
+            }
+
+            if (string.IsNullOrWhiteSpace(userLoginDto.Password))
+            {
+                return (false, "Password is required.", null);
+            }
+
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Username == userLoginDto.Username);
             if (user == null)
             {
@@ -119,6 +154,21 @@ namespace Qontracts.Backend.Services
 
         public async Task<(bool Success, string Message)> UpdatePassword(Guid userId, UpdatePasswordDto updatePasswordDto)
         {
+            if (string.IsNullOrWhiteSpace(updatePasswordDto.CurrentPassword))
+            {
+                return (false, "Current password is required.");
+            }
+
+            if (string.IsNullOrWhiteSpace(updatePasswordDto.NewPassword))
+            {
+                return (false, "New password is required.");
+            }
+
+            if (updatePasswordDto.NewPassword.Length < 8)
+            {
+                return (false, "New password must be at least 8 characters.");
+            }
+
             var user = await _context.Users.FindAsync(userId);
             if (user == null)
             {
@@ -141,15 +191,20 @@ namespace Qontracts.Backend.Services
 
         public async Task<(bool Success, string Message)> ChangePassword(Guid userId, ChangePasswordDto changePasswordDto)
         {
-            var user = await _context.Users.FindAsync(userId);
-            if (user == null)
+            if (string.IsNullOrWhiteSpace(changePasswordDto.NewPassword))
             {
-                return (false, "User not found.");
+                return (false, "New password is required.");
             }
 
             if (changePasswordDto.NewPassword.Length < 8)
             {
                 return (false, "Password must be at least 8 characters.");
+            }
+
+            var user = await _context.Users.FindAsync(userId);
+            if (user == null)
+            {
+                return (false, "User not found.");
             }
 
             CreatePasswordHash(changePasswordDto.NewPassword, out byte[] passwordHash, out byte[] passwordSalt);
