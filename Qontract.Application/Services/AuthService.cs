@@ -1,5 +1,12 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using Qontract.Application.Interfaces;
 using System.Security.Cryptography;
 using System.Text;
+using System.IdentityModel.Tokens.Jwt;
+using Microsoft.IdentityModel.Tokens;
+using System.Security.Claims;
 
 namespace Qontract.Application.Services;
 
@@ -104,7 +111,7 @@ public class AuthService : IAuthService
         }
     }
 
-    private async Task<string> HashPasswordAsync(string password)
+    public async Task<string> HashPasswordAsync(string password)
     {
         try
         {
@@ -153,27 +160,22 @@ public class AuthService : IAuthService
         // Generate a sample JWT token
         // In production, use a proper JWT library like System.IdentityModel.Tokens.Jwt
 
-        var keyBytes = System.Text.Encoding.ASCII.GetBytes(_configuration["Jwt:Key"]!);
-        var key = new System.Security.Cryptography.SecurityKey
-        {
-            Key = keyBytes,
-            KeySize = 256
-        };
-
+        var keyBytes = Encoding.ASCII.GetBytes(_configuration["Jwt:Key"]!);
+        var key = new SymmetricSecurityKey(keyBytes);
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+        var claims = new[]
+        {
+            new Claim("userId", user.Id.ToString()),
+            new Claim("email", user.Email),
+            new Claim("role", user.Role.ToString())
+        };
 
         var token = new JwtSecurityToken(
             issuer: _configuration["Jwt:Issuer"],
             audience: _configuration["Jwt:Audience"],
-            subject: new ClaimsIdentity(new[]
-            {
-                new Claim("userId", user.Id.ToString()),
-                new Claim("email", user.Email),
-                new Claim("role", user.Role.ToString())
-            }, "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name")
-            , expiration: DateTime.UtcNow.AddHours(24),
-            notBefore: DateTime.UtcNow,
-            issuer: _configuration["Jwt:Issuer"],
+            claims: claims,
+            expires: DateTime.UtcNow.AddHours(24),
             signingCredentials: credentials
         );
 

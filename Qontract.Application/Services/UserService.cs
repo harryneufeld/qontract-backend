@@ -2,6 +2,12 @@ using FluentValidation;
 using Qontract.Domain.Models;
 using Qontract.Application.Models;
 using Qontract.Application.FluentValidation;
+using Microsoft.EntityFrameworkCore;
+using Qontract.Application.Interfaces;
+using Microsoft.Extensions.Logging;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Collections.Generic;
 
 namespace Qontract.Application.Services;
 
@@ -91,7 +97,7 @@ public class UserService : IUserService
         {
             // Validate DTO
             var validator = new UserCreateValidator();
-            var validationResults = await validator.ValidateAsync(dto, CancellationToken);
+            var validationResults = await validator.ValidateAsync(dto, cancellationToken);
 
             if (!validationResults.IsValid)
             {
@@ -145,7 +151,7 @@ public class UserService : IUserService
 
             // Validate DTO
             var validator = new UserUpdateValidator();
-            var validationResults = await validator.ValidateAsync(dto, CancellationToken);
+            var validationResults = await validator.ValidateAsync(dto, cancellationToken);
 
             if (!validationResults.IsValid)
             {

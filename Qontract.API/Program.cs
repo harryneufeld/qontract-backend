@@ -2,6 +2,8 @@ using Microsoft.EntityFrameworkCore;
 using Qontract.Infrastructure.Data;
 using Qontract.Application.Services;
 using Qontract.Infrastructure.FileStorage;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -39,11 +41,7 @@ builder.Services.AddAuthentication(options =>
     options.TokenValidationParameters = new TokenValidationParameters
     {
         ValidateIssuerSigningKey = true,
-        IssuerSigningKey = new System.Security.Cryptography.SecurityKey
-        {
-            Key = System.Text.Encoding.ASCII.GetBytes(builder.Configuration["Jwt:Key"]!),
-            KeySize = 256
-        },
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(builder.Configuration["Jwt:Key"]!)),
         ValidateIssuer = true,
         ValidIssuer = builder.Configuration["Jwt:Issuer"],
         ValidateAudience = true,

@@ -1,3 +1,6 @@
+using Microsoft.Extensions.Configuration;
+using Qontract.Application.Interfaces;
+
 namespace Qontract.Infrastructure.FileStorage;
 
 public class FileStorage : IFileStorage

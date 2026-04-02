@@ -1,9 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using Qontract.Domain.Models;
+using Qontract.Application.Interfaces;
 
 namespace Qontract.Infrastructure.Data;
 
-public class ApplicationDbContext : DbContext
+public class ApplicationDbContext : DbContext, IApplicationDbContext
 {
     public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options)
     {
@@ -15,6 +16,8 @@ public class ApplicationDbContext : DbContext
     public DbSet<Contract> Contracts { get; set; }
     public DbSet<Document> Documents { get; set; }
     public DbSet<Address> Addresses { get; set; }
+
+    public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) => base.SaveChangesAsync(cancellationToken);
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -80,7 +83,7 @@ public class ApplicationDbContext : DbContext
             entity.Property(e => e.Counterparty).HasMaxLength(100);
             entity.Property(e => e.Currency).HasMaxLength(50);
             entity.Property(e => e.Value).HasMaxLength(500);
-            entity.Property(e => e.ContractorId).HasMaxLength(500);
+            entity.Property(e => e.ContractorId);
             entity.Property(e => e.CreatedBy).HasMaxLength(500);
             entity.Property(e => e.ModifiedBy).HasMaxLength(500);
             entity.HasOne(e => e.Tenant)
@@ -89,25 +92,9 @@ public class ApplicationDbContext : DbContext
             entity.HasOne(e => e.Contractor)
                 .WithMany()
                 .HasForeignKey(e => e.ContractorId);
-            entity.HasOne(e => e.Creator)
-                .WithMany()
-                .HasForeignKey(e => e.CreatedBy);
-            entity.HasOne(e => e.Modifier)
-                .WithMany()
-                .HasForeignKey(e => e.ModifiedBy);
             entity.HasMany(e => e.Documents)
-                .WithMany(d => d.Contracts)
-                .UsingEntity<Dictionary<string, object>>(
-                    "ContractDocuments",
-                    j => j.HasOne<Document>()
-                        .WithMany()
-                        .HasForeignKey("DocumentId")
-                        .OnDelete(DeleteBehavior.Cascade),
-                    k => k.HasOne<Contract>()
-                        .WithMany()
-                        .HasForeignKey("ContractId")
-                        .OnDelete(DeleteBehavior.Cascade),
-                    b => b.HasKey("DocumentId", "ContractId"));
+                .WithOne(d => d.Contract)
+                .HasForeignKey(d => d.ContractId);
         });
 
         // Document

@@ -1,3 +1,4 @@
+using Qontract.Domain.Models;
 using System.ComponentModel.DataAnnotations;
 
 namespace Qontract.Application.Models;

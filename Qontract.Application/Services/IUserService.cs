@@ -1,9 +1,15 @@
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
+using Qontract.Application.Models;
+
 namespace Qontract.Application.Services;
 
 public interface IAuthService
 {
     Task<AuthDTO> LoginAsync(LoginDTO dto, CancellationToken cancellationToken = default);
     Task<AuthDTO> RefreshTokenAsync(string refreshToken, CancellationToken cancellationToken = default);
+    Task<string> HashPasswordAsync(string password);
 }
 
 public class AuthDTO

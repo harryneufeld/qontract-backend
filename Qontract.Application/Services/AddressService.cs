@@ -1,5 +1,11 @@
 using Qontract.Domain.Models;
 using Qontract.Application.Models;
+using Qontract.Application.Interfaces;
+using Microsoft.Extensions.Logging;
+using Microsoft.EntityFrameworkCore;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Collections.Generic;
 
 namespace Qontract.Application.Services;
 
@@ -21,7 +27,6 @@ public class AddressService : IAddressService
             City = dto.City,
             Zip = dto.Zip,
             Country = dto.Country,
-            CreatedBy = int.Parse(createdBy),
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -31,8 +36,8 @@ public class AddressService : IAddressService
             case EntityType.Tenant:
                 address.TenantId = entityId;
                 break;
-            case EntityType.Contract:
-                address.ContractId = entityId;
+            case EntityType.Contractor:
+                address.ContractorId = entityId;
                 break;
         }
 
@@ -63,7 +68,7 @@ public class AddressService : IAddressService
             address.Country = dto.Country;
 
         address.UpdatedAt = DateTime.UtcNow;
-        address.ModifiedBy = int.Parse(modifiedBy);
+        address.ModifiedBy = modifiedBy ?? string.Empty;
 
         await _context.SaveChangesAsync(cancellationToken);
 
@@ -104,7 +109,7 @@ public class AddressService : IAddressService
         address.Zip = string.Empty;
         address.Country = string.Empty;
         address.UpdatedAt = DateTime.UtcNow;
-        address.ModifiedBy = int.Parse(modifiedBy);
+        address.ModifiedBy = modifiedBy ?? string.Empty;
 
         await _context.SaveChangesAsync(cancellationToken);
 

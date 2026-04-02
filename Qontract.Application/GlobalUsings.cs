@@ -1,0 +1,10 @@
+global using System;
+global using System.Collections.Generic;
+global using System.Threading;
+global using System.Threading.Tasks;
+global using Microsoft.EntityFrameworkCore;
+global using Microsoft.Extensions.Logging;
+global using Qontract.Application.Models;
+global using Qontract.Application.Interfaces;
+global using Qontract.Domain.Models;
+global using Qontract.Application.FluentValidation;

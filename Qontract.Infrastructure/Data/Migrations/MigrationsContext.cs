@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Qontract.Domain.Models;
 using Qontract.Infrastructure.Data;
 
 namespace Qontract.Infrastructure.Data.Migrations;

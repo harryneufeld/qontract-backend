@@ -90,8 +90,8 @@ public class ContractService : IContractService
             Value = dto.Value,
             ContractorId = dto.ContractorId,
             IsActive = true,
-            CreatedBy = int.Parse(createdBy),
-            ModifiedBy = int.Parse(createdBy),
+            CreatedBy = createdBy ?? string.Empty,
+            ModifiedBy = createdBy ?? string.Empty,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -138,7 +138,7 @@ public class ContractService : IContractService
             contract.ContractorId = dto.ContractorId.Value;
 
         contract.UpdatedAt = DateTime.UtcNow;
-        contract.ModifiedBy = int.Parse(modifiedBy);
+        contract.ModifiedBy = modifiedBy ?? string.Empty;
 
         await _context.SaveChangesAsync(cancellationToken);
 
@@ -155,7 +155,7 @@ public class ContractService : IContractService
 
         contract.IsActive = false;
         contract.UpdatedAt = DateTime.UtcNow;
-        contract.ModifiedBy = int.Parse(modifiedBy);
+        contract.ModifiedBy = modifiedBy ?? string.Empty;
 
         await _context.SaveChangesAsync(cancellationToken);
 
@@ -172,7 +172,7 @@ public class ContractService : IContractService
 
         contract.IsActive = false;
         contract.UpdatedAt = DateTime.UtcNow;
-        contract.ModifiedBy = int.Parse(modifiedBy);
+        contract.ModifiedBy = modifiedBy ?? string.Empty;
 
         await _context.SaveChangesAsync(cancellationToken);
 

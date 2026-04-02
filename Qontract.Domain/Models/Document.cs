@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Qontract.Domain.Models;
 
@@ -24,19 +25,16 @@ public class Document
     public long FileSize { get; set; }
 
     [Required]
-    [MaxLength(500)]
-    public int UploadedBy { get; set; }
+    public string UploadedBy { get; set; } = string.Empty;
 
     [Required]
     public int ContractId { get; set; }
 
     [Required]
-    [MaxLength(500)]
-    public int CreatedBy { get; set; }
+    public string CreatedBy { get; set; } = string.Empty;
 
     [Required]
-    [MaxLength(500)]
-    public int ModifiedBy { get; set; }
+    public string ModifiedBy { get; set; } = string.Empty;
 
     [Required]
     public DateTime UploadedAt { get; set; } = DateTime.UtcNow;
@@ -53,4 +51,5 @@ public class Document
     // Navigation properties
     public Contract Contract { get; set; }
     public User? User { get; set; }
+    public ICollection<Contract> Contracts { get; set; } = new List<Contract>();
 }

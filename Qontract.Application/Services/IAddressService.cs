@@ -1,3 +1,9 @@
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
+using Qontract.Application.Models;
+using Qontract.Domain.Models;
+
 namespace Qontract.Application.Services;
 
 public interface IAddressService

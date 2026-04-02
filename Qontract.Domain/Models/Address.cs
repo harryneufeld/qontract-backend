@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Qontract.Domain.Models;
 
@@ -39,6 +40,12 @@ public class Address
     public Tenant? Tenant { get; set; }
     public Contractor? Contractor { get; set; }
     public Contract? Contract { get; set; }
+
+    [MaxLength(500)]
+    public string? CreatedBy { get; set; }
+
+    [MaxLength(500)]
+    public string? ModifiedBy { get; set; }
 }
 
 public enum EntityType

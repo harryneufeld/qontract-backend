@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Qontract.Domain.Models;
 
@@ -37,6 +38,12 @@ public class Contractor
     // Navigation properties
     public Tenant? Tenant { get; set; }
     public User? User { get; set; }
+
+    [MaxLength(500)]
+    public string? CreatedBy { get; set; }
+
+    [MaxLength(500)]
+    public string? ModifiedBy { get; set; }
 }
 
 public enum ContractorType

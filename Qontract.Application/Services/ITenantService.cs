@@ -1,3 +1,8 @@
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
+using Qontract.Application.Models;
+
 namespace Qontract.Application.Services;
 
 public interface ITenantService

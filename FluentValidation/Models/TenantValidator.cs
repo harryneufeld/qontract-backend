@@ -2,11 +2,11 @@ using FluentValidation;
 using Qontract.Application.Models;
 using Qontract.Domain.Models;
 
-namespace FluentValidation.Models;
+namespace Qontract.Application.FluentValidation;
 
-public class TenantValidator : AbstractValidator<TenantCreateDTO>
+public class TenantCreateValidator : AbstractValidator<TenantCreateDTO>
 {
-    public TenantValidator()
+    public TenantCreateValidator()
     {
         RuleFor(x => x.Name)
             .NotEmpty().WithMessage("Name is required.")

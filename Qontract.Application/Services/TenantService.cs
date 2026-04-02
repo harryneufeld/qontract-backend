@@ -2,6 +2,12 @@ using FluentValidation;
 using Qontract.Domain.Models;
 using Qontract.Application.Models;
 using Qontract.Application.FluentValidation;
+using Qontract.Application.Interfaces;
+using Microsoft.Extensions.Logging;
+using Microsoft.EntityFrameworkCore;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Collections.Generic;
 
 namespace Qontract.Application.Services;
 
@@ -85,7 +91,7 @@ public class TenantService : ITenantService
         {
             // Validate DTO
             var validator = new TenantCreateValidator();
-            var validationResults = await validator.ValidateAsync(dto, CancellationToken);
+            var validationResults = await validator.ValidateAsync(dto, cancellationToken);
 
             if (!validationResults.IsValid)
             {
@@ -98,9 +104,9 @@ public class TenantService : ITenantService
                 Name = dto.Name,
                 Type = dto.Type,
                 Settings = dto.Settings,
-                IsActive = dto.IsActive ?? true,
-                CreatedBy = User.Identity?.Name,
-                ModifiedBy = User.Identity?.Name,
+                IsActive = dto.IsActive,
+                CreatedBy = null,
+                ModifiedBy = null,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
@@ -133,7 +139,7 @@ public class TenantService : ITenantService
 
             // Validate DTO
             var validator = new TenantUpdateValidator();
-            var validationResults = await validator.ValidateAsync(dto, CancellationToken);
+            var validationResults = await validator.ValidateAsync(dto, cancellationToken);
 
             if (!validationResults.IsValid)
             {
@@ -162,7 +168,7 @@ public class TenantService : ITenantService
             }
 
             tenant.UpdatedAt = DateTime.UtcNow;
-            tenant.ModifiedBy = User.Identity?.Name;
+            tenant.ModifiedBy = null;
 
             await _context.SaveChangesAsync(cancellationToken);
 

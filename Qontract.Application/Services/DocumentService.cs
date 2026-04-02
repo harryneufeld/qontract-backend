@@ -1,5 +1,11 @@
+using Microsoft.EntityFrameworkCore;
 using Qontract.Domain.Models;
 using Qontract.Application.Models;
+using Qontract.Application.Interfaces;
+using Microsoft.Extensions.Logging;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Collections.Generic;
 
 namespace Qontract.Application.Services;
 
@@ -73,11 +79,10 @@ public class DocumentService : IDocumentService
             throw new InvalidOperationException($"Failed to upload file: {dto.FileName}");
 
         // Check for existing version
-        var nextVersion = await _context.Documents
+        var maxVersion = await _context.Documents
             .Where(d => d.ContractId == contractId)
-            .OrderByDescending(d => d.Version)
-            .Select(d => d.Version)
-            .FirstOrDefaultAsync() ?? 0;
+            .MaxAsync(d => (int?)d.Version, cancellationToken) ?? 0;
+        var nextVersion = maxVersion + 1;
 
         var document = new Document
         {
@@ -86,8 +91,8 @@ public class DocumentService : IDocumentService
             FilePath = _fileStorage.GenerateFilePath(contractId, dto.FileName, nextVersion + 1),
             FileSize = dto.FileSize,
             ContractId = contractId,
-            UploadedBy = uploadedBy,
-            CreatedBy = int.Parse(createdBy),
+            UploadedBy = uploadedBy.ToString(),
+            CreatedBy = createdBy ?? string.Empty,
             Version = nextVersion + 1,
             UploadedAt = DateTime.UtcNow,
             CreatedAt = DateTime.UtcNow,
@@ -118,12 +123,12 @@ public class DocumentService : IDocumentService
         document.FilePath = _fileStorage.GenerateFilePath(document.ContractId, dto.FileName, document.Version + 1);
         document.FileSize = dto.FileSize;
         document.UpdatedAt = DateTime.UtcNow;
-        document.ModifiedBy = modifiedByName;
+        if (!string.IsNullOrEmpty(modifiedByName)) document.ModifiedBy = modifiedByName;
         document.Version += 1;
 
         await _context.SaveChangesAsync(cancellationToken);
 
-        return await GetDocumentByIdAsync(id, cancellationToken);
+        return await GetDocumentByIdAsync(document.Id, cancellationToken);
     }
 
     public async Task<bool> DeleteDocumentAsync(int id, int modifiedBy, string? modifiedByName, CancellationToken cancellationToken = default)

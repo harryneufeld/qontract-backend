@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Qontract.Domain.Models;
 
@@ -35,16 +36,18 @@ public class Contract
     public string? Value { get; set; }
 
     [Required]
-    [MaxLength(500)]
     public int? ContractorId { get; set; }
 
-    [Required]
+    public int? TenantId { get; set; }
+
     [MaxLength(500)]
-    public int? CreatedBy { get; set; }
+    public string? CreatedBy { get; set; }
+
+    [MaxLength(500)]
+    public string? ModifiedBy { get; set; }
 
     [Required]
-    [MaxLength(500)]
-    public int? ModifiedBy { get; set; }
+    public bool IsActive { get; set; }
 
     [Required]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
