@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Qontract.Application.Interfaces;
+using Qontract.Application.Models;
 using System.Security.Cryptography;
 using System.Text;
 using System.IdentityModel.Tokens.Jwt;
@@ -25,7 +26,7 @@ public class AuthService : IAuthService
         _logger = logger;
     }
 
-    public async Task<AuthDTO> LoginAsync(LoginDTO dto, CancellationToken cancellationToken = default)
+    public async Task<Qontract.Application.Models.AuthDTO> LoginAsync(Qontract.Application.Models.LoginDTO dto, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -46,7 +47,7 @@ public class AuthService : IAuthService
 
             var token = GenerateJwtToken(user);
 
-            return new AuthDTO
+            return new Qontract.Application.Models.AuthDTO
             {
                 AccessToken = token,
                 UserId = user.Id,
@@ -61,14 +62,14 @@ public class AuthService : IAuthService
         }
     }
 
-    public async Task<AuthDTO> RefreshTokenAsync(string refreshToken, CancellationToken cancellationToken = default)
+    public async Task<Qontract.Application.Models.AuthDTO> RefreshTokenAsync(string refreshToken, CancellationToken cancellationToken = default)
     {
         // In production, validate the refresh token here
         // For now, return a new access token
-        
+
         // TODO: Implement refresh token validation
         // This would validate the JWT token and issue a new one
-        
+
         var user = await _context.Users
             .FirstOrDefaultAsync(u => u.Email == "refresh@example.com", cancellationToken);
 
@@ -79,36 +80,13 @@ public class AuthService : IAuthService
 
         var token = GenerateJwtToken(user);
 
-        return new AuthDTO
+        return new Qontract.Application.Models.AuthDTO
         {
             AccessToken = token,
             UserId = user.Id,
             Email = user.Email,
             ExpiresAt = DateTime.UtcNow.AddHours(24)
         };
-    }
-
-    private bool VerifyPassword(string password, string passwordHash)
-    {
-        if (!passwordHash.Contains(SaltKey))
-            return false;
-
-        var hashParts = passwordHash.Split(':');
-        if (hashParts.Length < 2)
-            return false;
-
-        try
-        {
-            var salt = Convert.FromBase64String(hashParts[0]);
-            var hashedPassword = HashPassword(password, salt);
-
-            return hashedPassword == hashParts[1];
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error verifying password for email: {Email}", password);
-            return false;
-        }
     }
 
     public async Task<string> HashPasswordAsync(string password)
@@ -140,35 +118,65 @@ public class AuthService : IAuthService
         }
     }
 
-    private string HashPassword(string password, byte[] salt)
+    private bool VerifyPassword(string password, string storedHash)
     {
-        using var hmac = new HMACSHA256(salt);
-        var hashed = hmac.ComputeHash(Encoding.UTF8.GetBytes(password));
-        return Convert.ToBase64String(hashed);
+        try
+        {
+            var hashParts = storedHash.Split(':');
+            if (hashParts.Length != 2)
+            {
+                return false;
+            }
+
+            var salt = Convert.FromBase64String(hashParts[0]);
+            var hash = hashParts[1];
+
+            var inputHash = HashPassword(password, salt);
+
+            return hash == inputHash;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error verifying password for email: {Email}", password);
+            return false;
+        }
     }
 
     private byte[] GenerateSalt()
     {
-        using var rng = RandomNumberGenerator.Create();
         var salt = new byte[SaltBytesSize];
-        rng.GetBytes(salt);
+        using (var rng = RandomNumberGenerator.Create())
+        {
+            rng.GetBytes(salt);
+        }
         return salt;
+    }
+
+    private string HashPassword(string password, byte[] salt)
+    {
+        using (var sha256 = SHA256.Create())
+        {
+            var combined = new byte[salt.Length + password.Length];
+            Buffer.BlockCopy(salt, 0, combined, 0, salt.Length);
+            Buffer.BlockCopy(System.Text.Encoding.UTF8.GetBytes(password), 0, combined, salt.Length, password.Length);
+
+            var hash = sha256.ComputeHash(combined);
+            return Convert.ToBase64String(hash);
+        }
     }
 
     private string GenerateJwtToken(User user)
     {
-        // Generate a sample JWT token
-        // In production, use a proper JWT library like System.IdentityModel.Tokens.Jwt
-
-        var keyBytes = Encoding.ASCII.GetBytes(_configuration["Jwt:Key"]!);
-        var key = new SymmetricSecurityKey(keyBytes);
-        var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+        var securityKey = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(_configuration["Jwt:Key"]!));
+        var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
 
         var claims = new[]
         {
-            new Claim("userId", user.Id.ToString()),
-            new Claim("email", user.Email),
-            new Claim("role", user.Role.ToString())
+            new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
+            new Claim(JwtRegisteredClaimNames.Email, user.Email!),
+            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+            new Claim(ClaimTypes.Role, user.Role.ToString()),
+            new Claim("TenantId", user.TenantId.ToString())
         };
 
         var token = new JwtSecurityToken(

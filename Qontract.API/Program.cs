@@ -1,9 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using Qontract.Infrastructure.Data;
 using Qontract.Application.Services;
-using Qontract.Infrastructure.FileStorage;
+using Qontract.Application.Interfaces;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using Qontract.Infrastructure.FileStorage;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,6 +16,7 @@ builder.Services.AddSwaggerGen();
 // Register DbContext
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+builder.Services.AddScoped<Qontract.Application.Interfaces.IApplicationDbContext, ApplicationDbContext>();
 
 // Register services
 builder.Services.AddScoped<IAuthService, AuthService>();
@@ -26,9 +28,8 @@ builder.Services.AddScoped<IDocumentService, DocumentService>();
 builder.Services.AddScoped<IAddressService, AddressService>();
 
 // Register File Storage
-var fileStorageOptions = builder.Configuration.GetSection("Storage");
-builder.Services.AddSingleton<IFileStorage, FileStorage>(sp =>
-    new FileStorage(sp.GetRequiredService<IConfiguration>()));
+var fileStorage = new FileStorage(builder.Configuration);
+builder.Services.AddSingleton(fileStorage);
 
 // Configure JWT
 builder.Services.AddAuthentication(options =>

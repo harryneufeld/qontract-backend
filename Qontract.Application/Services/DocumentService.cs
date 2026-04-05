@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Qontract.Domain.Models;
 using Qontract.Application.Models;
-using Qontract.Application.Interfaces;
+using Qontract.Core.Interfaces;
 using Microsoft.Extensions.Logging;
 using System.Threading;
 using System.Threading.Tasks;
@@ -12,10 +12,10 @@ namespace Qontract.Application.Services;
 public class DocumentService : IDocumentService
 {
     private readonly IApplicationDbContext _context;
-    private readonly IFileStorage _fileStorage;
+    private readonly Qontract.Core.Interfaces.IFileStorage _fileStorage;
     private readonly int _maxFileSize = 50 * 1024 * 1024; // 50MB
 
-    public DocumentService(IApplicationDbContext context, IFileStorage fileStorage)
+    public DocumentService(IApplicationDbContext context, Qontract.Core.Interfaces.IFileStorage fileStorage)
     {
         _context = context;
         _fileStorage = fileStorage;
@@ -49,10 +49,68 @@ public class DocumentService : IDocumentService
     public async Task<DocumentDTO> GetDocumentByIdAsync(int id, CancellationToken cancellationToken = default)
     {
         var document = await _context.Documents
-            .FirstOrDefaultAsync(d => d.Id == id, cancellationToken);
+            .Where(d => d.Id == id)
+            .Select(d => new DocumentDTO
+            {
+                Id = d.Id,
+                FileName = d.FileName,
+                FileType = d.FileType,
+                FilePath = d.FilePath,
+                FileSize = d.FileSize,
+                ContractId = d.ContractId,
+                UploadedAt = d.UploadedAt,
+                CreatedAt = d.CreatedAt,
+                UpdatedAt = d.UpdatedAt,
+                Version = d.Version,
+                CreatedBy = d.CreatedBy,
+                ModifiedBy = d.ModifiedBy
+            })
+            .FirstOrDefaultAsync(cancellationToken);
 
         if (document == null)
-            throw new KeyNotFoundException($"Document with ID {id} not found.");
+        {
+            throw new InvalidOperationException($"Document with id {id} not found");
+        }
+
+        return document;
+    }
+
+    public async Task<DocumentDTO> CreateDocumentAsync(DocumentCreateDTO dto, int contractId, int uploadedBy, string? createdBy, CancellationToken cancellationToken = default)
+    {
+        if (dto.FileSize > _maxFileSize)
+        {
+            throw new InvalidOperationException($"File size exceeds maximum allowed size of {_maxFileSize / (1024 * 1024)}MB");
+        }
+
+        var contract = await _context.Contracts
+            .FirstOrDefaultAsync(c => c.Id == contractId, cancellationToken);
+
+        if (contract == null)
+        {
+            throw new InvalidOperationException($"Contract with id {contractId} not found");
+        }
+
+        var filePath = _fileStorage.GenerateFilePath(dto.ContractId, dto.FileName, 1);
+        var fileBytes = Convert.FromBase64String(dto.FileData);
+        await File.WriteAllBytesAsync(filePath, fileBytes);
+
+        var document = new Document
+        {
+            FileName = dto.FileName,
+            FileType = dto.FileType,
+            FilePath = filePath,
+            FileSize = dto.FileSize,
+            ContractId = dto.ContractId,
+            UploadedAt = DateTime.UtcNow,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+            Version = 1,
+            CreatedBy = createdBy ?? "system",
+            ModifiedBy = createdBy ?? "system"
+        };
+
+        await _context.Documents.AddAsync(document, cancellationToken);
+        await _context.SaveChangesAsync(cancellationToken);
 
         return new DocumentDTO
         {
@@ -71,85 +129,51 @@ public class DocumentService : IDocumentService
         };
     }
 
-    public async Task<DocumentDTO> CreateDocumentAsync(DocumentCreateDTO dto, int contractId, int uploadedBy, string? createdBy, CancellationToken cancellationToken = default)
-    {
-        var fileBytes = await _fileStorage.UploadAsync(dto.FileName, dto.FileType, dto.FileSize);
-
-        if (fileBytes == null)
-            throw new InvalidOperationException($"Failed to upload file: {dto.FileName}");
-
-        // Check for existing version
-        var maxVersion = await _context.Documents
-            .Where(d => d.ContractId == contractId)
-            .MaxAsync(d => (int?)d.Version, cancellationToken) ?? 0;
-        var nextVersion = maxVersion + 1;
-
-        var document = new Document
-        {
-            FileName = dto.FileName,
-            FileType = dto.FileType,
-            FilePath = _fileStorage.GenerateFilePath(contractId, dto.FileName, nextVersion + 1),
-            FileSize = dto.FileSize,
-            ContractId = contractId,
-            UploadedBy = uploadedBy.ToString(),
-            CreatedBy = createdBy ?? string.Empty,
-            Version = nextVersion + 1,
-            UploadedAt = DateTime.UtcNow,
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow
-        };
-
-        _context.Documents.Add(document);
-        await _context.SaveChangesAsync(cancellationToken);
-
-        return await GetDocumentByIdAsync(document.Id, cancellationToken);
-    }
-
-    public async Task<DocumentDTO> UpdateDocumentAsync(int id, DocumentCreateDTO dto, int modifiedBy, string? modifiedByName, CancellationToken cancellationToken = default)
+    public async Task<DocumentDTO> UpdateDocumentAsync(int id, DocumentCreateDTO dto, int modifiedById, string? modifiedBy, CancellationToken cancellationToken = default)
     {
         var document = await _context.Documents
             .FirstOrDefaultAsync(d => d.Id == id, cancellationToken);
 
         if (document == null)
-            throw new KeyNotFoundException($"Document with ID {id} not found.");
-
-        var fileBytes = await _fileStorage.UploadAsync(dto.FileName, dto.FileType, dto.FileSize);
-
-        if (fileBytes == null)
-            throw new InvalidOperationException($"Failed to upload file: {dto.FileName}");
-
-        document.FileName = dto.FileName;
-        document.FileType = dto.FileType;
-        document.FilePath = _fileStorage.GenerateFilePath(document.ContractId, dto.FileName, document.Version + 1);
-        document.FileSize = dto.FileSize;
-        document.UpdatedAt = DateTime.UtcNow;
-        if (!string.IsNullOrEmpty(modifiedByName)) document.ModifiedBy = modifiedByName;
-        document.Version += 1;
-
-        await _context.SaveChangesAsync(cancellationToken);
-
-        return await GetDocumentByIdAsync(document.Id, cancellationToken);
-    }
-
-    public async Task<bool> DeleteDocumentAsync(int id, int modifiedBy, string? modifiedByName, CancellationToken cancellationToken = default)
-    {
-        var document = await _context.Documents
-            .FirstOrDefaultAsync(d => d.Id == id, cancellationToken);
-
-        if (document == null)
-            throw new KeyNotFoundException($"Document with ID {id} not found.");
-
-        // Delete file from storage
-        try
         {
-            await _fileStorage.DeleteAsync(document.FilePath);
+            throw new InvalidOperationException($"Document with id {id} not found");
         }
-        catch { /* File might not exist, ignore */ }
 
-        document.FileName = string.Empty;
-        document.FilePath = string.Empty;
-        document.FileSize = 0;
+        document.FileName = dto.FileName ?? document.FileName;
+        document.FileType = dto.FileType ?? document.FileType;
+        document.ModifiedBy = modifiedBy ?? "system";
+        document.UpdatedAt = DateTime.UtcNow;
 
+        await _context.SaveChangesAsync(cancellationToken);
+
+        return new DocumentDTO
+        {
+            Id = document.Id,
+            FileName = document.FileName,
+            FileType = document.FileType,
+            FilePath = document.FilePath,
+            FileSize = document.FileSize,
+            ContractId = document.ContractId,
+            UploadedAt = document.UploadedAt,
+            CreatedAt = document.CreatedAt,
+            UpdatedAt = document.UpdatedAt,
+            Version = document.Version,
+            CreatedBy = document.CreatedBy,
+            ModifiedBy = document.ModifiedBy
+        };
+    }
+
+    public async Task<bool> DeleteDocumentAsync(int id, int modifiedById, string? modifiedBy, CancellationToken cancellationToken = default)
+    {
+        var document = await _context.Documents
+            .FirstOrDefaultAsync(d => d.Id == id, cancellationToken);
+
+        if (document == null)
+        {
+            return false;
+        }
+
+        _context.Documents.Remove(document);
         await _context.SaveChangesAsync(cancellationToken);
 
         return true;
@@ -161,9 +185,10 @@ public class DocumentService : IDocumentService
             .FirstOrDefaultAsync(d => d.Id == id, cancellationToken);
 
         if (document == null)
-            throw new KeyNotFoundException($"Document with ID {id} not found.");
+        {
+            throw new InvalidOperationException($"Document with id {id} not found");
+        }
 
-        var bytes = await _fileStorage.ReadAsync(document.FilePath);
-        return bytes;
+        return await File.ReadAllBytesAsync(document.FilePath);
     }
 }

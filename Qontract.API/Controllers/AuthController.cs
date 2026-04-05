@@ -1,5 +1,5 @@
-using Qontract.Application.Models;
 using Qontract.Application.Services;
+using Qontract.Application.Models;
 
 namespace Qontract.API.Controllers;
 
@@ -15,7 +15,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("login")]
-    public async Task<ActionResult<AuthDTO>> Login([FromBody] LoginDTO dto)
+    public async Task<ActionResult<Qontract.Application.Models.AuthDTO>> Login([FromBody] Qontract.Application.Models.LoginDTO dto)
     {
         try
         {
@@ -29,7 +29,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("refresh-token")]
-    public async Task<ActionResult<AuthDTO>> RefreshToken(string refreshToken)
+    public async Task<ActionResult<Qontract.Application.Models.AuthDTO>> RefreshToken(string refreshToken)
     {
         try
         {

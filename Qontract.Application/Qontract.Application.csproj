@@ -15,5 +15,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Qontract.Domain\Qontract.Domain.csproj" />
+    <ProjectReference Include="..\Qontract.Core\Qontract.Core.csproj" />
   </ItemGroup>
 </Project>

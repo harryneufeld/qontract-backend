@@ -7,23 +7,9 @@ namespace Qontract.Application.Services;
 
 public interface IAuthService
 {
-    Task<AuthDTO> LoginAsync(LoginDTO dto, CancellationToken cancellationToken = default);
-    Task<AuthDTO> RefreshTokenAsync(string refreshToken, CancellationToken cancellationToken = default);
+    Task<Qontract.Application.Models.AuthDTO> LoginAsync(Qontract.Application.Models.LoginDTO dto, CancellationToken cancellationToken = default);
+    Task<Qontract.Application.Models.AuthDTO> RefreshTokenAsync(string refreshToken, CancellationToken cancellationToken = default);
     Task<string> HashPasswordAsync(string password);
-}
-
-public class AuthDTO
-{
-    public string AccessToken { get; set; } = string.Empty;
-    public int UserId { get; set; }
-    public string? Email { get; set; }
-    public DateTime ExpiresAt { get; set; }
-}
-
-public class LoginDTO
-{
-    public string Email { get; set; } = string.Empty;
-    public string Password { get; set; } = string.Empty;
 }
 
 public interface IUserService

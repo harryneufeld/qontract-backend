@@ -1,4 +1,4 @@
-namespace Qontract.Application.Interfaces;
+namespace Qontract.Core.Interfaces;
 
 public interface IFileStorage
 {
