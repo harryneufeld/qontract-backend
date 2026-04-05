@@ -1,9 +1,10 @@
 using System.IO;
 using Microsoft.Extensions.Configuration;
+using Qontract.Core.Interfaces;
 
 namespace Qontract.Infrastructure.FileStorage;
 
-public class FileStorage : IFileStorage
+public class FileStorage : Qontract.Core.Interfaces.IFileStorage
 {
     private readonly string _storageRoot;
     private readonly int _maxFileSize = 50 * 1024 * 1024; // 50MB
@@ -41,7 +42,7 @@ public class FileStorage : IFileStorage
     {
         if (System.IO.File.Exists(filePath))
         {
-            await System.IO.File.DeleteAsync(filePath);
+            System.IO.File.Delete(filePath);
             return true;
         }
         return false;

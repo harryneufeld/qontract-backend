@@ -8,6 +8,10 @@ using Qontract.Infrastructure.FileStorage;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Get connection string from configuration
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+    ?? "Server=(localdb)\\mssqllocaldb;Database=QontractDb;Trusted_Connection=True;MultipleActiveResultSets=True";
+
 // Add services to the container.
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
@@ -15,7 +19,7 @@ builder.Services.AddSwaggerGen();
 
 // Register DbContext
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseSqlServer(connectionString));
 builder.Services.AddScoped<Qontract.Application.Interfaces.IApplicationDbContext, ApplicationDbContext>();
 
 // Register services
@@ -28,8 +32,7 @@ builder.Services.AddScoped<IDocumentService, DocumentService>();
 builder.Services.AddScoped<IAddressService, AddressService>();
 
 // Register File Storage
-var fileStorage = new FileStorage(builder.Configuration);
-builder.Services.AddSingleton(fileStorage);
+builder.Services.AddSingleton<Qontract.Core.Interfaces.IFileStorage, Qontract.Infrastructure.FileStorage.FileStorage>();
 
 // Configure JWT
 builder.Services.AddAuthentication(options =>
@@ -78,7 +81,7 @@ builder.Services.AddCors(options =>
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
+if (app.Environment.EnvironmentName == "Development")
 {
     app.UseSwagger();
     app.UseSwaggerUI();

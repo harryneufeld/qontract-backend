@@ -13,7 +13,6 @@
     <PackageReference Include="FluentValidation.AspNetCore" Version="11.3.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Qontract.API.Services\Qontract.API.Services.csproj" />
     <ProjectReference Include="..\Qontract.Application\Qontract.Application.csproj" />
     <ProjectReference Include="..\Qontract.Infrastructure\Qontract.Infrastructure.csproj" />
   </ItemGroup>

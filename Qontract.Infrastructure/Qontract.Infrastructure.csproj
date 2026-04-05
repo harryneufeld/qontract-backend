@@ -6,6 +6,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Qontract.Domain\Qontract.Domain.csproj" />
+    <ProjectReference Include="..\Qontract.Core\Qontract.Core.csproj" />
     <ProjectReference Include="..\Qontract.Application\Qontract.Application.csproj" />
   </ItemGroup>
   <ItemGroup>
@@ -18,4 +19,5 @@
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.17.0" />
     <PackageReference Include="Microsoft.Extensions.Identity.Core" Version="10.0.5" />
   </ItemGroup>
+
 </Project>

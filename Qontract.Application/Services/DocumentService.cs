@@ -12,10 +12,10 @@ namespace Qontract.Application.Services;
 public class DocumentService : IDocumentService
 {
     private readonly IApplicationDbContext _context;
-    private readonly Qontract.Core.Interfaces.IFileStorage _fileStorage;
+    private readonly IFileStorage _fileStorage;
     private readonly int _maxFileSize = 50 * 1024 * 1024; // 50MB
 
-    public DocumentService(IApplicationDbContext context, Qontract.Core.Interfaces.IFileStorage fileStorage)
+    public DocumentService(IApplicationDbContext context, IFileStorage fileStorage)
     {
         _context = context;
         _fileStorage = fileStorage;
