@@ -4,13 +4,14 @@ using Qontract.Application.Services;
 using Qontract.Application.Interfaces;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using Qontract.Core.Interfaces;
 using Qontract.Infrastructure.FileStorage;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Get connection string from configuration
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
-    ?? "Server=(localdb)\\mssqllocaldb;Database=QontractDb;Trusted_Connection=True;MultipleActiveResultSets=True";
+    ?? "Data Source=QontractDb.sqlite";
 
 // Add services to the container.
 builder.Services.AddControllers();
@@ -19,7 +20,7 @@ builder.Services.AddSwaggerGen();
 
 // Register DbContext
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlServer(connectionString));
+    options.UseSqlite(connectionString, b => b.MigrationsAssembly("Qontract.Infrastructure")));
 builder.Services.AddScoped<Qontract.Application.Interfaces.IApplicationDbContext, ApplicationDbContext>();
 
 // Register services
@@ -32,7 +33,7 @@ builder.Services.AddScoped<IDocumentService, DocumentService>();
 builder.Services.AddScoped<IAddressService, AddressService>();
 
 // Register File Storage
-builder.Services.AddSingleton<Qontract.Core.Interfaces.IFileStorage, Qontract.Infrastructure.FileStorage.FileStorage>();
+builder.Services.AddSingleton<IFileStorage, FileStorage>();
 
 // Configure JWT
 builder.Services.AddAuthentication(options =>

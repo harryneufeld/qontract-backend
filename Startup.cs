@@ -15,7 +15,7 @@ public class Startup
     {
         // DbContext
         services.AddDbContext<ApplicationDbContext>(options =>
-            options.UseSqlServer(Configuration.GetConnectionString("DefaultConnection")));
+            options.UseSqlite(Configuration.GetConnectionString("DefaultConnection")));
 
         // Services
         services.AddScoped<IAuthService, AuthService>();

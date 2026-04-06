@@ -20,11 +20,119 @@ public class MigrationsContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
-        modelBuilder.Entity<Tenant>().ToTable("Tenants");
-        modelBuilder.Entity<User>().ToTable("Users");
-        modelBuilder.Entity<Contractor>().ToTable("Contractors");
-        modelBuilder.Entity<Contract>().ToTable("Contracts");
-        modelBuilder.Entity<Document>().ToTable("Documents");
-        modelBuilder.Entity<Address>().ToTable("Addresses");
+
+        // Tenant
+        modelBuilder.Entity<Tenant>(entity =>
+        {
+            entity.ToTable("Tenants");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.Type).IsRequired();
+            entity.Property(e => e.Settings).HasMaxLength(5000);
+            entity.Property(e => e.CreatedBy).HasMaxLength(500);
+            entity.Property(e => e.ModifiedBy).HasMaxLength(500);
+        });
+
+        // User
+        modelBuilder.Entity<User>(entity =>
+        {
+            entity.ToTable("Users");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.Email).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.PasswordHash).IsRequired().HasMaxLength(255);
+            entity.Property(e => e.Role).IsRequired();
+            entity.Property(e => e.TenantId).IsRequired();
+            entity.Property(e => e.CreatedBy).HasMaxLength(500);
+            entity.Property(e => e.ModifiedBy).HasMaxLength(500);
+            entity.HasOne(e => e.Tenant)
+                .WithMany()
+                .HasForeignKey(e => e.TenantId);
+        });
+
+        // Contractor
+        modelBuilder.Entity<Contractor>(entity =>
+        {
+            entity.ToTable("Contractors");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.Type).IsRequired();
+            entity.Property(e => e.ContactInfo).HasMaxLength(500);
+            entity.Property(e => e.CreatedBy).HasMaxLength(500);
+            entity.Property(e => e.ModifiedBy).HasMaxLength(500);
+            entity.HasOne(e => e.Tenant)
+                .WithMany()
+                .HasForeignKey(e => e.TenantId);
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId);
+        });
+
+        // Contract
+        modelBuilder.Entity<Contract>(entity =>
+        {
+            entity.ToTable("Contracts");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Title).IsRequired().HasMaxLength(200);
+            entity.Property(e => e.Description).HasMaxLength(2000);
+            entity.Property(e => e.Status).IsRequired();
+            entity.Property(e => e.StartDate).HasMaxLength(50);
+            entity.Property(e => e.EndDate).HasMaxLength(50);
+            entity.Property(e => e.Counterparty).HasMaxLength(100);
+            entity.Property(e => e.Currency).HasMaxLength(50);
+            entity.Property(e => e.Value).HasMaxLength(500);
+            entity.Property(e => e.ContractorId);
+            entity.Property(e => e.CreatedBy).HasMaxLength(500);
+            entity.Property(e => e.ModifiedBy).HasMaxLength(500);
+            entity.HasOne(e => e.Tenant)
+                .WithMany()
+                .HasForeignKey(e => e.TenantId);
+            entity.HasOne(e => e.Contractor)
+                .WithMany()
+                .HasForeignKey(e => e.ContractorId);
+            entity.HasMany(e => e.Documents)
+                .WithOne(d => d.Contract)
+                .HasForeignKey(d => d.ContractId);
+        });
+
+        // Document
+        modelBuilder.Entity<Document>(entity =>
+        {
+            entity.ToTable("Documents");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.FileName).IsRequired().HasMaxLength(255);
+            entity.Property(e => e.FileType).IsRequired().HasMaxLength(200);
+            entity.Property(e => e.FilePath).HasMaxLength(500);
+            entity.Property(e => e.UploadedBy).HasMaxLength(500);
+            entity.Property(e => e.CreatedBy).HasMaxLength(500);
+            entity.Property(e => e.ModifiedBy).HasMaxLength(500);
+            entity.Property(e => e.ContractId).IsRequired();
+            entity.HasOne(e => e.Contract)
+                .WithMany()
+                .HasForeignKey(e => e.ContractId);
+        });
+
+        // Address
+        modelBuilder.Entity<Address>(entity =>
+        {
+            entity.ToTable("Addresses");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.EntityType).IsRequired();
+            entity.Property(e => e.Street).HasMaxLength(500);
+            entity.Property(e => e.City).HasMaxLength(100);
+            entity.Property(e => e.Zip).HasMaxLength(20);
+            entity.Property(e => e.Country).HasMaxLength(100);
+            entity.Property(e => e.CreatedBy).HasMaxLength(500);
+            entity.Property(e => e.ModifiedBy).HasMaxLength(500);
+            entity.HasOne(e => e.Tenant)
+                .WithMany()
+                .HasForeignKey(e => e.TenantId);
+            entity.HasOne(e => e.Contractor)
+                .WithMany()
+                .HasForeignKey(e => e.ContractorId);
+            entity.HasOne(e => e.Contract)
+                .WithMany()
+                .HasForeignKey(e => e.ContractId);
+        });
     }
 }
