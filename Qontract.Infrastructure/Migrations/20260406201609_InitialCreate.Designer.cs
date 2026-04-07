@@ -4,14 +4,14 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
-using Qontract.Infrastructure.Data.Migrations;
+using Qontract.Infrastructure.Data;
 
 #nullable disable
 
 namespace Qontract.Infrastructure.Migrations
 {
-    [DbContext(typeof(MigrationsContext))]
-    [Migration("20260406110518_InitialCreate")]
+    [DbContext(typeof(ApplicationDbContext))]
+    [Migration("20260406201609_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />

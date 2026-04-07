@@ -1,15 +1,16 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Qontract.Infrastructure.Data;
-using Qontract.Infrastructure.Data.Migrations;
 
-public class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<MigrationsContext>
+namespace Qontract.Infrastructure;
+
+public class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<ApplicationDbContext>
 {
-    public MigrationsContext CreateDbContext(string[] args)
+    public ApplicationDbContext CreateDbContext(string[] args)
     {
-        var optionsBuilder = new DbContextOptionsBuilder<MigrationsContext>();
+        var optionsBuilder = new DbContextOptionsBuilder<ApplicationDbContext>();
         optionsBuilder.UseSqlite("Data Source=QontractDb.sqlite");
 
-        return new MigrationsContext(optionsBuilder.Options);
+        return new ApplicationDbContext(optionsBuilder.Options);
     }
 }

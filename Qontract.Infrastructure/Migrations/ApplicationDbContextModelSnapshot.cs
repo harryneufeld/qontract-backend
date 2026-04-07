@@ -2,20 +2,17 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
-using Qontract.Infrastructure.Data.Migrations;
+using Qontract.Infrastructure.Data;
 
 #nullable disable
 
 namespace Qontract.Infrastructure.Migrations
 {
-    [DbContext(typeof(MigrationsContext))]
-    [Migration("20260406102708_InitialCreateSqlite")]
-    partial class InitialCreateSqlite
+    [DbContext(typeof(ApplicationDbContext))]
+    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
     {
-        /// <inheritdoc />
-        protected override void BuildTargetModel(ModelBuilder modelBuilder)
+        protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.5");

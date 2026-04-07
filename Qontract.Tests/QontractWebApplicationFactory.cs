@@ -27,25 +27,19 @@ public class QontractWebApplicationFactory : WebApplicationFactory<Program>, IDi
             {
                 options.UseSqlite("Data Source=:memory:");
             });
-
-            // Apply migrations
-            using var scope = services.BuildServiceProvider().CreateScope();
-            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-            db.Database.EnsureCreated();
         });
+
     }
 
-    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    public override void Dispose()
     {
-        builder.ConfigureLogging(logging =>
-        {
-            logging.ClearProviders();
-            logging.AddConsole();
-        });
+        // Clean up if needed
+        base.Dispose();
     }
 
-    public new void Dispose()
+    protected override void ConfigureLogging(logging =>
     {
-        // Clean up any resources if needed
-    }
+        logging.ClearProviders();
+        logging.AddConsole();
+    });
 }

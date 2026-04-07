@@ -20,8 +20,11 @@ builder.Services.AddSwaggerGen();
 
 // Register DbContext
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlite(connectionString, b => b.MigrationsAssembly("Qontract.Infrastructure")));
-builder.Services.AddScoped<Qontract.Application.Interfaces.IApplicationDbContext, ApplicationDbContext>();
+{
+    options.UseSqlite(connectionString, b => b.MigrationsAssembly("Qontract.Infrastructure"));
+    options.EnableSensitiveDataLogging();
+});
+builder.Services.AddScoped<IApplicationDbContext, ApplicationDbContext>();
 
 // Register services
 builder.Services.AddScoped<IAuthService, AuthService>();
@@ -94,11 +97,15 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
-// Seed data
+// Apply migrations and seed data
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
     var context = services.GetRequiredService<ApplicationDbContext>();
+    
+    // Apply migrations if needed
+    context.Database.Migrate();
+    
     var userManager = services.GetRequiredService<IUserService>();
     await SeedDataAsync(context, userManager);
 }

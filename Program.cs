@@ -77,7 +77,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
-// Seed data
+// Ensure database and seed data
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
