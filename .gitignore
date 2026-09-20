@@ -485,3 +485,6 @@ $RECYCLE.BIN/
 Qontract.API/QontractDb.sqlite-shm
 Qontract.API/QontractDb.sqlite-wal
 core.*
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
