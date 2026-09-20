@@ -15,7 +15,13 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
     ?? "Data Source=QontractDb.sqlite";
 
 // Add services to the container.
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        // Enums as strings so API consumers (Flutter app) work with readable values
+        options.JsonSerializerOptions.Converters.Add(
+            new System.Text.Json.Serialization.JsonStringEnumConverter());
+    });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -65,11 +71,20 @@ builder.Services.AddAuthentication(options =>
 });
 
 // Add CORS
+var allowedOrigins = new[]
+{
+    "http://localhost:3000", "https://localhost:3000",
+    // Flutter web dev server (flutter run -d chrome / web-server)
+    "http://localhost:8080", "http://127.0.0.1:8080",
+    "http://localhost:8081", "http://127.0.0.1:8081",
+    "http://localhost:50000", "http://127.0.0.1:50000",
+};
+
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(builder =>
     {
-        builder.WithOrigins("http://localhost:3000", "https://localhost:3000")
+        builder.WithOrigins(allowedOrigins)
                .AllowAnyHeader()
                .AllowAnyMethod()
                .AllowCredentials();
@@ -81,7 +96,7 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowLocalhost",
         builder => builder
-            .WithOrigins("http://localhost:3000", "https://localhost:3000")
+            .WithOrigins(allowedOrigins)
             .AllowAnyMethod()
             .AllowAnyHeader()
             .AllowCredentials());

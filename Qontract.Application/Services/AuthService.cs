@@ -52,7 +52,8 @@ public class AuthService : IAuthService
                 AccessToken = token,
                 UserId = user.Id,
                 Email = user.Email,
-                ExpiresAt = DateTime.UtcNow.AddHours(24)
+                ExpiresAt = DateTime.UtcNow.AddHours(24),
+                User = ToAuthUser(user)
             };
         }
         catch (Exception ex)
@@ -61,6 +62,24 @@ public class AuthService : IAuthService
             throw;
         }
     }
+
+    public async Task<AuthUserDTO?> GetCurrentUserAsync(int userId, CancellationToken cancellationToken = default)
+    {
+        var user = await _context.Users
+            .FirstOrDefaultAsync(u => u.Id == userId && u.IsActive, cancellationToken);
+
+        return user == null ? null : ToAuthUser(user);
+    }
+
+    private static AuthUserDTO ToAuthUser(User user) => new()
+    {
+        Id = user.Id,
+        Name = user.Name,
+        Email = user.Email,
+        Role = user.Role.ToString(),
+        TenantId = user.TenantId,
+        CreatedAt = user.CreatedAt
+    };
 
     public async Task<Qontract.Application.Models.AuthDTO> RefreshTokenAsync(string refreshToken, CancellationToken cancellationToken = default)
     {

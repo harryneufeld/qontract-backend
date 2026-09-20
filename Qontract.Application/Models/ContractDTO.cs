@@ -32,7 +32,6 @@ public class ContractCreateDTO
     public string? Description { get; set; }
 
     [Required]
-    [MaxLength(50)]
     public ContractStatus Status { get; set; }
 
     [MaxLength(50)]
@@ -61,7 +60,6 @@ public class ContractUpdateDTO
     [MaxLength(2000)]
     public string? Description { get; set; }
 
-    [MaxLength(50)]
     public ContractStatus? Status { get; set; }
 
     [MaxLength(50)]

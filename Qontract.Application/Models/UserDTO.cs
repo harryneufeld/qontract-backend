@@ -8,6 +8,7 @@ public class UserDTO
     public int Id { get; set; }
     public string Name { get; set; } = string.Empty;
     public string Email { get; set; } = string.Empty;
+    [System.Text.Json.Serialization.JsonIgnore]
     public string PasswordHash { get; set; } = string.Empty;
     public UserRole Role { get; set; }
     public bool IsActive { get; set; }
@@ -33,7 +34,6 @@ public class UserCreateDTO
     public string PasswordHash { get; set; } = string.Empty;
 
     [Required]
-    [MaxLength(50)]
     public UserRole Role { get; set; }
 
     public int TenantId { get; set; }
@@ -50,7 +50,6 @@ public class UserUpdateDTO
     [MaxLength(255)]
     public string? PasswordHash { get; set; }
 
-    [MaxLength(50)]
     public UserRole? Role { get; set; }
 
     public bool? IsActive { get; set; }

@@ -35,7 +35,8 @@ public class Contract
     [MaxLength(500)]
     public string? Value { get; set; }
 
-    [Required]
+    // Optional link to a contractor (a contract can reference a free-text
+    // counterparty instead); must stay nullable.
     public int? ContractorId { get; set; }
 
     public int? TenantId { get; set; }

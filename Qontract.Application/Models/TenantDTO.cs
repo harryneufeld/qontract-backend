@@ -23,7 +23,6 @@ public class TenantCreateDTO
     public string Name { get; set; } = string.Empty;
 
     [Required]
-    [StringLength(50)]
     public TenantType Type { get; set; }
 
     [MaxLength(5000)]
@@ -37,7 +36,6 @@ public class TenantUpdateDTO
     [MaxLength(100)]
     public string? Name { get; set; }
 
-    [StringLength(50)]
     public TenantType? Type { get; set; }
 
     [MaxLength(5000)]

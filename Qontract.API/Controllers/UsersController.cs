@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Qontract.Domain.Models;
 using Qontract.Application.Models;
 using Qontract.Application.Services;
@@ -5,6 +6,7 @@ using Qontract.Application.Services;
 namespace Qontract.API.Controllers;
 
 [ApiController]
+[Authorize]
 [Route("api/[controller]")]
 public class UsersController : ControllerBase
 {

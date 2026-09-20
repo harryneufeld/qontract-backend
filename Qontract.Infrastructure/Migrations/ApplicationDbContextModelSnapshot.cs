@@ -99,7 +99,7 @@ namespace Qontract.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
-                    b.Property<int>("ContractorId")
+                    b.Property<int?>("ContractorId")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("Counterparty")
@@ -425,9 +425,7 @@ namespace Qontract.Infrastructure.Migrations
                 {
                     b.HasOne("Qontract.Domain.Models.Contractor", "Contractor")
                         .WithMany()
-                        .HasForeignKey("ContractorId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .HasForeignKey("ContractorId");
 
                     b.HasOne("Qontract.Domain.Models.User", "Creator")
                         .WithMany()

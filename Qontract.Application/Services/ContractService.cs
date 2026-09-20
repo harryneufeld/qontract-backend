@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using Qontract.Domain.Models;
 using Qontract.Application.Models;
 
@@ -12,14 +13,14 @@ public class ContractService : IContractService
         _context = context;
     }
 
-    public async Task<List<ContractDTO>> GetContractsAsync(CancellationToken cancellationToken = default)
+    public async Task<List<ContractDTO>> GetContractsAsync(int tenantId, CancellationToken cancellationToken = default)
     {
         var contracts = await _context.Contracts
             .Include(c => c.Tenant)
             .Include(c => c.Contractor)
             .Include(c => c.Creator)
             .Include(c => c.Modifier)
-            .Where(c => c.IsActive)
+            .Where(c => c.IsActive && c.TenantId == tenantId)
             .OrderByDescending(c => c.CreatedAt)
             .Select(c => new ContractDTO
             {
@@ -44,17 +45,17 @@ public class ContractService : IContractService
         return contracts;
     }
 
-    public async Task<ContractDTO> GetContractByIdAsync(int id, CancellationToken cancellationToken = default)
+    public async Task<ContractDTO> GetContractByIdAsync(int id, int tenantId, CancellationToken cancellationToken = default)
     {
         var contract = await _context.Contracts
             .Include(c => c.Tenant)
             .Include(c => c.Contractor)
             .Include(c => c.Creator)
             .Include(c => c.Modifier)
-            .FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
+            .FirstOrDefaultAsync(c => c.Id == id && c.IsActive && c.TenantId == tenantId, cancellationToken);
 
         if (contract == null)
-            throw new KeyNotFoundException($"Contract with ID {id} not found.");
+            throw new KeyNotFoundException($"Contract with ID {id} not found in tenant {tenantId}.");
 
         return new ContractDTO
         {
@@ -76,7 +77,7 @@ public class ContractService : IContractService
         };
     }
 
-    public async Task<ContractDTO> CreateContractAsync(ContractCreateDTO dto, string? createdBy, CancellationToken cancellationToken = default)
+    public async Task<ContractDTO> CreateContractAsync(int tenantId, ContractCreateDTO dto, string? createdBy, CancellationToken cancellationToken = default)
     {
         var contract = new Contract
         {
@@ -89,9 +90,10 @@ public class ContractService : IContractService
             Currency = dto.Currency,
             Value = dto.Value,
             ContractorId = dto.ContractorId,
+            TenantId = tenantId,
             IsActive = true,
-            CreatedBy = createdBy ?? string.Empty,
-            ModifiedBy = createdBy ?? string.Empty,
+            CreatedBy = createdBy,
+            ModifiedBy = createdBy,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -99,16 +101,16 @@ public class ContractService : IContractService
         _context.Contracts.Add(contract);
         await _context.SaveChangesAsync(cancellationToken);
 
-        return await GetContractByIdAsync(contract.Id, cancellationToken);
+        return await GetContractByIdAsync(contract.Id, tenantId, cancellationToken);
     }
 
-    public async Task<ContractDTO> UpdateContractAsync(int id, ContractUpdateDTO dto, string? modifiedBy, CancellationToken cancellationToken = default)
+    public async Task<ContractDTO> UpdateContractAsync(int id, int tenantId, ContractUpdateDTO dto, string? modifiedBy, CancellationToken cancellationToken = default)
     {
         var contract = await _context.Contracts
-            .FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
+            .FirstOrDefaultAsync(c => c.Id == id && c.IsActive && c.TenantId == tenantId, cancellationToken);
 
         if (contract == null)
-            throw new KeyNotFoundException($"Contract with ID {id} not found.");
+            throw new KeyNotFoundException($"Contract with ID {id} not found in tenant {tenantId}.");
 
         if (!string.IsNullOrEmpty(dto.Title))
             contract.Title = dto.Title;
@@ -138,41 +140,61 @@ public class ContractService : IContractService
             contract.ContractorId = dto.ContractorId.Value;
 
         contract.UpdatedAt = DateTime.UtcNow;
-        contract.ModifiedBy = modifiedBy ?? string.Empty;
+        contract.ModifiedBy = modifiedBy;
 
         await _context.SaveChangesAsync(cancellationToken);
 
-        return await GetContractByIdAsync(id, cancellationToken);
+        return await GetContractByIdAsync(id, tenantId, cancellationToken);
     }
 
-    public async Task<ContractDTO> DeactivateContractAsync(int id, string? modifiedBy, CancellationToken cancellationToken = default)
+    public async Task<ContractDTO> DeactivateContractAsync(int id, int tenantId, string? modifiedBy, CancellationToken cancellationToken = default)
     {
         var contract = await _context.Contracts
-            .FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
+            .FirstOrDefaultAsync(c => c.Id == id && c.IsActive && c.TenantId == tenantId, cancellationToken);
 
         if (contract == null)
-            throw new KeyNotFoundException($"Contract with ID {id} not found.");
+            throw new KeyNotFoundException($"Contract with ID {id} not found in tenant {tenantId}.");
 
         contract.IsActive = false;
         contract.UpdatedAt = DateTime.UtcNow;
-        contract.ModifiedBy = modifiedBy ?? string.Empty;
+        contract.ModifiedBy = modifiedBy;
 
         await _context.SaveChangesAsync(cancellationToken);
 
-        return await GetContractByIdAsync(id, cancellationToken);
+        // The row is now inactive; build the DTO from the tracked entity
+        // instead of going through GetContractByIdAsync (which filters
+        // inactive rows and would 404).
+        return new ContractDTO
+        {
+            Id = contract.Id,
+            Title = contract.Title,
+            Description = contract.Description,
+            Status = contract.Status,
+            StartDate = contract.StartDate,
+            EndDate = contract.EndDate,
+            Counterparty = contract.Counterparty,
+            Currency = contract.Currency,
+            Value = contract.Value,
+            ContractorId = contract.ContractorId,
+            CreatedAt = contract.CreatedAt,
+            UpdatedAt = contract.UpdatedAt,
+            CreatedBy = contract.CreatedBy,
+            ModifiedBy = contract.ModifiedBy,
+            CreatedAtUTC = contract.CreatedAt
+        };
     }
 
-    public async Task<bool> DeleteContractSoftAsync(int id, string? modifiedBy, CancellationToken cancellationToken = default)
+    public async Task<bool> DeleteContractSoftAsync(int id, int tenantId, string? modifiedBy, CancellationToken cancellationToken = default)
     {
         var contract = await _context.Contracts
-            .FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
+            .FirstOrDefaultAsync(c => c.Id == id && c.IsActive && c.TenantId == tenantId, cancellationToken);
 
         if (contract == null)
-            throw new KeyNotFoundException($"Contract with ID {id} not found.");
+            throw new KeyNotFoundException($"Contract with ID {id} not found in tenant {tenantId}.");
 
         contract.IsActive = false;
         contract.UpdatedAt = DateTime.UtcNow;
-        contract.ModifiedBy = modifiedBy ?? string.Empty;
+        contract.ModifiedBy = modifiedBy;
 
         await _context.SaveChangesAsync(cancellationToken);
 

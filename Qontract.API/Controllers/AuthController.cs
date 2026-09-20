@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Qontract.Application.Services;
 using Qontract.Application.Models;
 
@@ -26,6 +27,35 @@ public class AuthController : ControllerBase
         {
             return Unauthorized(new { error = ex.Message });
         }
+    }
+
+    /// <summary>
+    /// Returns the currently authenticated user (identity from the JWT Subject claim).
+    /// </summary>
+    [HttpGet("me")]
+    [Authorize]
+    public async Task<ActionResult<Qontract.Application.Models.AuthUserDTO>> Me()
+    {
+        var subject = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+            ?? User.FindFirst("sub")?.Value;
+
+        if (string.IsNullOrEmpty(subject) || !int.TryParse(subject, out var userId))
+        {
+            return Unauthorized(new { error = "Invalid token subject." });
+        }
+
+        var user = await _authService.GetCurrentUserAsync(userId);
+        return user is null ? Unauthorized(new { error = "User no longer active." }) : Ok(user);
+    }
+
+    /// <summary>
+    /// Stateless logout — the client discards its token.
+    /// </summary>
+    [HttpPost("logout")]
+    [Authorize]
+    public IActionResult Logout()
+    {
+        return Ok(new { message = "Logged out" });
     }
 
     [HttpPost("refresh-token")]
