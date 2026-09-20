@@ -12,8 +12,10 @@ public class FileStorage : IFileStorage
 
     public FileStorage(IConfiguration configuration)
     {
-        var storagePath = configuration["Storage:Path"] ?? @".\Storage";
-        _storageRoot = Path.Combine(storagePath);
+        var storagePath = configuration["Storage:Path"] ?? "Storage";
+        // Relative paths resolve against the process working directory
+        // (the API project), so storage ends up next to the SQLite db.
+        _storageRoot = Path.GetFullPath(storagePath);
         Directory.CreateDirectory(_storageRoot);
     }
 
@@ -46,7 +48,7 @@ public class FileStorage : IFileStorage
         {
             if (!File.Exists(filePath))
             {
-                throw new FileNotFoundException($"File not found: {filePath}");
+                throw new FileNotFoundException($"File not found: {filePath}", filePath);
             }
 
             return await File.ReadAllBytesAsync(filePath);
@@ -77,7 +79,9 @@ public class FileStorage : IFileStorage
 
     public string GenerateFilePath(int contractId, string fileName, int version)
     {
-        var directory = Path.Combine(_storageRoot, $"contracts\\{contractId}\\{version}");
+        // Path.Combine (not literal backslashes) so the layout is correct on
+        // Linux and Windows alike: <root>/contracts/<contractId>/<version>/<file>.
+        var directory = Path.Combine(_storageRoot, "contracts", contractId.ToString(), version.ToString());
         Directory.CreateDirectory(directory);
         return Path.Combine(directory, fileName);
     }

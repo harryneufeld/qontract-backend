@@ -488,3 +488,6 @@ core.*
 *.sqlite
 *.sqlite-shm
 *.sqlite-wal
+
+# Uploaded document storage
+Storage/
