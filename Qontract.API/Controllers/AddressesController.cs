@@ -17,10 +17,19 @@ public class AddressesController : ControllerBase
         _addressService = addressService;
     }
 
+    /// <summary>
+    /// The tenant a request applies to, resolved from the authenticated user's
+    /// TenantId claim (same convention as the other controllers).
+    /// </summary>
+    private int CurrentTenantId =>
+        int.Parse(User.FindFirst("TenantId")?.Value
+            ?? throw new InvalidOperationException("Authenticated user has no TenantId claim."));
+
     [HttpPost]
     public async Task<ActionResult<AddressDTO>> CreateAddress([FromBody] AddressCreateDTO dto)
     {
-        var address = await _addressService.CreateAddressAsync(dto, 0, dto.EntityType, User.Identity?.Name);
+        var entityId = dto.EntityType == EntityType.Tenant ? CurrentTenantId : 0;
+        var address = await _addressService.CreateAddressAsync(dto, entityId, dto.EntityType, User.Identity?.Name);
         return CreatedAtAction(nameof(GetAddress), new { id = address.Id }, address);
     }
 

@@ -34,6 +34,10 @@ public class QontractWebApplicationFactory : WebApplicationFactory<Program>
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        // Pin the environment so environment-dependent behaviour (e.g. the
+        // Development-only `details` field of the error envelope, issue #11)
+        // is deterministic in tests.
+        builder.UseEnvironment("Development");
         builder.ConfigureServices(services =>
         {
             // Remove existing DbContext registration

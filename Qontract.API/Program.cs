@@ -146,6 +146,11 @@ if (usedJwtFallbackKey)
         "Set 'Jwt:Key' in configuration before deploying.");
 }
 
+// Exception handling middleware: converts unhandled exceptions into a clean,
+// consistent JSON error envelope so no stack trace ever reaches clients
+// (issue #11). Registered first so it wraps the whole pipeline.
+app.UseMiddleware<Qontract.API.Middleware.ExceptionHandlingMiddleware>();
+
 // Configure the HTTP request pipeline.
 if (app.Environment.EnvironmentName == "Development")
 {

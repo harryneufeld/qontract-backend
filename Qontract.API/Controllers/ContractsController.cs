@@ -44,15 +44,10 @@ public class ContractsController : ControllerBase
     [HttpGet("{id}")]
     public async Task<ActionResult<ContractDTO>> GetContract(int id)
     {
-        try
-        {
-            var contract = await _contractService.GetContractByIdAsync(id, CurrentTenantId);
-            return Ok(contract);
-        }
-        catch (KeyNotFoundException)
-        {
-            return NotFound();
-        }
+        // KeyNotFoundException -> 404 is handled uniformly by
+        // ExceptionHandlingMiddleware (issue #11).
+        var contract = await _contractService.GetContractByIdAsync(id, CurrentTenantId);
+        return Ok(contract);
     }
 
     [HttpPost]
@@ -65,42 +60,21 @@ public class ContractsController : ControllerBase
     [HttpPut("{id}")]
     public async Task<ActionResult<ContractDTO>> UpdateContract(int id, [FromBody] ContractUpdateDTO dto)
     {
-        try
-        {
-            var contract = await _contractService.UpdateContractAsync(id, CurrentTenantId, dto, CurrentUser);
-            return Ok(contract);
-        }
-        catch (KeyNotFoundException)
-        {
-            return NotFound();
-        }
+        var contract = await _contractService.UpdateContractAsync(id, CurrentTenantId, dto, CurrentUser);
+        return Ok(contract);
     }
 
     [HttpPatch("{id}/deactivate")]
     public async Task<ActionResult<ContractDTO>> DeactivateContract(int id)
     {
-        try
-        {
-            var contract = await _contractService.DeactivateContractAsync(id, CurrentTenantId, CurrentUser);
-            return Ok(contract);
-        }
-        catch (KeyNotFoundException)
-        {
-            return NotFound();
-        }
+        var contract = await _contractService.DeactivateContractAsync(id, CurrentTenantId, CurrentUser);
+        return Ok(contract);
     }
 
     [HttpDelete("{id}")]
     public async Task<ActionResult<bool>> DeleteContract(int id)
     {
-        try
-        {
-            var result = await _contractService.DeleteContractSoftAsync(id, CurrentTenantId, CurrentUser);
-            return Ok(result);
-        }
-        catch (KeyNotFoundException)
-        {
-            return NotFound();
-        }
+        var result = await _contractService.DeleteContractSoftAsync(id, CurrentTenantId, CurrentUser);
+        return Ok(result);
     }
 }

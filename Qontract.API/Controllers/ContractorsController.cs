@@ -51,15 +51,10 @@ public class ContractorsController : ControllerBase
     [HttpGet("{id:int}")]
     public async Task<ActionResult<ContractorDTO>> GetContractor(int id)
     {
-        try
-        {
-            var contractor = await _contractorService.GetContractorByIdAsync(id, CurrentTenantId);
-            return Ok(contractor);
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new { error = ex.Message });
-        }
+        // KeyNotFoundException -> 404 is handled uniformly by
+        // ExceptionHandlingMiddleware (issue #11).
+        var contractor = await _contractorService.GetContractorByIdAsync(id, CurrentTenantId);
+        return Ok(contractor);
     }
 
     [HttpPost]
@@ -83,15 +78,10 @@ public class ContractorsController : ControllerBase
         if (!validationResult.IsValid)
             return BadRequest(new { errors = validationResult.Errors });
 
-        try
-        {
-            var contractor = await _contractorService.UpdateContractorAsync(id, CurrentTenantId, dto, CurrentUser);
-            return Ok(contractor);
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new { error = ex.Message });
-        }
+        // KeyNotFoundException -> 404 is handled uniformly by
+        // ExceptionHandlingMiddleware (issue #11).
+        var contractor = await _contractorService.UpdateContractorAsync(id, CurrentTenantId, dto, CurrentUser);
+        return Ok(contractor);
     }
 
     [HttpPatch("{id:int}/deactivate")]
