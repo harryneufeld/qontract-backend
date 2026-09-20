@@ -1,8 +1,10 @@
 using FluentAssertions;
+using System.Net;
 using System.Net.Http.Json;
 using System.Text;
 using Xunit;
 using Qontract.API;
+using Qontract.Application.Models;
 
 namespace Qontract.Tests;
 
@@ -33,7 +35,7 @@ public class ApiIntegrationTests : IClassFixture<QontractWebApplicationFactory>
 
         var content = await response.Content.ReadFromJsonAsync<AuthResponse>();
         content.Should().NotBeNull();
-        content!.Token.Should().NotBeNullOrEmpty();
+        content!.AccessToken.Should().NotBeNullOrEmpty();
     }
 
     [Fact]
@@ -53,5 +55,6 @@ public class ApiIntegrationTests : IClassFixture<QontractWebApplicationFactory>
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
-    private record AuthResponse(string Token);
+    // Mirrors AuthDTO (camelCase JSON: accessToken, email, userId, expiresAt)
+    private record AuthResponse(string AccessToken, string? Email = null, int? UserId = null, DateTime? ExpiresAt = null);
 }

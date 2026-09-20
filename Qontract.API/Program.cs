@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using FluentValidation;
 using Qontract.Infrastructure.Data;
 using Qontract.Application.Services;
 using Qontract.Application.Interfaces;
@@ -17,6 +18,10 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+// Register FluentValidation validators (live in Qontract.Application;
+// IValidator<T> is resolved per-DTO in controllers)
+builder.Services.AddValidatorsFromAssembly(typeof(Qontract.Application.Services.IContractorService).Assembly);
 
 // Register DbContext
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
@@ -130,14 +135,31 @@ async Task SeedDataAsync(ApplicationDbContext context, IUserService userService)
         await context.SaveChangesAsync();
     }
 
-    // Create admin user
+    // Second tenant for multi-tenancy tests (its own admin user + contractors
+    // that must never be visible to the first tenant)
+    var tenant2 = new Tenant
+    {
+        Name = "Test Family Two",
+        Type = TenantType.Family,
+        IsActive = true,
+        CreatedAt = DateTime.UtcNow,
+        UpdatedAt = DateTime.UtcNow
+    };
+
+    if (!await context.Tenants.AnyAsync(t => t.Name == "Test Family Two"))
+    {
+        context.Tenants.Add(tenant2);
+        await context.SaveChangesAsync();
+    }
+
+    // Create admin user (tenant 1)
     if (!await context.Users.AnyAsync(u => u.Email == "admin@qontract.com"))
     {
         var user = new User
         {
             Name = "Admin User",
             Email = "admin@qontract.com",
-            PasswordHash = "2b7f3a5d9f3e8c1a:8:password123:8", // SHA256 hash of "password123"
+            PasswordHash = "cW9udHJhY3Rfc2VlZF9zYWx0:IqHPhrNNkcLnI0/caOLUw3Cixr9EUYwymWWdYK8DLcA=", // salted SHA256 of "password123"
             Role = UserRole.TenantAdmin,
             IsActive = true,
             TenantId = tenant.Id,
@@ -146,6 +168,25 @@ async Task SeedDataAsync(ApplicationDbContext context, IUserService userService)
         };
 
         context.Users.Add(user);
+        await context.SaveChangesAsync();
+    }
+
+    // Create admin user (tenant 2)
+    if (!await context.Users.AnyAsync(u => u.Email == "admin2@qontract.com"))
+    {
+        var user2 = new User
+        {
+            Name = "Admin User Two",
+            Email = "admin2@qontract.com",
+            PasswordHash = "dGVzdF9zYWx0XzE2Ynl0ZQ==:jt8FI9ppKsxLD6SNvDkj5HCXkgj++ybAlEXxTaUWmuM=", // salted SHA256 of "password123"
+            Role = UserRole.TenantAdmin,
+            IsActive = true,
+            TenantId = tenant2.Id,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        context.Users.Add(user2);
         await context.SaveChangesAsync();
     }
 }

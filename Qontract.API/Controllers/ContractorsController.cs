@@ -1,52 +1,110 @@
-using Qontract.Domain.Models;
+using FluentValidation;
+using Microsoft.AspNetCore.Authorization;
 using Qontract.Application.Models;
 using Qontract.Application.Services;
 
 namespace Qontract.API.Controllers;
 
 [ApiController]
+[Authorize]
 [Route("api/[controller]")]
 public class ContractorsController : ControllerBase
 {
     private readonly IContractorService _contractorService;
+    private readonly IValidator<ContractorCreateDTO> _createValidator;
+    private readonly IValidator<ContractorUpdateDTO> _updateValidator;
 
-    public ContractorsController(IContractorService contractorService)
+    public ContractorsController(
+        IContractorService contractorService,
+        IValidator<ContractorCreateDTO> createValidator,
+        IValidator<ContractorUpdateDTO> updateValidator)
     {
         _contractorService = contractorService;
+        _createValidator = createValidator;
+        _updateValidator = updateValidator;
     }
+
+    /// <summary>
+    /// The tenant a request applies to, resolved from the authenticated user's
+    /// TenantId claim. All contractor data is scoped to this tenant.
+    /// </summary>
+    private int CurrentTenantId =>
+        int.Parse(User.FindFirst("TenantId")?.Value
+            ?? throw new InvalidOperationException("Authenticated user has no TenantId claim."));
+
+    /// <summary>
+    /// Identity used for audit fields (CreatedBy/ModifiedBy). The JWT carries
+    /// the email claim, not name.
+    /// </summary>
+    private string? CurrentUser =>
+        User.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value
+        ?? User.FindFirst("email")?.Value
+        ?? User.Identity?.Name;
 
     [HttpGet]
     public async Task<ActionResult<List<ContractorDTO>>> GetContractors()
     {
-        var contractors = await _contractorService.GetContractorsAsync(1); // TODO: get from auth context
+        var contractors = await _contractorService.GetContractorsAsync(CurrentTenantId);
         return Ok(contractors);
     }
 
-    [HttpGet("{id}")]
+    [HttpGet("{id:int}")]
     public async Task<ActionResult<ContractorDTO>> GetContractor(int id)
     {
-        var contractor = await _contractorService.GetContractorByIdAsync(id, 1);
-        return Ok(contractor);
+        try
+        {
+            var contractor = await _contractorService.GetContractorByIdAsync(id, CurrentTenantId);
+            return Ok(contractor);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { error = ex.Message });
+        }
     }
 
     [HttpPost]
     public async Task<ActionResult<ContractorDTO>> CreateContractor([FromBody] ContractorCreateDTO dto)
     {
-        var contractor = await _contractorService.CreateContractorAsync(dto, User.Identity?.Name);
+        var validationResult = await _createValidator.ValidateAsync(dto);
+        if (!validationResult.IsValid)
+            return BadRequest(new { errors = validationResult.Errors });
+
+        // Always scope to the authenticated tenant, never trust the client.
+        dto.TenantId = CurrentTenantId;
+
+        var contractor = await _contractorService.CreateContractorAsync(dto, CurrentUser);
         return CreatedAtAction(nameof(GetContractor), new { id = contractor.Id }, contractor);
     }
 
-    [HttpPut("{id}")]
+    [HttpPut("{id:int}")]
     public async Task<ActionResult<ContractorDTO>> UpdateContractor(int id, [FromBody] ContractorUpdateDTO dto)
     {
-        var contractor = await _contractorService.UpdateContractorAsync(id, 1, dto, User.Identity?.Name);
-        return Ok(contractor);
+        var validationResult = await _updateValidator.ValidateAsync(dto);
+        if (!validationResult.IsValid)
+            return BadRequest(new { errors = validationResult.Errors });
+
+        try
+        {
+            var contractor = await _contractorService.UpdateContractorAsync(id, CurrentTenantId, dto, CurrentUser);
+            return Ok(contractor);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { error = ex.Message });
+        }
     }
 
-    [HttpPatch("{id}/deactivate")]
+    [HttpPatch("{id:int}/deactivate")]
     public async Task<ActionResult<ContractorDTO>> DeactivateContractor(int id)
     {
-        var contractor = await _contractorService.DeactivateContractorAsync(id, 1, User.Identity?.Name);
-        return Ok(contractor);
+        try
+        {
+            var contractor = await _contractorService.DeactivateContractorAsync(id, CurrentTenantId, CurrentUser);
+            return Ok(contractor);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { error = ex.Message });
+        }
     }
 }

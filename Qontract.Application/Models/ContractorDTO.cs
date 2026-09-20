@@ -25,7 +25,6 @@ public class ContractorCreateDTO
     public string Name { get; set; } = string.Empty;
 
     [Required]
-    [StringLength(50)]
     public ContractorType Type { get; set; }
 
     [MaxLength(500)]
@@ -42,7 +41,6 @@ public class ContractorUpdateDTO
     [MaxLength(100)]
     public string? Name { get; set; }
 
-    [StringLength(50)]
     public ContractorType? Type { get; set; }
 
     [MaxLength(500)]

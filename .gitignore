@@ -480,3 +480,8 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+# Dev runtime artifacts
+Qontract.API/QontractDb.sqlite-shm
+Qontract.API/QontractDb.sqlite-wal
+core.*

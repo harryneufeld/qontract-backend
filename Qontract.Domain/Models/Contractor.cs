@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json.Serialization;
 
 namespace Qontract.Domain.Models;
 
@@ -46,6 +47,7 @@ public class Contractor
     public string? ModifiedBy { get; set; }
 }
 
+[JsonConverter(typeof(JsonStringEnumConverter))]
 public enum ContractorType
 {
     Individual,

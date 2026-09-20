@@ -112,10 +112,10 @@ public class ContractorService : IContractorService
     public async Task<ContractorDTO> DeactivateContractorAsync(int id, int tenantId, string? modifiedBy, CancellationToken cancellationToken = default)
     {
         var contractor = await _context.Contractors
-            .FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
+            .FirstOrDefaultAsync(c => c.Id == id && c.TenantId == tenantId, cancellationToken);
 
         if (contractor == null)
-            throw new KeyNotFoundException($"Contractor with ID {id} not found.");
+            throw new KeyNotFoundException($"Contractor with ID {id} not found in tenant {tenantId}.");
 
         contractor.IsActive = false;
         contractor.UpdatedAt = DateTime.UtcNow;

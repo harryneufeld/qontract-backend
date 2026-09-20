@@ -76,3 +76,34 @@ public class UserUpdateValidator : AbstractValidator<UserUpdateDTO>
             .Cascade(CascadeMode.Stop);
     }
 }
+
+public class ContractorCreateValidator : AbstractValidator<ContractorCreateDTO>
+{
+    public ContractorCreateValidator()
+    {
+        RuleFor(x => x.Name)
+            .NotEmpty().WithMessage("Name is required.")
+            .MaximumLength(100).WithMessage("Name cannot exceed 100 characters.");
+
+        RuleFor(x => x.Type)
+            .IsInEnum().WithMessage($"Type must be {nameof(ContractorType.Individual)} or {nameof(ContractorType.Company)}.");
+
+        RuleFor(x => x.ContactInfo)
+            .MaximumLength(500).When(x => x.ContactInfo is not null).WithMessage("ContactInfo cannot exceed 500 characters.");
+    }
+}
+
+public class ContractorUpdateValidator : AbstractValidator<ContractorUpdateDTO>
+{
+    public ContractorUpdateValidator()
+    {
+        RuleFor(x => x.Name)
+            .MaximumLength(100).When(x => x.Name is not null).WithMessage("Name cannot exceed 100 characters.");
+
+        RuleFor(x => x.Type)
+            .IsInEnum().When(x => x.Type.HasValue).WithMessage($"Type must be {nameof(ContractorType.Individual)} or {nameof(ContractorType.Company)}.");
+
+        RuleFor(x => x.ContactInfo)
+            .MaximumLength(500).When(x => x.ContactInfo is not null).WithMessage("ContactInfo cannot exceed 500 characters.");
+    }
+}
