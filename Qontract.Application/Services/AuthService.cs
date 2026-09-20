@@ -186,7 +186,18 @@ public class AuthService : IAuthService
 
     private string GenerateJwtToken(User user)
     {
-        var securityKey = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(_configuration["Jwt:Key"]!));
+        // Must mirror the fallback used by the API host (Qontract.API/Program.cs)
+        // so tokens signed in a dev environment without Jwt:Key configured are
+        // still accepted by the JWT validation pipeline (issue #10).
+        var jwtKey = _configuration["Jwt:Key"];
+        if (string.IsNullOrWhiteSpace(jwtKey))
+        {
+            jwtKey = "qontract-development-fallback-key-DO-NOT-USE-IN-PROD";
+            _logger.LogWarning(
+                "Jwt:Key is not configured. Using the development fallback signing key. " +
+                "Set 'Jwt:Key' in configuration before deploying.");
+        }
+        var securityKey = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(jwtKey));
         var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
 
         var claims = new[]
@@ -199,8 +210,8 @@ public class AuthService : IAuthService
         };
 
         var token = new JwtSecurityToken(
-            issuer: _configuration["Jwt:Issuer"],
-            audience: _configuration["Jwt:Audience"],
+            issuer: _configuration["Jwt:Issuer"] ?? "Qontract",
+            audience: _configuration["Jwt:Audience"] ?? "QontractClients",
             claims: claims,
             expires: DateTime.UtcNow.AddHours(24),
             signingCredentials: credentials

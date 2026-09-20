@@ -50,6 +50,41 @@ builder.Services.AddScoped<IAddressService, AddressService>();
 builder.Services.AddSingleton<IFileStorage, FileStorage>();
 
 // Configure JWT
+// Resolve + validate the JWT settings up front so a missing Jwt:Key fails
+// fast with a clear message (or falls back to a dev-only key in Development)
+// instead of blowing up with an unhandled ArgumentNullException on the
+// first authenticated request (issue #10).
+var isDevelopment = builder.Environment.EnvironmentName == "Development";
+var jwtKey = builder.Configuration["Jwt:Key"];
+var usedJwtFallbackKey = false;
+if (string.IsNullOrWhiteSpace(jwtKey))
+{
+    if (isDevelopment)
+    {
+        // Development-only fallback so the API runs out of the box.
+        // This key is NOT secret-safe and must never be used in production.
+        jwtKey = "qontract-development-fallback-key-DO-NOT-USE-IN-PROD";
+        usedJwtFallbackKey = true;
+    }
+    else
+    {
+        throw new InvalidOperationException(
+            "Jwt:Key is not configured. Set the 'Jwt:Key' configuration value " +
+            "(appsettings.json, environment variable Jwt__Key, or user secrets) " +
+            "to a secret of at least 32 characters.");
+    }
+}
+
+if (Encoding.ASCII.GetByteCount(jwtKey) < 32)
+{
+    throw new InvalidOperationException(
+        $"Jwt:Key is too short ({Encoding.ASCII.GetByteCount(jwtKey)} bytes). " +
+        "The HS256 signing key must be at least 32 characters long.");
+}
+
+var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "Qontract";
+var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "QontractClients";
+
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -60,11 +95,11 @@ builder.Services.AddAuthentication(options =>
     options.TokenValidationParameters = new TokenValidationParameters
     {
         ValidateIssuerSigningKey = true,
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(builder.Configuration["Jwt:Key"]!)),
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(jwtKey)),
         ValidateIssuer = true,
-        ValidIssuer = builder.Configuration["Jwt:Issuer"],
+        ValidIssuer = jwtIssuer,
         ValidateAudience = true,
-        ValidAudience = builder.Configuration["Jwt:Audience"],
+        ValidAudience = jwtAudience,
         ValidateLifetime = true,
         ClockSkew = TimeSpan.Zero
     };
@@ -103,6 +138,13 @@ builder.Services.AddCors(options =>
 });
 
 var app = builder.Build();
+
+if (usedJwtFallbackKey)
+{
+    app.Logger.LogWarning(
+        "Jwt:Key is not configured. Falling back to a development-only signing key. " +
+        "Set 'Jwt:Key' in configuration before deploying.");
+}
 
 // Configure the HTTP request pipeline.
 if (app.Environment.EnvironmentName == "Development")
