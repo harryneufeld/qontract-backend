@@ -99,6 +99,10 @@ namespace Qontract.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("ContractNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
                     b.Property<int?>("ContractorId")
                         .HasColumnType("INTEGER");
 

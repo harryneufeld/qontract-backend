@@ -45,6 +45,7 @@ public class ContractApiIntegrationTests : IClassFixture<QontractWebApplicationF
         string? EndDate,
         string? Currency,
         string? Value,
+        string? ContractNumber,
         int? ContractorId,
         DateTime CreatedAt,
         DateTime UpdatedAt,
@@ -91,13 +92,15 @@ public class ContractApiIntegrationTests : IClassFixture<QontractWebApplicationF
             startDate = "2026-01-01",
             endDate = "2027-01-01",
             currency = "EUR",
-            value = "850.00"
+            value = "850.00",
+            contractNumber = "INT-2026-0001"
         });
         createResponse.StatusCode.Should().Be(HttpStatusCode.Created);
         var created = await createResponse.Content.ReadFromJsonAsync<ContractJson>();
         created.Should().NotBeNull();
         created!.Title.Should().Be("Integration Lease");
         created.Status.Should().Be("Active");
+        created.ContractNumber.Should().Be("INT-2026-0001");
         created.ContractorId.Should().BeNull(); // no contractor required
 
         // Read back
@@ -129,6 +132,72 @@ public class ContractApiIntegrationTests : IClassFixture<QontractWebApplicationF
         // Unknown id -> 404
         var notFound = await _client.GetAsync("/api/contracts/999999");
         notFound.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task ContractNumber_ShouldRoundTripThroughCreateGetAndUpdate()
+    {
+        var token = await GetTokenAsync("admin@qontract.com");
+        Authenticate(token);
+
+        // Without a contract number the field must be null
+        var blankResponse = await _client.PostAsJsonAsync("/api/contracts", new
+        {
+            title = "No Number",
+            status = "Active"
+        });
+        blankResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+        var blank = await blankResponse.Content.ReadFromJsonAsync<ContractJson>();
+        blank!.ContractNumber.Should().BeNull();
+
+        // Create with a contract number
+        var createResponse = await _client.PostAsJsonAsync("/api/contracts", new
+        {
+            title = "Numbered Contract",
+            status = "Active",
+            contractNumber = "CNT-2026-0042"
+        });
+        createResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+        var created = await createResponse.Content.ReadFromJsonAsync<ContractJson>();
+        created!.ContractNumber.Should().Be("CNT-2026-0042");
+
+        // Read back: the number survives persistence
+        var getResponse = await _client.GetAsync($"/api/contracts/{created.Id}");
+        getResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var fetched = await getResponse.Content.ReadFromJsonAsync<ContractJson>();
+        fetched!.ContractNumber.Should().Be("CNT-2026-0042");
+
+        // The number also appears in the list endpoint
+        var listResponse = await _client.GetFromJsonAsync<List<ContractJson>>("/api/contracts");
+        listResponse.Should().NotBeNull();
+        var inList = listResponse!.First(c => c.Id == created.Id);
+        inList.ContractNumber.Should().Be("CNT-2026-0042");
+
+        // Update to a new number
+        var updateResponse = await _client.PutAsJsonAsync($"/api/contracts/{created.Id}", new
+        {
+            contractNumber = "CNT-2026-0099"
+        });
+        updateResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var updated = await updateResponse.Content.ReadFromJsonAsync<ContractJson>();
+        updated!.ContractNumber.Should().Be("CNT-2026-0099");
+
+        // A partial update without contractNumber must not clear it
+        var partialResponse = await _client.PutAsJsonAsync($"/api/contracts/{created.Id}", new
+        {
+            title = "Numbered Contract (v2)"
+        });
+        partialResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var partial = await partialResponse.Content.ReadFromJsonAsync<ContractJson>();
+        partial!.ContractNumber.Should().Be("CNT-2026-0099");
+
+        // Deactivate response still carries the number
+        var deactivateResponse = await _client.PatchAsync(
+            $"/api/contracts/{created.Id}/deactivate",
+            new StringContent(""));
+        deactivateResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var deactivated = await deactivateResponse.Content.ReadFromJsonAsync<ContractJson>();
+        deactivated!.ContractNumber.Should().Be("CNT-2026-0099");
     }
 
     [Fact]

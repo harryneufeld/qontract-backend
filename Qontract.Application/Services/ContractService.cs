@@ -32,6 +32,7 @@ public class ContractService : IContractService
                 EndDate = c.EndDate,
                 Currency = c.Currency,
                 Value = c.Value,
+                ContractNumber = c.ContractNumber,
                 ContractorId = c.ContractorId,
                 CreatedAt = c.CreatedAt,
                 UpdatedAt = c.UpdatedAt,
@@ -66,6 +67,7 @@ public class ContractService : IContractService
             EndDate = contract.EndDate,
             Currency = contract.Currency,
             Value = contract.Value,
+            ContractNumber = contract.ContractNumber,
             ContractorId = contract.ContractorId,
             CreatedAt = contract.CreatedAt,
             UpdatedAt = contract.UpdatedAt,
@@ -86,6 +88,7 @@ public class ContractService : IContractService
             EndDate = dto.EndDate,
             Currency = dto.Currency,
             Value = dto.Value,
+            ContractNumber = dto.ContractNumber,
             ContractorId = dto.ContractorId,
             TenantId = tenantId,
             IsActive = true,
@@ -130,6 +133,9 @@ public class ContractService : IContractService
         if (!string.IsNullOrEmpty(dto.Value))
             contract.Value = dto.Value;
 
+        if (!string.IsNullOrEmpty(dto.ContractNumber))
+            contract.ContractNumber = dto.ContractNumber;
+
         if (dto.ContractorId.HasValue)
             contract.ContractorId = dto.ContractorId.Value;
 
@@ -168,6 +174,7 @@ public class ContractService : IContractService
             EndDate = contract.EndDate,
             Currency = contract.Currency,
             Value = contract.Value,
+            ContractNumber = contract.ContractNumber,
             ContractorId = contract.ContractorId,
             CreatedAt = contract.CreatedAt,
             UpdatedAt = contract.UpdatedAt,

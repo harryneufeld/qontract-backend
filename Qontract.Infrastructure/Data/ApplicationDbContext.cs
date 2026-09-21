@@ -82,6 +82,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
             entity.Property(e => e.EndDate).HasMaxLength(50);
             entity.Property(e => e.Currency).HasMaxLength(50);
             entity.Property(e => e.Value).HasMaxLength(500);
+            entity.Property(e => e.ContractNumber).HasMaxLength(100);
             entity.Property(e => e.ContractorId);
             entity.Property(e => e.CreatedBy).HasMaxLength(500);
             entity.Property(e => e.ModifiedBy).HasMaxLength(500);
