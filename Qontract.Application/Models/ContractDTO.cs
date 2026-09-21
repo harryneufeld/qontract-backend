@@ -11,7 +11,6 @@ public class ContractDTO
     public ContractStatus Status { get; set; }
     public string? StartDate { get; set; }
     public string? EndDate { get; set; }
-    public string? Counterparty { get; set; }
     public string? Currency { get; set; }
     public string? Value { get; set; }
     public int? ContractorId { get; set; }
@@ -40,9 +39,6 @@ public class ContractCreateDTO
     [MaxLength(50)]
     public string? EndDate { get; set; }
 
-    [MaxLength(100)]
-    public string? Counterparty { get; set; }
-
     [MaxLength(50)]
     public string? Currency { get; set; }
 
@@ -67,9 +63,6 @@ public class ContractUpdateDTO
 
     [MaxLength(50)]
     public string? EndDate { get; set; }
-
-    [MaxLength(100)]
-    public string? Counterparty { get; set; }
 
     [MaxLength(50)]
     public string? Currency { get; set; }

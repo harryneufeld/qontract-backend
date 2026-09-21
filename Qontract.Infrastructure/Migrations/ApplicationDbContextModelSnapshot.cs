@@ -102,10 +102,6 @@ namespace Qontract.Infrastructure.Migrations
                     b.Property<int?>("ContractorId")
                         .HasColumnType("INTEGER");
 
-                    b.Property<string>("Counterparty")
-                        .HasMaxLength(100)
-                        .HasColumnType("TEXT");
-
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("TEXT");
 

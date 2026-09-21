@@ -30,7 +30,6 @@ public class ContractService : IContractService
                 Status = c.Status,
                 StartDate = c.StartDate,
                 EndDate = c.EndDate,
-                Counterparty = c.Counterparty,
                 Currency = c.Currency,
                 Value = c.Value,
                 ContractorId = c.ContractorId,
@@ -65,7 +64,6 @@ public class ContractService : IContractService
             Status = contract.Status,
             StartDate = contract.StartDate,
             EndDate = contract.EndDate,
-            Counterparty = contract.Counterparty,
             Currency = contract.Currency,
             Value = contract.Value,
             ContractorId = contract.ContractorId,
@@ -86,7 +84,6 @@ public class ContractService : IContractService
             Status = dto.Status,
             StartDate = dto.StartDate,
             EndDate = dto.EndDate,
-            Counterparty = dto.Counterparty,
             Currency = dto.Currency,
             Value = dto.Value,
             ContractorId = dto.ContractorId,
@@ -126,9 +123,6 @@ public class ContractService : IContractService
 
         if (!string.IsNullOrEmpty(dto.EndDate))
             contract.EndDate = dto.EndDate;
-
-        if (!string.IsNullOrEmpty(dto.Counterparty))
-            contract.Counterparty = dto.Counterparty;
 
         if (!string.IsNullOrEmpty(dto.Currency))
             contract.Currency = dto.Currency;
@@ -172,7 +166,6 @@ public class ContractService : IContractService
             Status = contract.Status,
             StartDate = contract.StartDate,
             EndDate = contract.EndDate,
-            Counterparty = contract.Counterparty,
             Currency = contract.Currency,
             Value = contract.Value,
             ContractorId = contract.ContractorId,

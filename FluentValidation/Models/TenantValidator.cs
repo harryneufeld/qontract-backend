@@ -131,9 +131,6 @@ public class ContractCreateValidator : AbstractValidator<ContractCreateDTO>
         RuleFor(x => x.EndDate)
             .MaximumLength(50).WithMessage("End date cannot exceed 50 characters.");
 
-        RuleFor(x => x.Counterparty)
-            .MaximumLength(100).WithMessage("Counterparty cannot exceed 100 characters.");
-
         RuleFor(x => x.Currency)
             .MaximumLength(50).WithMessage("Currency cannot exceed 50 characters.");
 
@@ -164,9 +161,6 @@ public class ContractUpdateValidator : AbstractValidator<ContractUpdateDTO>
         RuleFor(x => x.EndDate)
             .MaximumLength(50).WithMessage("End date cannot exceed 50 characters.");
 
-        RuleFor(x => x.Counterparty)
-            .MaximumLength(100).WithMessage("Counterparty cannot exceed 100 characters.");
-
         RuleFor(x => x.Currency)
             .MaximumLength(50).WithMessage("Currency cannot exceed 50 characters.");
 
@@ -190,9 +184,6 @@ public class ContractUpdateValidator : AbstractValidator<ContractUpdateDTO>
 
         RuleFor(x => x.EndDate)
             .Cascade(ValidateMode.Stop).When(x => !string.IsNullOrEmpty(x.EndDate));
-
-        RuleFor(x => x.Counterparty)
-            .Cascade(ValidateMode.Stop).When(x => !string.IsNullOrEmpty(x.Counterparty));
 
         RuleFor(x => x.Currency)
             .Cascade(ValidateMode.Stop).When(x => !string.IsNullOrEmpty(x.Currency));

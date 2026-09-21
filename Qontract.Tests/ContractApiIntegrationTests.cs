@@ -43,7 +43,6 @@ public class ContractApiIntegrationTests : IClassFixture<QontractWebApplicationF
         string? Status,
         string? StartDate,
         string? EndDate,
-        string? Counterparty,
         string? Currency,
         string? Value,
         int? ContractorId,
@@ -91,7 +90,6 @@ public class ContractApiIntegrationTests : IClassFixture<QontractWebApplicationF
             status = "Active",
             startDate = "2026-01-01",
             endDate = "2027-01-01",
-            counterparty = "Acme Rentals",
             currency = "EUR",
             value = "850.00"
         });

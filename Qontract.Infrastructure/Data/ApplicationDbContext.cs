@@ -80,7 +80,6 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
             entity.Property(e => e.Status).IsRequired();
             entity.Property(e => e.StartDate).HasMaxLength(50);
             entity.Property(e => e.EndDate).HasMaxLength(50);
-            entity.Property(e => e.Counterparty).HasMaxLength(100);
             entity.Property(e => e.Currency).HasMaxLength(50);
             entity.Property(e => e.Value).HasMaxLength(500);
             entity.Property(e => e.ContractorId);

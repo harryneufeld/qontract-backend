@@ -26,9 +26,6 @@ public class Contract
     [MaxLength(50)]
     public string? EndDate { get; set; }
 
-    [MaxLength(100)]
-    public string? Counterparty { get; set; }
-
     [MaxLength(50)]
     public string? Currency { get; set; }
 
