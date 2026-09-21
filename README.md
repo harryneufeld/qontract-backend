@@ -40,8 +40,8 @@ Qontract/
 
 ### Prerequisites
 
-- .NET 8.0 SDK
-- SQL Server or PostgreSQL
+- .NET 10.0 SDK
+- No external database required — SQLite is embedded and created automatically on first run
 
 ### Installation
 
@@ -50,26 +50,24 @@ Qontract/
 dotnet restore
 ```
 
-2. Update connection string in `appsettings.json`:
-```json
-{
-  "ConnectionStrings": {
-    "DefaultConnection": "Server=localhost;Database=QontractDb;Trusted_Connection=False;User Id=your_user;Password=your_password"
-  }
-}
-```
+2. (Optional) The database connection is `Data Source=QontractDb.sqlite` in `appsettings.json`. Migrations run automatically at startup.
 
-3. Run migrations:
+3. Build and run:
 ```bash
-dotnet ef database update --project Qontract.Infrastructure --startup-project Qontract
+dotnet run --project Qontract.API
 ```
 
-4. Build and run:
-```bash
-dotnet run --project Qontract.API --startup-project Qontract
-```
+4. API is available at:
+   - HTTP: `http://localhost:65533`
+   - HTTPS: `https://localhost:65532`
+   - Swagger UI: `https://localhost:65532/swagger` (or `http://localhost:65533/swagger`)
 
-5. API will be available at: `http://localhost:5000`
+5. A seed tenant (`Test Family`) and admin user are created on first run:
+   - Email: `admin@qontract.com`
+   - Password: `password123`
+
+> Note: the Flutter app expects the API at `http://localhost:65533/api` and
+> the web client on `http://localhost:3000` (CORS).
 
 ## API Endpoints
 
@@ -136,7 +134,7 @@ dotnet test
 
 ### Swagger UI
 
-Open `http://localhost:5000/swagger` to view interactive API documentation.
+Open `https://localhost:65532/swagger` (or `http://localhost:65533/swagger`) to view interactive API documentation.
 
 ## Contributing
 
