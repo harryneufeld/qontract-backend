@@ -106,35 +106,48 @@ builder.Services.AddAuthentication(options =>
 });
 
 // Add CORS
-var allowedOrigins = new[]
-{
-    "http://localhost:3000", "https://localhost:3000",
-    // Flutter web dev server (flutter run -d chrome / web-server)
-    "http://localhost:8080", "http://127.0.0.1:8080",
-    "http://localhost:8081", "http://127.0.0.1:8081",
-    "http://localhost:50000", "http://127.0.0.1:50000",
-};
+//
+// In Development the Flutter web app may be served from any localhost
+// port (flutter run picks a random high port, e.g. 5354 — issue #12),
+// so allow any origin. AllowCredentials is intentionally omitted there:
+// it cannot be combined with AllowAnyOrigin, and the app authenticates
+// with a JWT bearer header, not cookies.
+//
+// In Production only the explicitly configured origins (Cors:Origins in
+// appsettings.json) are allowed, and credentials are permitted.
+var allowedOrigins = builder.Configuration.GetSection("Cors:Origins").Get<string[]>()
+    ?? Array.Empty<string>();
 
 builder.Services.AddCors(options =>
 {
-    options.AddDefaultPolicy(builder =>
+    if (isDevelopment)
     {
-        builder.WithOrigins(allowedOrigins)
-               .AllowAnyHeader()
-               .AllowAnyMethod()
-               .AllowCredentials();
-    });
-});
-
-// Add CORS policy
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("AllowLocalhost",
-        builder => builder
-            .WithOrigins(allowedOrigins)
-            .AllowAnyMethod()
-            .AllowAnyHeader()
-            .AllowCredentials());
+        options.AddDefaultPolicy(policy =>
+            policy
+                .AllowAnyOrigin()
+                .AllowAnyMethod()
+                .AllowAnyHeader());
+        options.AddPolicy("AllowLocalhost",
+            policy => policy
+                .AllowAnyOrigin()
+                .AllowAnyMethod()
+                .AllowAnyHeader());
+    }
+    else
+    {
+        options.AddDefaultPolicy(policy =>
+            policy
+                .WithOrigins(allowedOrigins)
+                .AllowAnyHeader()
+                .AllowAnyMethod()
+                .AllowCredentials());
+        options.AddPolicy("AllowLocalhost",
+            policy => policy
+                .WithOrigins(allowedOrigins)
+                .AllowAnyMethod()
+                .AllowAnyHeader()
+                .AllowCredentials());
+    }
 });
 
 var app = builder.Build();
