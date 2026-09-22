@@ -6,7 +6,10 @@ using Qontract.Application.Services;
 namespace Qontract.API.Controllers;
 
 [ApiController]
-[Authorize]
+// User management (list, read, create/invite, update, deactivate) is an
+// admin-only operation (issue #24): only tenant admins may manage the
+// members of their tenant.
+[Authorize(Roles = AppRoles.TenantAdmin)]
 [Route("api/[controller]")]
 public class UsersController : ControllerBase
 {

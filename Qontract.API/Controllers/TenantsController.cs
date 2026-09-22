@@ -6,7 +6,10 @@ using Qontract.Application.Services;
 namespace Qontract.API.Controllers;
 
 [ApiController]
-[Authorize]
+// Tenant management (list, read, create, update, deactivate) is an
+// admin-only operation (issue #24): only tenant admins may create or
+// change tenants.
+[Authorize(Roles = AppRoles.TenantAdmin)]
 [Route("api/[controller]")]
 public class TenantsController : ControllerBase
 {
