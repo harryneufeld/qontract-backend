@@ -35,7 +35,6 @@ public class UserService : IUserService
                     Id = u.Id,
                     Name = u.Name,
                     Email = u.Email,
-                    PasswordHash = u.PasswordHash,
                     Role = u.Role,
                     IsActive = u.IsActive,
                     TenantId = u.TenantId,
@@ -74,7 +73,6 @@ public class UserService : IUserService
                 Id = user.Id,
                 Name = user.Name,
                 Email = user.Email,
-                PasswordHash = user.PasswordHash,
                 Role = user.Role,
                 IsActive = user.IsActive,
                 TenantId = user.TenantId,
@@ -105,15 +103,14 @@ public class UserService : IUserService
                 throw new ValidationException("Validation failed: " + string.Join(", ", validationResults.Errors.Select(e => e.ErrorMessage)));
             }
 
-            // Hash password
-            var hashedPassword = await _authService.HashPasswordAsync(dto.PasswordHash);
-            dto.PasswordHash = hashedPassword;
+            // Hash the plain password the client sent
+            var hashedPassword = await _authService.HashPasswordAsync(dto.Password);
 
             var user = new User
             {
                 Name = dto.Name,
                 Email = dto.Email,
-                PasswordHash = dto.PasswordHash,
+                PasswordHash = hashedPassword,
                 Role = dto.Role,
                 IsActive = true,
                 TenantId = dto.TenantId,
@@ -169,9 +166,9 @@ public class UserService : IUserService
                 user.Email = dto.Email;
             }
 
-            if (!string.IsNullOrEmpty(dto.PasswordHash))
+            if (!string.IsNullOrEmpty(dto.Password))
             {
-                var hashedPassword = await _authService.HashPasswordAsync(dto.PasswordHash);
+                var hashedPassword = await _authService.HashPasswordAsync(dto.Password);
                 user.PasswordHash = hashedPassword;
             }
 

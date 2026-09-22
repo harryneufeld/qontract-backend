@@ -104,7 +104,7 @@ public class RoleAuthorizationTests : IClassFixture<QontractWebApplicationFactor
         {
             name = "Sneaky Admin",
             email = "sneaky@qontract.com",
-            passwordHash = "hunter2",
+            password = "hunter2",
             role = "TenantAdmin",
             tenantId = 1
         });
@@ -161,12 +161,13 @@ public class RoleAuthorizationTests : IClassFixture<QontractWebApplicationFactor
         // workarounds for pre-existing bugs in the user-management flow
         // (issue #40): HashPasswordAsync 500s on any plain password that is
         // not valid base64, and UserCreateValidator rejects the enum default
-        // TenantAdmin (0).
+        // TenantAdmin (0). The field is "password" (plain, not a hash) since
+        // issue #33.
         var create = await _client.PostAsJsonAsync("/api/users", new
         {
             name = "New Member",
             email = "newmember@qontract.com",
-            passwordHash = "cGFzc3dvcmQxMjM=",
+            password = "cGFzc3dvcmQxMjM=",
             role = "User",
             tenantId = 1
         });

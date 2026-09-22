@@ -8,8 +8,6 @@ public class UserDTO
     public int Id { get; set; }
     public string Name { get; set; } = string.Empty;
     public string Email { get; set; } = string.Empty;
-    [System.Text.Json.Serialization.JsonIgnore]
-    public string PasswordHash { get; set; } = string.Empty;
     public UserRole Role { get; set; }
     public bool IsActive { get; set; }
     public int TenantId { get; set; }
@@ -29,9 +27,12 @@ public class UserCreateDTO
     [MaxLength(100)]
     public string Email { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Plain password (NOT a hash) — the service hashes it before storing.
+    /// </summary>
     [Required]
     [MaxLength(255)]
-    public string PasswordHash { get; set; } = string.Empty;
+    public string Password { get; set; } = string.Empty;
 
     [Required]
     public UserRole Role { get; set; }
@@ -47,8 +48,12 @@ public class UserUpdateDTO
     [MaxLength(100)]
     public string? Email { get; set; }
 
+    /// <summary>
+    /// Plain password (NOT a hash), only set when the password should be
+    /// changed — the service hashes it before storing.
+    /// </summary>
     [MaxLength(255)]
-    public string? PasswordHash { get; set; }
+    public string? Password { get; set; }
 
     public UserRole? Role { get; set; }
 

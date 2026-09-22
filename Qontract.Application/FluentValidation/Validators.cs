@@ -47,7 +47,7 @@ public class UserCreateValidator : AbstractValidator<UserCreateDTO>
             .NotEmpty().WithMessage("Email is required.")
             .EmailAddress().WithMessage("Invalid email format.");
 
-        RuleFor(x => x.PasswordHash)
+        RuleFor(x => x.Password)
             .NotEmpty().WithMessage("Password is required.")
             .MaximumLength(255).WithMessage("Password cannot exceed 255 characters.");
 
@@ -66,8 +66,8 @@ public class UserUpdateValidator : AbstractValidator<UserUpdateDTO>
         RuleFor(x => x.Email)
             .EmailAddress().When(x => !string.IsNullOrEmpty(x.Email)).WithMessage("Invalid email format.");
 
-        RuleFor(x => x.PasswordHash)
-            .MaximumLength(255).When(x => !string.IsNullOrEmpty(x.PasswordHash)).WithMessage("Password cannot exceed 255 characters.");
+        RuleFor(x => x.Password)
+            .MaximumLength(255).When(x => !string.IsNullOrEmpty(x.Password)).WithMessage("Password cannot exceed 255 characters.");
 
         RuleFor(x => x.Role)
             .NotEmpty().When(x => x.Role.HasValue).WithMessage("Role is required when specified.");
