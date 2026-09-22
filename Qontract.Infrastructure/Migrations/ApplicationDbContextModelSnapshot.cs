@@ -131,6 +131,10 @@ namespace Qontract.Infrastructure.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("MinimumContractDate")
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("ModifiedBy")
                         .HasMaxLength(500)
                         .HasColumnType("TEXT");

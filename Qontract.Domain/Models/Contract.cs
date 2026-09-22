@@ -35,6 +35,9 @@ public class Contract
     [MaxLength(100)]
     public string? ContractNumber { get; set; }
 
+    [MaxLength(50)]
+    public string? MinimumContractDate { get; set; }
+
     // Optional link to a contractor (a contract can reference a free-text
     // counterparty instead); must stay nullable.
     public int? ContractorId { get; set; }

@@ -14,6 +14,7 @@ public class ContractDTO
     public string? Currency { get; set; }
     public string? Value { get; set; }
     public string? ContractNumber { get; set; }
+    public string? MinimumContractDate { get; set; }
     public int? ContractorId { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
@@ -49,6 +50,9 @@ public class ContractCreateDTO
     [MaxLength(100)]
     public string? ContractNumber { get; set; }
 
+    [MaxLength(50)]
+    public string? MinimumContractDate { get; set; }
+
     public int? ContractorId { get; set; }
 }
 
@@ -76,6 +80,9 @@ public class ContractUpdateDTO
 
     [MaxLength(100)]
     public string? ContractNumber { get; set; }
+
+    [MaxLength(50)]
+    public string? MinimumContractDate { get; set; }
 
     [MaxLength(500)]
     public int? ContractorId { get; set; }

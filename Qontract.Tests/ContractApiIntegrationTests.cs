@@ -46,6 +46,7 @@ public class ContractApiIntegrationTests : IClassFixture<QontractWebApplicationF
         string? Currency,
         string? Value,
         string? ContractNumber,
+        string? MinimumContractDate,
         int? ContractorId,
         DateTime CreatedAt,
         DateTime UpdatedAt,
@@ -198,6 +199,72 @@ public class ContractApiIntegrationTests : IClassFixture<QontractWebApplicationF
         deactivateResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         var deactivated = await deactivateResponse.Content.ReadFromJsonAsync<ContractJson>();
         deactivated!.ContractNumber.Should().Be("CNT-2026-0099");
+    }
+
+    [Fact]
+    public async Task MinimumContractDate_ShouldRoundTripThroughCreateGetAndUpdate()
+    {
+        var token = await GetTokenAsync("admin@qontract.com");
+        Authenticate(token);
+
+        // Without a minimum contract date the field must be null
+        var blankResponse = await _client.PostAsJsonAsync("/api/contracts", new
+        {
+            title = "No Minimum Date",
+            status = "Active"
+        });
+        blankResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+        var blank = await blankResponse.Content.ReadFromJsonAsync<ContractJson>();
+        blank!.MinimumContractDate.Should().BeNull();
+
+        // Create with a minimum contract date
+        var createResponse = await _client.PostAsJsonAsync("/api/contracts", new
+        {
+            title = "Minimum Date Contract",
+            status = "Active",
+            minimumContractDate = "2027-06-30"
+        });
+        createResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+        var created = await createResponse.Content.ReadFromJsonAsync<ContractJson>();
+        created!.MinimumContractDate.Should().Be("2027-06-30");
+
+        // Read back: the date survives persistence
+        var getResponse = await _client.GetAsync($"/api/contracts/{created.Id}");
+        getResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var fetched = await getResponse.Content.ReadFromJsonAsync<ContractJson>();
+        fetched!.MinimumContractDate.Should().Be("2027-06-30");
+
+        // The date also appears in the list endpoint
+        var listResponse = await _client.GetFromJsonAsync<List<ContractJson>>("/api/contracts");
+        listResponse.Should().NotBeNull();
+        var inList = listResponse!.First(c => c.Id == created.Id);
+        inList.MinimumContractDate.Should().Be("2027-06-30");
+
+        // Update to a new minimum date
+        var updateResponse = await _client.PutAsJsonAsync($"/api/contracts/{created.Id}", new
+        {
+            minimumContractDate = "2028-01-31"
+        });
+        updateResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var updated = await updateResponse.Content.ReadFromJsonAsync<ContractJson>();
+        updated!.MinimumContractDate.Should().Be("2028-01-31");
+
+        // A partial update without minimumContractDate must not clear it
+        var partialResponse = await _client.PutAsJsonAsync($"/api/contracts/{created.Id}", new
+        {
+            title = "Minimum Date Contract (v2)"
+        });
+        partialResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var partial = await partialResponse.Content.ReadFromJsonAsync<ContractJson>();
+        partial!.MinimumContractDate.Should().Be("2028-01-31");
+
+        // Deactivate response still carries the date
+        var deactivateResponse = await _client.PatchAsync(
+            $"/api/contracts/{created.Id}/deactivate",
+            new StringContent(""));
+        deactivateResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var deactivated = await deactivateResponse.Content.ReadFromJsonAsync<ContractJson>();
+        deactivated!.MinimumContractDate.Should().Be("2028-01-31");
     }
 
     [Fact]
