@@ -58,6 +58,18 @@ public class QontractWebApplicationFactory : WebApplicationFactory<Program>
             {
                 options.UseSqlite(_connection);
             });
+
+            // Remove the document retention background worker (issue #14):
+            // it would share the singleton in-memory SQLite connection with
+            // the request pipeline. Tests exercise the purge logic directly
+            // through DocumentPurgeService instead.
+            var workerDescriptor = services.SingleOrDefault(d =>
+                d.ServiceType == typeof(IHostedService)
+                && d.ImplementationType == typeof(Qontract.API.Services.DocumentRetentionWorker));
+            if (workerDescriptor != null)
+            {
+                services.Remove(workerDescriptor);
+            }
         });
     }
 }

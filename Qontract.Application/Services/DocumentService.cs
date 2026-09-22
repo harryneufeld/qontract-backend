@@ -31,7 +31,7 @@ public class DocumentService : IDocumentService
         }
 
         var documents = await _context.Documents
-            .Where(d => d.ContractId == contractId)
+            .Where(d => d.ContractId == contractId && !d.IsDeleted)
             .OrderByDescending(d => d.ModifiedAt)
             .Select(d => new DocumentDTO
             {
@@ -55,7 +55,7 @@ public class DocumentService : IDocumentService
     public async Task<DocumentDTO> GetDocumentByIdAsync(int id, int tenantId, CancellationToken cancellationToken = default)
     {
         var document = await _context.Documents
-            .Where(d => d.Id == id)
+            .Where(d => d.Id == id && !d.IsDeleted)
             .Select(d => new DocumentDTO
             {
                 Id = d.Id,
@@ -148,7 +148,7 @@ public class DocumentService : IDocumentService
     public async Task<DocumentDTO> UpdateDocumentAsync(int id, DocumentCreateDTO dto, int tenantId, string? modifiedBy, CancellationToken cancellationToken = default)
     {
         var document = await _context.Documents
-            .FirstOrDefaultAsync(d => d.Id == id, cancellationToken);
+            .FirstOrDefaultAsync(d => d.Id == id && !d.IsDeleted, cancellationToken);
 
         if (document == null || await IsContractInOtherTenantAsync(document.ContractId, tenantId, cancellationToken))
         {
@@ -174,25 +174,22 @@ public class DocumentService : IDocumentService
     public async Task<bool> DeleteDocumentAsync(int id, int tenantId, string? modifiedBy, CancellationToken cancellationToken = default)
     {
         var document = await _context.Documents
-            .FirstOrDefaultAsync(d => d.Id == id, cancellationToken);
+            .FirstOrDefaultAsync(d => d.Id == id && !d.IsDeleted, cancellationToken);
 
         if (document == null || await IsContractInOtherTenantAsync(document.ContractId, tenantId, cancellationToken))
         {
             return false;
         }
 
-        // Best-effort: remove the stored file so disk space is reclaimed.
-        try
-        {
-            await _fileStorage.DeleteAsync(document.FilePath);
-        }
-        catch
-        {
-            // File already gone (or unreadable path) — the DB row is what
-            // matters; deletion still succeeds.
-        }
+        // Soft delete (issue #14): the row and the stored file are kept so
+        // the document can be recovered; the retention purge (deletion
+        // queue) permanently removes them after the tenant's retention
+        // period.
+        document.IsDeleted = true;
+        document.DeletedAt = DateTime.UtcNow;
+        document.ModifiedBy = modifiedBy ?? "system";
+        document.ModifiedAt = DateTime.UtcNow;
 
-        _context.Documents.Remove(document);
         await _context.SaveChangesAsync(cancellationToken);
 
         return true;
@@ -201,7 +198,7 @@ public class DocumentService : IDocumentService
     public async Task<byte[]> GetDocumentContentAsync(int id, int tenantId, CancellationToken cancellationToken = default)
     {
         var document = await _context.Documents
-            .FirstOrDefaultAsync(d => d.Id == id, cancellationToken);
+            .FirstOrDefaultAsync(d => d.Id == id && !d.IsDeleted, cancellationToken);
 
         if (document == null || await IsContractInOtherTenantAsync(document.ContractId, tenantId, cancellationToken))
         {

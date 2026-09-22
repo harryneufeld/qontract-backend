@@ -49,6 +49,13 @@ builder.Services.AddScoped<IAddressService, AddressService>();
 // Register File Storage
 builder.Services.AddSingleton<IFileStorage, FileStorage>();
 
+// Document deletion queue (issue #14): retention settings + the background
+// worker that permanently removes expired soft-deleted documents.
+builder.Services.Configure<Qontract.Application.Services.DocumentRetentionOptions>(
+    builder.Configuration.GetSection(Qontract.Application.Services.DocumentRetentionOptions.SectionName));
+builder.Services.AddScoped<Qontract.Application.Services.DocumentPurgeService>();
+builder.Services.AddHostedService<Qontract.API.Services.DocumentRetentionWorker>();
+
 // Configure JWT
 // Resolve + validate the JWT settings up front so a missing Jwt:Key fails
 // fast with a clear message (or falls back to a dev-only key in Development)

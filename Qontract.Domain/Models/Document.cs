@@ -36,6 +36,19 @@ public class Document : BaseEntity
     [Required]
     public int Version { get; set; }
 
+    /// <summary>
+    /// Soft-delete flag (issue #14). Deleted documents stay in the database
+    /// (and on disk) until the retention period has passed; list/get
+    /// endpoints hide them. The retention purge removes row + file.
+    /// </summary>
+    public bool IsDeleted { get; set; }
+
+    /// <summary>
+    /// When the document was soft-deleted; the retention purge removes the
+    /// row and file after the tenant's retention period.
+    /// </summary>
+    public DateTime? DeletedAt { get; set; }
+
     // Navigation properties
     public Contract Contract { get; set; }
     public User? User { get; set; }

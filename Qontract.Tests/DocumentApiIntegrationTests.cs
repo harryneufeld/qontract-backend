@@ -12,7 +12,10 @@ namespace Qontract.Tests;
 /// audit fields, and cross-tenant isolation.
 /// Tests within the class run sequentially, so mutating the shared
 /// client's Authorization header per test is safe.
+/// Shares the on-disk Storage folder with SoftDeleteTests, so both
+/// classes run in the same xunit collection (sequentially).
 /// </summary>
+[Collection("QontractApiStorage")]
 public class DocumentApiIntegrationTests : IClassFixture<QontractWebApplicationFactory>
 {
     private readonly HttpClient _client;
