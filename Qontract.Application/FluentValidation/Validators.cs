@@ -13,7 +13,7 @@ public class TenantCreateValidator : AbstractValidator<TenantCreateDTO>
             .MaximumLength(100).WithMessage("Name cannot exceed 100 characters.");
 
         RuleFor(x => x.Type)
-            .NotEmpty().WithMessage("Tenant type is required.");
+            .IsInEnum().WithMessage("Invalid tenant type.");
     }
 }
 
@@ -25,7 +25,7 @@ public class TenantUpdateValidator : AbstractValidator<TenantUpdateDTO>
             .MaximumLength(100).WithMessage("Name cannot exceed 100 characters.");
 
         RuleFor(x => x.Type)
-            .NotEmpty().WithMessage("Tenant type is required.");
+            .IsInEnum().When(x => x.Type.HasValue).WithMessage("Invalid tenant type.");
 
         RuleFor(x => x.Settings)
             .MaximumLength(5000).WithMessage("Settings cannot exceed 5000 characters.");
@@ -52,7 +52,7 @@ public class UserCreateValidator : AbstractValidator<UserCreateDTO>
             .MaximumLength(255).WithMessage("Password cannot exceed 255 characters.");
 
         RuleFor(x => x.Role)
-            .NotEmpty().WithMessage("Role is required.");
+            .IsInEnum().WithMessage("Invalid role.");
     }
 }
 
@@ -70,7 +70,7 @@ public class UserUpdateValidator : AbstractValidator<UserUpdateDTO>
             .MaximumLength(255).When(x => !string.IsNullOrEmpty(x.Password)).WithMessage("Password cannot exceed 255 characters.");
 
         RuleFor(x => x.Role)
-            .NotEmpty().When(x => x.Role.HasValue).WithMessage("Role is required when specified.");
+            .IsInEnum().When(x => x.Role.HasValue).WithMessage("Invalid role.");
 
         RuleFor(x => x.IsActive)
             .Cascade(CascadeMode.Stop);

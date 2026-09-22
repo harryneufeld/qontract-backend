@@ -15,7 +15,6 @@ public class AuthService : IAuthService
 {
     private readonly IApplicationDbContext _context;
     private readonly IConfiguration _configuration;
-    private const string SaltKey = "salt";
     private const int SaltBytesSize = 16;
     private readonly ILogger<AuthService> _logger;
 
@@ -115,14 +114,19 @@ public class AuthService : IAuthService
             byte[] salt;
             var hashParts = password.Split(':');
 
-            if (hashParts.Length >= 1 && hashParts[0] != null && hashParts[0] != SaltKey)
+            if (IsSaltedHash(hashParts))
             {
-                // Existing password hash, extract salt
+                // Already a stored "salt:hash" pair — reuse the original salt
+                // so re-hashing stays stable against the existing stored hash.
                 salt = Convert.FromBase64String(hashParts[0]);
             }
             else
             {
-                // Generate new salt
+                // Plain (unhashed) password: generate a fresh salt. This is the
+                // normal case — DTOs carry a plain password, never a hash.
+                // (issue #40: a plain password such as "password123" is not
+                // base64, so the old "extract salt" branch threw FormatException
+                // and 500'd; it is now guarded by IsSaltedHash.)
                 salt = GenerateSalt();
             }
 
@@ -134,6 +138,33 @@ public class AuthService : IAuthService
         {
             _logger.LogError(ex, "Error hashing password");
             throw;
+        }
+    }
+
+    /// <summary>
+    /// True only when the value is a stored "salt:hash" pair — exactly two
+    /// ':'-separated segments, both valid base64. Any plain password (no colon,
+    /// or a segment that is not base64) is treated as unhashed input and gets a
+    /// fresh salt instead of failing to decode (issue #40).
+    /// </summary>
+    private static bool IsSaltedHash(string[] hashParts)
+    {
+        return hashParts.Length == 2
+            && TryBase64Decode(hashParts[0], out _)
+            && TryBase64Decode(hashParts[1], out _);
+    }
+
+    private static bool TryBase64Decode(string value, out byte[] decoded)
+    {
+        try
+        {
+            decoded = Convert.FromBase64String(value);
+            return true;
+        }
+        catch (FormatException)
+        {
+            decoded = Array.Empty<byte>();
+            return false;
         }
     }
 

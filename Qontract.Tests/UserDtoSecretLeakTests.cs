@@ -80,13 +80,13 @@ public class UserDtoSecretLeakTests : IClassFixture<QontractWebApplicationFactor
     {
         await AuthenticateAsAdminAsync();
 
-        // NOTE: the password is deliberately base64 ("password123") —
-        // HashPasswordAsync 500s on non-base64 input until issue #40 is fixed.
+        // The field "password" carries a plain (unhashed) password. Issue #40
+        // is fixed, so a plain non-base64 password works end to end here.
         var create = await _client.PostAsJsonAsync("/api/users", new
         {
             name = "Leak Check User",
             email = $"leakcheck{Guid.NewGuid():N}@qontract.com",
-            password = "cGFzc3dvcmQxMjM=",
+            password = "plain-password-123",
             role = "User",
             tenantId = 1
         });

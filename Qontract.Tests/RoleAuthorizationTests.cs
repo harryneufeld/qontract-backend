@@ -155,14 +155,10 @@ public class RoleAuthorizationTests : IClassFixture<QontractWebApplicationFactor
         var listUsers = await _client.GetAsync("/api/users");
         listUsers.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        // Member invitation = user creation.
-        // NOTE: the password below is deliberately the base64 encoding of
-        // "password123" and the role is "User" (not "TenantAdmin") — both are
-        // workarounds for pre-existing bugs in the user-management flow
-        // (issue #40): HashPasswordAsync 500s on any plain password that is
-        // not valid base64, and UserCreateValidator rejects the enum default
-        // TenantAdmin (0). The field is "password" (plain, not a hash) since
-        // issue #33.
+        // Member invitation = user creation. The values below are the
+        // historical workarounds for the issue #40 bugs (plain-password 500,
+        // TenantAdmin role rejected, Family type rejected); #40 is now fixed,
+        // but this call keeps exercising the still-valid role "User".
         var create = await _client.PostAsJsonAsync("/api/users", new
         {
             name = "New Member",
@@ -176,10 +172,7 @@ public class RoleAuthorizationTests : IClassFixture<QontractWebApplicationFactor
         var listTenants = await _client.GetAsync("/api/tenants");
         listTenants.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        // Tenant management works for admins. NOTE: type is "Company" on
-        // purpose — the pre-existing TenantCreateValidator bug (issue #40)
-        // rejects TenantType.Family (0) because FluentValidation NotEmpty()
-        // treats the enum default as empty.
+        // Tenant management works for admins.
         var createTenant = await _client.PostAsJsonAsync("/api/tenants", new { name = "Admin Created Tenant", type = "Company" });
         createTenant.StatusCode.Should().Be(HttpStatusCode.Created);
     }
