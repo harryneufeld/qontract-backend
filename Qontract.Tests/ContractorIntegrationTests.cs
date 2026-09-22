@@ -46,7 +46,7 @@ public class ContractorApiIntegrationTests : IClassFixture<QontractWebApplicatio
         int? UserId,
         bool IsActive,
         DateTime CreatedAt,
-        DateTime UpdatedAt,
+        DateTime ModifiedAt,
         string? CreatedBy,
         string? ModifiedBy);
 

@@ -28,7 +28,7 @@ public class AddressService : IAddressService
             Zip = dto.Zip,
             Country = dto.Country,
             CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow
+            ModifiedAt = DateTime.UtcNow
         };
 
         switch (entityType)
@@ -67,7 +67,7 @@ public class AddressService : IAddressService
         if (!string.IsNullOrEmpty(dto.Country))
             address.Country = dto.Country;
 
-        address.UpdatedAt = DateTime.UtcNow;
+        address.ModifiedAt = DateTime.UtcNow;
         address.ModifiedBy = modifiedBy ?? string.Empty;
 
         await _context.SaveChangesAsync(cancellationToken);
@@ -92,7 +92,7 @@ public class AddressService : IAddressService
             Zip = address.Zip,
             Country = address.Country,
             CreatedAt = address.CreatedAt,
-            UpdatedAt = address.UpdatedAt
+            ModifiedAt = address.ModifiedAt
         };
     }
 
@@ -108,7 +108,7 @@ public class AddressService : IAddressService
         address.City = string.Empty;
         address.Zip = string.Empty;
         address.Country = string.Empty;
-        address.UpdatedAt = DateTime.UtcNow;
+        address.ModifiedAt = DateTime.UtcNow;
         address.ModifiedBy = modifiedBy ?? string.Empty;
 
         await _context.SaveChangesAsync(cancellationToken);

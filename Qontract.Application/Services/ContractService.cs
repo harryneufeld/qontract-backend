@@ -36,7 +36,7 @@ public class ContractService : IContractService
                 MinimumContractDate = c.MinimumContractDate,
                 ContractorId = c.ContractorId,
                 CreatedAt = c.CreatedAt,
-                UpdatedAt = c.UpdatedAt,
+                ModifiedAt = c.ModifiedAt,
                 CreatedBy = c.CreatedBy,
                 ModifiedBy = c.ModifiedBy,
                 CreatedAtUTC = c.CreatedAt
@@ -72,7 +72,7 @@ public class ContractService : IContractService
             MinimumContractDate = contract.MinimumContractDate,
             ContractorId = contract.ContractorId,
             CreatedAt = contract.CreatedAt,
-            UpdatedAt = contract.UpdatedAt,
+            ModifiedAt = contract.ModifiedAt,
             CreatedBy = contract.CreatedBy,
             ModifiedBy = contract.ModifiedBy,
             CreatedAtUTC = contract.CreatedAt
@@ -98,7 +98,7 @@ public class ContractService : IContractService
             CreatedBy = createdBy,
             ModifiedBy = createdBy,
             CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow
+            ModifiedAt = DateTime.UtcNow
         };
 
         _context.Contracts.Add(contract);
@@ -145,7 +145,7 @@ public class ContractService : IContractService
         if (dto.ContractorId.HasValue)
             contract.ContractorId = dto.ContractorId.Value;
 
-        contract.UpdatedAt = DateTime.UtcNow;
+        contract.ModifiedAt = DateTime.UtcNow;
         contract.ModifiedBy = modifiedBy;
 
         await _context.SaveChangesAsync(cancellationToken);
@@ -162,7 +162,7 @@ public class ContractService : IContractService
             throw new KeyNotFoundException($"Contract with ID {id} not found in tenant {tenantId}.");
 
         contract.IsActive = false;
-        contract.UpdatedAt = DateTime.UtcNow;
+        contract.ModifiedAt = DateTime.UtcNow;
         contract.ModifiedBy = modifiedBy;
 
         await _context.SaveChangesAsync(cancellationToken);
@@ -184,7 +184,7 @@ public class ContractService : IContractService
             MinimumContractDate = contract.MinimumContractDate,
             ContractorId = contract.ContractorId,
             CreatedAt = contract.CreatedAt,
-            UpdatedAt = contract.UpdatedAt,
+            ModifiedAt = contract.ModifiedAt,
             CreatedBy = contract.CreatedBy,
             ModifiedBy = contract.ModifiedBy,
             CreatedAtUTC = contract.CreatedAt
@@ -200,7 +200,7 @@ public class ContractService : IContractService
             throw new KeyNotFoundException($"Contract with ID {id} not found in tenant {tenantId}.");
 
         contract.IsActive = false;
-        contract.UpdatedAt = DateTime.UtcNow;
+        contract.ModifiedAt = DateTime.UtcNow;
         contract.ModifiedBy = modifiedBy;
 
         await _context.SaveChangesAsync(cancellationToken);

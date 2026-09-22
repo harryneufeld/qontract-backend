@@ -17,7 +17,40 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<Document> Documents { get; set; }
     public DbSet<Address> Addresses { get; set; }
 
-    public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) => base.SaveChangesAsync(cancellationToken);
+    public override int SaveChanges(bool acceptAllChangesOnSuccess)
+    {
+        ApplyAuditTimestamps();
+        return base.SaveChanges(acceptAllChangesOnSuccess);
+    }
+
+    public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    {
+        ApplyAuditTimestamps();
+        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+    }
+
+    /// <summary>
+    /// Maintains the audit timestamps on every saved entity (issue #16):
+    /// new entities get their CreatedAt/ModifiedAt stamped on first save and
+    /// ModifiedAt is refreshed on every update.
+    /// </summary>
+    private void ApplyAuditTimestamps()
+    {
+        var now = DateTime.UtcNow;
+        foreach (var entry in ChangeTracker.Entries<BaseEntity>())
+        {
+            switch (entry.State)
+            {
+                case EntityState.Added:
+                    entry.Entity.CreatedAt = now;
+                    entry.Entity.ModifiedAt = now;
+                    break;
+                case EntityState.Modified:
+                    entry.Entity.ModifiedAt = now;
+                    break;
+            }
+        }
+    }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

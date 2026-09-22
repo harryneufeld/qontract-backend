@@ -12,7 +12,7 @@ public class AddressDTO
     public string? Zip { get; set; }
     public string? Country { get; set; }
     public DateTime CreatedAt { get; set; }
-    public DateTime UpdatedAt { get; set; }
+    public DateTime ModifiedAt { get; set; }
 }
 
 public class AddressCreateDTO

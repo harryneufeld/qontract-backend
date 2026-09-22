@@ -200,7 +200,7 @@ async Task SeedDataAsync(ApplicationDbContext context, IUserService userService)
         Type = TenantType.Family,
         IsActive = true,
         CreatedAt = DateTime.UtcNow,
-        UpdatedAt = DateTime.UtcNow
+        ModifiedAt = DateTime.UtcNow
     };
 
     var tenantExists = await context.Tenants.AnyAsync(t => t.Name == "Test Family");
@@ -218,7 +218,7 @@ async Task SeedDataAsync(ApplicationDbContext context, IUserService userService)
         Type = TenantType.Family,
         IsActive = true,
         CreatedAt = DateTime.UtcNow,
-        UpdatedAt = DateTime.UtcNow
+        ModifiedAt = DateTime.UtcNow
     };
 
     if (!await context.Tenants.AnyAsync(t => t.Name == "Test Family Two"))
@@ -239,7 +239,7 @@ async Task SeedDataAsync(ApplicationDbContext context, IUserService userService)
             IsActive = true,
             TenantId = tenant.Id,
             CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow
+            ModifiedAt = DateTime.UtcNow
         };
 
         context.Users.Add(user);
@@ -258,7 +258,7 @@ async Task SeedDataAsync(ApplicationDbContext context, IUserService userService)
             IsActive = true,
             TenantId = tenant2.Id,
             CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow
+            ModifiedAt = DateTime.UtcNow
         };
 
         context.Users.Add(user2);

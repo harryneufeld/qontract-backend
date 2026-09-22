@@ -17,7 +17,7 @@ public class ContractDTO
     public string? MinimumContractDate { get; set; }
     public int? ContractorId { get; set; }
     public DateTime CreatedAt { get; set; }
-    public DateTime UpdatedAt { get; set; }
+    public DateTime ModifiedAt { get; set; }
     public string? CreatedBy { get; set; }
     public string? ModifiedBy { get; set; }
     public DateTime? CreatedAtUTC { get; set; } = DateTime.UtcNow;

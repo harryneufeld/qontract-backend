@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Qontract.Domain.Models;
 
-public class Address
+public class Address : BaseEntity
 {
     [Key]
     [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -26,12 +26,6 @@ public class Address
     [MaxLength(100)]
     public string? Country { get; set; }
 
-    [Required]
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-
-    [Required]
-    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
-
     // Navigation properties
     public int? TenantId { get; set; }
     public int? ContractorId { get; set; }
@@ -40,12 +34,6 @@ public class Address
     public Tenant? Tenant { get; set; }
     public Contractor? Contractor { get; set; }
     public Contract? Contract { get; set; }
-
-    [MaxLength(500)]
-    public string? CreatedBy { get; set; }
-
-    [MaxLength(500)]
-    public string? ModifiedBy { get; set; }
 }
 
 public enum EntityType

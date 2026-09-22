@@ -49,7 +49,7 @@ public class ContractApiIntegrationTests : IClassFixture<QontractWebApplicationF
         string? MinimumContractDate,
         int? ContractorId,
         DateTime CreatedAt,
-        DateTime UpdatedAt,
+        DateTime ModifiedAt,
         string? CreatedBy,
         string? ModifiedBy);
 

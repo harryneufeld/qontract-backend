@@ -26,7 +26,7 @@ public class ContractorService : IContractorService
                 UserId = c.UserId,
                 IsActive = c.IsActive,
                 CreatedAt = c.CreatedAt,
-                UpdatedAt = c.UpdatedAt,
+                ModifiedAt = c.ModifiedAt,
                 CreatedBy = c.CreatedBy,
                 ModifiedBy = c.ModifiedBy
             })
@@ -53,7 +53,7 @@ public class ContractorService : IContractorService
             UserId = contractor.UserId,
             IsActive = contractor.IsActive,
             CreatedAt = contractor.CreatedAt,
-            UpdatedAt = contractor.UpdatedAt,
+            ModifiedAt = contractor.ModifiedAt,
             CreatedBy = contractor.CreatedBy,
             ModifiedBy = contractor.ModifiedBy
         };
@@ -72,7 +72,7 @@ public class ContractorService : IContractorService
             CreatedBy = createdBy,
             ModifiedBy = createdBy,
             CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow
+            ModifiedAt = DateTime.UtcNow
         };
 
         _context.Contractors.Add(contractor);
@@ -101,7 +101,7 @@ public class ContractorService : IContractorService
         if (dto.IsActive.HasValue)
             contractor.IsActive = dto.IsActive.Value;
 
-        contractor.UpdatedAt = DateTime.UtcNow;
+        contractor.ModifiedAt = DateTime.UtcNow;
         contractor.ModifiedBy = modifiedBy;
 
         await _context.SaveChangesAsync(cancellationToken);
@@ -118,7 +118,7 @@ public class ContractorService : IContractorService
             throw new KeyNotFoundException($"Contractor with ID {id} not found in tenant {tenantId}.");
 
         contractor.IsActive = false;
-        contractor.UpdatedAt = DateTime.UtcNow;
+        contractor.ModifiedAt = DateTime.UtcNow;
         contractor.ModifiedBy = modifiedBy;
 
         await _context.SaveChangesAsync(cancellationToken);

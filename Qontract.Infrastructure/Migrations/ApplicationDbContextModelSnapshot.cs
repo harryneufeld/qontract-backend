@@ -63,6 +63,9 @@ namespace Qontract.Infrastructure.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("INTEGER");
 
+                    b.Property<DateTime>("ModifiedAt")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("ModifiedBy")
                         .HasMaxLength(500)
                         .HasColumnType("TEXT");
@@ -74,9 +77,6 @@ namespace Qontract.Infrastructure.Migrations
 
                     b.Property<int?>("TenantId")
                         .HasColumnType("INTEGER");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("TEXT");
 
                     b.Property<string>("Zip")
                         .HasMaxLength(20)
@@ -135,6 +135,9 @@ namespace Qontract.Infrastructure.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("TEXT");
 
+                    b.Property<DateTime>("ModifiedAt")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("ModifiedBy")
                         .HasMaxLength(500)
                         .HasColumnType("TEXT");
@@ -156,9 +159,6 @@ namespace Qontract.Infrastructure.Migrations
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Value")
@@ -198,6 +198,9 @@ namespace Qontract.Infrastructure.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("INTEGER");
 
+                    b.Property<DateTime>("ModifiedAt")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("ModifiedBy")
                         .HasMaxLength(500)
                         .HasColumnType("TEXT");
@@ -213,9 +216,6 @@ namespace Qontract.Infrastructure.Migrations
                     b.Property<int>("Type")
                         .HasMaxLength(50)
                         .HasColumnType("INTEGER");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("TEXT");
 
                     b.Property<int?>("UserId")
                         .HasMaxLength(500)
@@ -243,7 +243,6 @@ namespace Qontract.Infrastructure.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<string>("CreatedBy")
-                        .IsRequired()
                         .HasMaxLength(500)
                         .HasColumnType("TEXT");
 
@@ -265,12 +264,11 @@ namespace Qontract.Infrastructure.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("ModifiedBy")
-                        .IsRequired()
-                        .HasMaxLength(500)
+                    b.Property<DateTime>("ModifiedAt")
                         .HasColumnType("TEXT");
 
-                    b.Property<DateTime>("UpdatedAt")
+                    b.Property<string>("ModifiedBy")
+                        .HasMaxLength(500)
                         .HasColumnType("TEXT");
 
                     b.Property<DateTime>("UploadedAt")
@@ -312,6 +310,9 @@ namespace Qontract.Infrastructure.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("INTEGER");
 
+                    b.Property<DateTime>("ModifiedAt")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("ModifiedBy")
                         .HasMaxLength(500)
                         .HasColumnType("TEXT");
@@ -328,9 +329,6 @@ namespace Qontract.Infrastructure.Migrations
                     b.Property<int>("Type")
                         .HasMaxLength(50)
                         .HasColumnType("INTEGER");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -358,6 +356,9 @@ namespace Qontract.Infrastructure.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("INTEGER");
 
+                    b.Property<DateTime>("ModifiedAt")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("ModifiedBy")
                         .HasMaxLength(500)
                         .HasColumnType("TEXT");
@@ -378,9 +379,6 @@ namespace Qontract.Infrastructure.Migrations
 
                     b.Property<int>("TenantId")
                         .HasColumnType("INTEGER");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 

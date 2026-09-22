@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Qontract.Domain.Models;
 
-public class Contract
+public class Contract : BaseEntity
 {
     [Key]
     [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -44,20 +44,8 @@ public class Contract
 
     public int? TenantId { get; set; }
 
-    [MaxLength(500)]
-    public string? CreatedBy { get; set; }
-
-    [MaxLength(500)]
-    public string? ModifiedBy { get; set; }
-
     [Required]
     public bool IsActive { get; set; }
-
-    [Required]
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-
-    [Required]
-    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
     // Navigation properties
     public Tenant? Tenant { get; set; }

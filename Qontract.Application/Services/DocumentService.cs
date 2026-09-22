@@ -32,7 +32,7 @@ public class DocumentService : IDocumentService
 
         var documents = await _context.Documents
             .Where(d => d.ContractId == contractId)
-            .OrderByDescending(d => d.UpdatedAt)
+            .OrderByDescending(d => d.ModifiedAt)
             .Select(d => new DocumentDTO
             {
                 Id = d.Id,
@@ -42,7 +42,7 @@ public class DocumentService : IDocumentService
                 ContractId = d.ContractId,
                 UploadedAt = d.UploadedAt,
                 CreatedAt = d.CreatedAt,
-                UpdatedAt = d.UpdatedAt,
+                ModifiedAt = d.ModifiedAt,
                 Version = d.Version,
                 CreatedBy = d.CreatedBy,
                 ModifiedBy = d.ModifiedBy
@@ -65,7 +65,7 @@ public class DocumentService : IDocumentService
                 ContractId = d.ContractId,
                 UploadedAt = d.UploadedAt,
                 CreatedAt = d.CreatedAt,
-                UpdatedAt = d.UpdatedAt,
+                ModifiedAt = d.ModifiedAt,
                 Version = d.Version,
                 CreatedBy = d.CreatedBy,
                 ModifiedBy = d.ModifiedBy
@@ -133,7 +133,7 @@ public class DocumentService : IDocumentService
             ContractId = contractId,
             UploadedAt = DateTime.UtcNow,
             CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow,
+            ModifiedAt = DateTime.UtcNow,
             Version = 1,
             CreatedBy = createdBy ?? "system",
             ModifiedBy = createdBy ?? "system"
@@ -164,7 +164,7 @@ public class DocumentService : IDocumentService
             document.FileType = dto.FileType;
         }
         document.ModifiedBy = modifiedBy ?? "system";
-        document.UpdatedAt = DateTime.UtcNow;
+        document.ModifiedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync(cancellationToken);
 
@@ -240,7 +240,7 @@ public class DocumentService : IDocumentService
         ContractId = d.ContractId,
         UploadedAt = d.UploadedAt,
         CreatedAt = d.CreatedAt,
-        UpdatedAt = d.UpdatedAt,
+        ModifiedAt = d.ModifiedAt,
         Version = d.Version,
         CreatedBy = d.CreatedBy,
         ModifiedBy = d.ModifiedBy

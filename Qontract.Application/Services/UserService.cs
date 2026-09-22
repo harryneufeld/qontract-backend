@@ -40,7 +40,7 @@ public class UserService : IUserService
                     IsActive = u.IsActive,
                     TenantId = u.TenantId,
                     CreatedAt = u.CreatedAt,
-                    UpdatedAt = u.UpdatedAt,
+                    ModifiedAt = u.ModifiedAt,
                     CreatedBy = u.CreatedBy,
                     ModifiedBy = u.ModifiedBy
                 })
@@ -79,7 +79,7 @@ public class UserService : IUserService
                 IsActive = user.IsActive,
                 TenantId = user.TenantId,
                 CreatedAt = user.CreatedAt,
-                UpdatedAt = user.UpdatedAt,
+                ModifiedAt = user.ModifiedAt,
                 CreatedBy = user.CreatedBy,
                 ModifiedBy = user.ModifiedBy
             };
@@ -120,7 +120,7 @@ public class UserService : IUserService
                 CreatedBy = createdBy,
                 ModifiedBy = createdBy,
                 CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
+                ModifiedAt = DateTime.UtcNow
             };
 
             _context.Users.Add(user);
@@ -185,7 +185,7 @@ public class UserService : IUserService
                 user.IsActive = dto.IsActive.Value;
             }
 
-            user.UpdatedAt = DateTime.UtcNow;
+            user.ModifiedAt = DateTime.UtcNow;
             user.ModifiedBy = modifiedBy;
 
             await _context.SaveChangesAsync(cancellationToken);
@@ -214,7 +214,7 @@ public class UserService : IUserService
             }
 
             user.IsActive = false;
-            user.UpdatedAt = DateTime.UtcNow;
+            user.ModifiedAt = DateTime.UtcNow;
             user.ModifiedBy = modifiedBy;
 
             await _context.SaveChangesAsync(cancellationToken);

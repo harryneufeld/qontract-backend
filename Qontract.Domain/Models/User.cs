@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Qontract.Domain.Models;
 
-public class User
+public class User : BaseEntity
 {
     [Key]
     [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -31,20 +31,8 @@ public class User
     [Required]
     public int TenantId { get; set; }
 
-    [Required]
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-
-    [Required]
-    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
-
     // Navigation properties
     public Tenant? Tenant { get; set; }
-
-    [MaxLength(500)]
-    public string? CreatedBy { get; set; }
-
-    [MaxLength(500)]
-    public string? ModifiedBy { get; set; }
 }
 
 public enum UserRole

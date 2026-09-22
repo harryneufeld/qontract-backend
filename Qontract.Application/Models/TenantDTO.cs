@@ -13,7 +13,7 @@ public class TenantDTO
     public DateTime CreatedAt { get; set; }
     public string? CreatedBy { get; set; }
     public string? ModifiedBy { get; set; }
-    public DateTime UpdatedAt { get; set; }
+    public DateTime ModifiedAt { get; set; }
 }
 
 public class TenantCreateDTO

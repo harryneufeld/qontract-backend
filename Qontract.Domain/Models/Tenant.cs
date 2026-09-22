@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Qontract.Domain.Models;
 
-public class Tenant
+public class Tenant : BaseEntity
 {
     [Key]
     [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -22,18 +22,6 @@ public class Tenant
 
     [Required]
     public bool IsActive { get; set; }
-
-    [MaxLength(500)]
-    public string? CreatedBy { get; set; }
-
-    [MaxLength(500)]
-    public string? ModifiedBy { get; set; }
-
-    [Required]
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-
-    [Required]
-    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }
 
 public enum TenantType

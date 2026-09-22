@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Qontract.Domain.Models;
 
-public class Document
+public class Document : BaseEntity
 {
     [Key]
     [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -31,19 +31,7 @@ public class Document
     public int ContractId { get; set; }
 
     [Required]
-    public string CreatedBy { get; set; } = string.Empty;
-
-    [Required]
-    public string ModifiedBy { get; set; } = string.Empty;
-
-    [Required]
     public DateTime UploadedAt { get; set; } = DateTime.UtcNow;
-
-    [Required]
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-
-    [Required]
-    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
     [Required]
     public int Version { get; set; }

@@ -38,7 +38,7 @@ public class TenantService : ITenantService
                     CreatedAt = t.CreatedAt,
                     CreatedBy = t.CreatedBy,
                     ModifiedBy = t.ModifiedBy,
-                    UpdatedAt = t.UpdatedAt
+                    ModifiedAt = t.ModifiedAt
                 })
                 .ToListAsync(cancellationToken);
 
@@ -75,7 +75,7 @@ public class TenantService : ITenantService
                 CreatedAt = tenant.CreatedAt,
                 CreatedBy = tenant.CreatedBy,
                 ModifiedBy = tenant.ModifiedBy,
-                UpdatedAt = tenant.UpdatedAt
+                ModifiedAt = tenant.ModifiedAt
             };
         }
         catch (Exception ex)
@@ -108,7 +108,7 @@ public class TenantService : ITenantService
                 CreatedBy = null,
                 ModifiedBy = null,
                 CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
+                ModifiedAt = DateTime.UtcNow
             };
 
             _context.Tenants.Add(tenant);
@@ -167,7 +167,7 @@ public class TenantService : ITenantService
                 tenant.IsActive = dto.IsActive.Value;
             }
 
-            tenant.UpdatedAt = DateTime.UtcNow;
+            tenant.ModifiedAt = DateTime.UtcNow;
             tenant.ModifiedBy = null;
 
             await _context.SaveChangesAsync(cancellationToken);
@@ -196,7 +196,7 @@ public class TenantService : ITenantService
             }
 
             tenant.IsActive = false;
-            tenant.UpdatedAt = DateTime.UtcNow;
+            tenant.ModifiedAt = DateTime.UtcNow;
             tenant.ModifiedBy = modifiedBy;
 
             await _context.SaveChangesAsync(cancellationToken);

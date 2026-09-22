@@ -9,7 +9,7 @@ public class DocumentDTO
     public int ContractId { get; set; }
     public DateTime UploadedAt { get; set; }
     public DateTime CreatedAt { get; set; }
-    public DateTime UpdatedAt { get; set; }
+    public DateTime ModifiedAt { get; set; }
     public int Version { get; set; }
     public string? CreatedBy { get; set; }
     public string? ModifiedBy { get; set; }
