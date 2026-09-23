@@ -1,3 +1,4 @@
+using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Qontract.Application.Models;
 using Qontract.Application.Services;
@@ -10,10 +11,14 @@ namespace Qontract.API.Controllers;
 public class DocumentsController : ControllerBase
 {
     private readonly IDocumentService _documentService;
+    private readonly IValidator<DocumentCreateDTO> _createValidator;
 
-    public DocumentsController(IDocumentService documentService)
+    public DocumentsController(
+        IDocumentService documentService,
+        IValidator<DocumentCreateDTO> createValidator)
     {
         _documentService = documentService;
+        _createValidator = createValidator;
     }
 
     /// <summary>
@@ -71,6 +76,10 @@ public class DocumentsController : ControllerBase
     {
         // The DTO carries a contractId from the client; the route value wins.
         dto.ContractId = contractId;
+        var reject = await DtoValidation.RejectIfInvalidAsync(_createValidator, dto);
+        if (reject is not null)
+            return reject;
+
         var document = await _documentService.CreateDocumentAsync(dto, contractId, CurrentTenantId, CurrentUser);
         return CreatedAtAction(nameof(GetDocument), new { id = document.Id }, document);
     }
@@ -79,6 +88,13 @@ public class DocumentsController : ControllerBase
     [HttpPut("{id}")]
     public async Task<ActionResult<DocumentDTO>> UpdateDocument(int id, [FromBody] DocumentCreateDTO dto)
     {
+        // The update path only applies FileName/FileType, but the payload
+        // contract is the same full DTO as create (matching the previous
+        // DataAnnotations behaviour), so the same validator applies.
+        var reject = await DtoValidation.RejectIfInvalidAsync(_createValidator, dto);
+        if (reject is not null)
+            return reject;
+
         var document = await _documentService.UpdateDocumentAsync(id, dto, CurrentTenantId, CurrentUser);
         return Ok(document);
     }

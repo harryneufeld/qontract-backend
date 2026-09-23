@@ -1,13 +1,11 @@
-using FluentValidation;
 using Qontract.Domain.Models;
 using Qontract.Application.Models;
-using Qontract.Application.FluentValidation;
-using Microsoft.EntityFrameworkCore;
 using Qontract.Application.Interfaces;
 using Microsoft.Extensions.Logging;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Collections.Generic;
+using Microsoft.EntityFrameworkCore;
 
 namespace Qontract.Application.Services;
 
@@ -93,15 +91,7 @@ public class UserService : IUserService
     {
         try
         {
-            // Validate DTO
-            var validator = new UserCreateValidator();
-            var validationResults = await validator.ValidateAsync(dto, cancellationToken);
-
-            if (!validationResults.IsValid)
-            {
-                _logger.LogWarning("Validation failed for user: {Error}", string.Join(", ", validationResults.Errors.Select(e => e.ErrorMessage)));
-                throw new ValidationException("Validation failed: " + string.Join(", ", validationResults.Errors.Select(e => e.ErrorMessage)));
-            }
+            // DTO validation lives in the controller layer (issue #39).
 
             // Hash the plain password the client sent
             var hashedPassword = await _authService.HashPasswordAsync(dto.Password);
@@ -146,16 +136,7 @@ public class UserService : IUserService
                 throw new KeyNotFoundException($"User with ID {id} not found in tenant {tenantId}.");
             }
 
-            // Validate DTO
-            var validator = new UserUpdateValidator();
-            var validationResults = await validator.ValidateAsync(dto, cancellationToken);
-
-            if (!validationResults.IsValid)
-            {
-                _logger.LogWarning("Validation failed for user update: {Error}", string.Join(", ", validationResults.Errors.Select(e => e.ErrorMessage)));
-                throw new ValidationException("Validation failed: " + string.Join(", ", validationResults.Errors.Select(e => e.ErrorMessage)));
-            }
-
+            // DTO validation lives in the controller layer (issue #39).
             if (!string.IsNullOrEmpty(dto.Name))
             {
                 user.Name = dto.Name;

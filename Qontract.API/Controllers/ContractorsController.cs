@@ -60,9 +60,9 @@ public class ContractorsController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<ContractorDTO>> CreateContractor([FromBody] ContractorCreateDTO dto)
     {
-        var validationResult = await _createValidator.ValidateAsync(dto);
-        if (!validationResult.IsValid)
-            return BadRequest(new { errors = validationResult.Errors });
+        var reject = await DtoValidation.RejectIfInvalidAsync(_createValidator, dto);
+        if (reject is not null)
+            return reject;
 
         // Always scope to the authenticated tenant, never trust the client.
         dto.TenantId = CurrentTenantId;
@@ -74,9 +74,9 @@ public class ContractorsController : ControllerBase
     [HttpPut("{id:int}")]
     public async Task<ActionResult<ContractorDTO>> UpdateContractor(int id, [FromBody] ContractorUpdateDTO dto)
     {
-        var validationResult = await _updateValidator.ValidateAsync(dto);
-        if (!validationResult.IsValid)
-            return BadRequest(new { errors = validationResult.Errors });
+        var reject = await DtoValidation.RejectIfInvalidAsync(_updateValidator, dto);
+        if (reject is not null)
+            return reject;
 
         // KeyNotFoundException -> 404 is handled uniformly by
         // ExceptionHandlingMiddleware (issue #11).

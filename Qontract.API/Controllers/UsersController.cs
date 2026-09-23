@@ -1,3 +1,4 @@
+using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Qontract.Domain.Models;
 using Qontract.Application.Models;
@@ -14,10 +15,17 @@ namespace Qontract.API.Controllers;
 public class UsersController : ControllerBase
 {
     private readonly IUserService _userService;
+    private readonly IValidator<UserCreateDTO> _createValidator;
+    private readonly IValidator<UserUpdateDTO> _updateValidator;
 
-    public UsersController(IUserService userService)
+    public UsersController(
+        IUserService userService,
+        IValidator<UserCreateDTO> createValidator,
+        IValidator<UserUpdateDTO> updateValidator)
     {
         _userService = userService;
+        _createValidator = createValidator;
+        _updateValidator = updateValidator;
     }
 
     /// <summary>
@@ -45,6 +53,10 @@ public class UsersController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<UserDTO>> CreateUser([FromBody] UserCreateDTO dto)
     {
+        var reject = await DtoValidation.RejectIfInvalidAsync(_createValidator, dto);
+        if (reject is not null)
+            return reject;
+
         var user = await _userService.CreateUserAsync(dto, User.Identity?.Name);
         return CreatedAtAction(nameof(GetUser), new { id = user.Id }, user);
     }
@@ -52,6 +64,10 @@ public class UsersController : ControllerBase
     [HttpPut("{id}")]
     public async Task<ActionResult<UserDTO>> UpdateUser(int id, [FromBody] UserUpdateDTO dto)
     {
+        var reject = await DtoValidation.RejectIfInvalidAsync(_updateValidator, dto);
+        if (reject is not null)
+            return reject;
+
         var user = await _userService.UpdateUserAsync(id, CurrentTenantId, dto, User.Identity?.Name);
         return Ok(user);
     }

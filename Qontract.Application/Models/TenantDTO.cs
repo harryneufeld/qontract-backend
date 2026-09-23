@@ -1,5 +1,4 @@
 using Qontract.Domain.Models;
-using System.ComponentModel.DataAnnotations;
 
 namespace Qontract.Application.Models;
 
@@ -16,30 +15,20 @@ public class TenantDTO
     public DateTime ModifiedAt { get; set; }
 }
 
+// Validated by TenantCreateValidator / TenantUpdateValidator (issue #39),
+// not DataAnnotations.
 public class TenantCreateDTO
 {
-    [Required]
-    [MaxLength(100)]
     public string Name { get; set; } = string.Empty;
-
-    [Required]
     public TenantType Type { get; set; }
-
-    [MaxLength(5000)]
     public string? Settings { get; set; }
-
     public bool IsActive { get; set; } = true;
 }
 
 public class TenantUpdateDTO
 {
-    [MaxLength(100)]
     public string? Name { get; set; }
-
     public TenantType? Type { get; set; }
-
-    [MaxLength(5000)]
     public string? Settings { get; set; }
-
     public bool? IsActive { get; set; }
 }

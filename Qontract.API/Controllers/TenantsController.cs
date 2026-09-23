@@ -1,3 +1,4 @@
+using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Qontract.Domain.Models;
 using Qontract.Application.Models;
@@ -14,12 +15,17 @@ namespace Qontract.API.Controllers;
 public class TenantsController : ControllerBase
 {
     private readonly ITenantService _tenantService;
-    private readonly IAuthService _authService;
+    private readonly IValidator<TenantCreateDTO> _createValidator;
+    private readonly IValidator<TenantUpdateDTO> _updateValidator;
 
-    public TenantsController(ITenantService tenantService, IAuthService authService)
+    public TenantsController(
+        ITenantService tenantService,
+        IValidator<TenantCreateDTO> createValidator,
+        IValidator<TenantUpdateDTO> updateValidator)
     {
         _tenantService = tenantService;
-        _authService = authService;
+        _createValidator = createValidator;
+        _updateValidator = updateValidator;
     }
 
     [HttpGet]
@@ -39,6 +45,10 @@ public class TenantsController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<TenantDTO>> CreateTenant([FromBody] TenantCreateDTO dto)
     {
+        var reject = await DtoValidation.RejectIfInvalidAsync(_createValidator, dto);
+        if (reject is not null)
+            return reject;
+
         var tenant = await _tenantService.CreateTenantAsync(dto);
         return CreatedAtAction(nameof(GetTenant), new { id = tenant.Id }, tenant);
     }
@@ -46,6 +56,10 @@ public class TenantsController : ControllerBase
     [HttpPut("{id}")]
     public async Task<ActionResult<TenantDTO>> UpdateTenant(int id, [FromBody] TenantUpdateDTO dto)
     {
+        var reject = await DtoValidation.RejectIfInvalidAsync(_updateValidator, dto);
+        if (reject is not null)
+            return reject;
+
         var tenant = await _tenantService.UpdateTenantAsync(id, dto);
         return Ok(tenant);
     }

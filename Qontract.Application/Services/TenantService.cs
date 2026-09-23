@@ -1,7 +1,5 @@
-using FluentValidation;
 using Qontract.Domain.Models;
 using Qontract.Application.Models;
-using Qontract.Application.FluentValidation;
 using Qontract.Application.Interfaces;
 using Microsoft.Extensions.Logging;
 using Microsoft.EntityFrameworkCore;
@@ -89,16 +87,7 @@ public class TenantService : ITenantService
     {
         try
         {
-            // Validate DTO
-            var validator = new TenantCreateValidator();
-            var validationResults = await validator.ValidateAsync(dto, cancellationToken);
-
-            if (!validationResults.IsValid)
-            {
-                _logger.LogWarning("Validation failed for tenant: {Error}", string.Join(", ", validationResults.Errors.Select(e => e.ErrorMessage)));
-                throw new ValidationException("Validation failed: " + string.Join(", ", validationResults.Errors.Select(e => e.ErrorMessage)));
-            }
-
+            // DTO validation lives in the controller layer (issue #39).
             var tenant = new Tenant
             {
                 Name = dto.Name,
@@ -137,16 +126,7 @@ public class TenantService : ITenantService
                 throw new KeyNotFoundException($"Tenant with ID {id} not found.");
             }
 
-            // Validate DTO
-            var validator = new TenantUpdateValidator();
-            var validationResults = await validator.ValidateAsync(dto, cancellationToken);
-
-            if (!validationResults.IsValid)
-            {
-                _logger.LogWarning("Validation failed for tenant update: {Error}", string.Join(", ", validationResults.Errors.Select(e => e.ErrorMessage)));
-                throw new ValidationException("Validation failed: " + string.Join(", ", validationResults.Errors.Select(e => e.ErrorMessage)));
-            }
-
+            // DTO validation lives in the controller layer (issue #39).
             if (!string.IsNullOrEmpty(dto.Name))
             {
                 tenant.Name = dto.Name;
@@ -202,7 +182,23 @@ public class TenantService : ITenantService
             await _context.SaveChangesAsync(cancellationToken);
 
             _logger.LogInformation("Deactivated tenant: {Name}", tenant.Name);
-            return await GetTenantByIdAsync(id, cancellationToken);
+
+            // The row is now inactive; build the DTO from the tracked
+            // entity instead of going through GetTenantByIdAsync (which
+            // filters inactive tenants and would 404 on the row we just
+            // deactivated) — same workaround as DeactivateContractAsync.
+            return new TenantDTO
+            {
+                Id = tenant.Id,
+                Name = tenant.Name,
+                Type = tenant.Type,
+                Settings = tenant.Settings,
+                IsActive = tenant.IsActive,
+                CreatedAt = tenant.CreatedAt,
+                CreatedBy = tenant.CreatedBy,
+                ModifiedBy = tenant.ModifiedBy,
+                ModifiedAt = tenant.ModifiedAt
+            };
         }
         catch (Exception ex)
         {

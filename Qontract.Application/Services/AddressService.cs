@@ -96,7 +96,14 @@ public class AddressService : IAddressService
         };
     }
 
-    public async Task<bool> DeleteAddressAsync(int id, string? modifiedBy, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Soft-deactivates the address: <c>Address</c> has no <c>IsActive</c>
+    /// flag (see the tenant-isolation issue), so deactivation blanks the
+    /// fields instead of deleting the row. Returns the deactivated DTO —
+    /// previously the method was misnamed <c>DeleteAddressAsync</c> and
+    /// returned a bare bool while the endpoint promised an AddressDTO.
+    /// </summary>
+    public async Task<AddressDTO> DeactivateAddressAsync(int id, string? modifiedBy, CancellationToken cancellationToken = default)
     {
         var address = await _context.Addresses
             .FirstOrDefaultAsync(a => a.Id == id, cancellationToken);
@@ -113,6 +120,6 @@ public class AddressService : IAddressService
 
         await _context.SaveChangesAsync(cancellationToken);
 
-        return true;
+        return await GetAddressByIdAsync(id, cancellationToken);
     }
 }

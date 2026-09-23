@@ -1,3 +1,4 @@
+using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Qontract.Domain.Models;
 using Qontract.Application.Models;
@@ -11,10 +12,14 @@ namespace Qontract.API.Controllers;
 public class AddressesController : ControllerBase
 {
     private readonly IAddressService _addressService;
+    private readonly IValidator<AddressCreateDTO> _createValidator;
 
-    public AddressesController(IAddressService addressService)
+    public AddressesController(
+        IAddressService addressService,
+        IValidator<AddressCreateDTO> createValidator)
     {
         _addressService = addressService;
+        _createValidator = createValidator;
     }
 
     /// <summary>
@@ -28,6 +33,10 @@ public class AddressesController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<AddressDTO>> CreateAddress([FromBody] AddressCreateDTO dto)
     {
+        var reject = await DtoValidation.RejectIfInvalidAsync(_createValidator, dto);
+        if (reject is not null)
+            return reject;
+
         var entityId = dto.EntityType == EntityType.Tenant ? CurrentTenantId : 0;
         var address = await _addressService.CreateAddressAsync(dto, entityId, dto.EntityType, User.Identity?.Name);
         return CreatedAtAction(nameof(GetAddress), new { id = address.Id }, address);
@@ -36,6 +45,10 @@ public class AddressesController : ControllerBase
     [HttpPut("{id}")]
     public async Task<ActionResult<AddressDTO>> UpdateAddress(int id, [FromBody] AddressCreateDTO dto)
     {
+        var reject = await DtoValidation.RejectIfInvalidAsync(_createValidator, dto);
+        if (reject is not null)
+            return reject;
+
         var address = await _addressService.UpdateAddressAsync(id, dto, User.Identity?.Name);
         return Ok(address);
     }
@@ -50,7 +63,7 @@ public class AddressesController : ControllerBase
     [HttpPatch("{id}/deactivate")]
     public async Task<ActionResult<AddressDTO>> DeactivateAddress(int id)
     {
-        var address = await _addressService.DeleteAddressAsync(id, User.Identity?.Name);
+        var address = await _addressService.DeactivateAddressAsync(id, User.Identity?.Name);
         return Ok(address);
     }
 }

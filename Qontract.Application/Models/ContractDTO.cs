@@ -1,5 +1,4 @@
 using Qontract.Domain.Models;
-using System.ComponentModel.DataAnnotations;
 
 namespace Qontract.Application.Models;
 
@@ -23,67 +22,32 @@ public class ContractDTO
     public DateTime? CreatedAtUTC { get; set; } = DateTime.UtcNow;
 }
 
+// DTO validation is done by the FluentValidation validators in
+// Qontract.Application.FluentValidation (issue #39), not DataAnnotations.
 public class ContractCreateDTO
 {
-    [Required]
-    [MaxLength(200)]
     public string Title { get; set; } = string.Empty;
-
-    [MaxLength(2000)]
     public string? Description { get; set; }
-
-    [Required]
     public ContractStatus Status { get; set; }
-
-    [MaxLength(50)]
     public string? StartDate { get; set; }
-
-    [MaxLength(50)]
     public string? EndDate { get; set; }
-
-    [MaxLength(50)]
     public string? Currency { get; set; }
-
-    [MaxLength(500)]
     public string? Value { get; set; }
-
-    [MaxLength(100)]
     public string? ContractNumber { get; set; }
-
-    [MaxLength(50)]
     public string? MinimumContractDate { get; set; }
-
     public int? ContractorId { get; set; }
 }
 
 public class ContractUpdateDTO
 {
-    [MaxLength(200)]
     public string? Title { get; set; }
-
-    [MaxLength(2000)]
     public string? Description { get; set; }
-
     public ContractStatus? Status { get; set; }
-
-    [MaxLength(50)]
     public string? StartDate { get; set; }
-
-    [MaxLength(50)]
     public string? EndDate { get; set; }
-
-    [MaxLength(50)]
     public string? Currency { get; set; }
-
-    [MaxLength(500)]
     public string? Value { get; set; }
-
-    [MaxLength(100)]
     public string? ContractNumber { get; set; }
-
-    [MaxLength(50)]
     public string? MinimumContractDate { get; set; }
-
-    [MaxLength(500)]
     public int? ContractorId { get; set; }
 }

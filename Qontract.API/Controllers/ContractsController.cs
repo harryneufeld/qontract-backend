@@ -1,3 +1,4 @@
+using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Qontract.Domain.Models;
 using Qontract.Application.Models;
@@ -11,10 +12,17 @@ namespace Qontract.API.Controllers;
 public class ContractsController : ControllerBase
 {
     private readonly IContractService _contractService;
+    private readonly IValidator<ContractCreateDTO> _createValidator;
+    private readonly IValidator<ContractUpdateDTO> _updateValidator;
 
-    public ContractsController(IContractService contractService)
+    public ContractsController(
+        IContractService contractService,
+        IValidator<ContractCreateDTO> createValidator,
+        IValidator<ContractUpdateDTO> updateValidator)
     {
         _contractService = contractService;
+        _createValidator = createValidator;
+        _updateValidator = updateValidator;
     }
 
     /// <summary>
@@ -53,6 +61,10 @@ public class ContractsController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<ContractDTO>> CreateContract([FromBody] ContractCreateDTO dto)
     {
+        var reject = await DtoValidation.RejectIfInvalidAsync(_createValidator, dto);
+        if (reject is not null)
+            return reject;
+
         var contract = await _contractService.CreateContractAsync(CurrentTenantId, dto, CurrentUser);
         return CreatedAtAction(nameof(GetContract), new { id = contract.Id }, contract);
     }
@@ -60,6 +72,10 @@ public class ContractsController : ControllerBase
     [HttpPut("{id}")]
     public async Task<ActionResult<ContractDTO>> UpdateContract(int id, [FromBody] ContractUpdateDTO dto)
     {
+        var reject = await DtoValidation.RejectIfInvalidAsync(_updateValidator, dto);
+        if (reject is not null)
+            return reject;
+
         var contract = await _contractService.UpdateContractAsync(id, CurrentTenantId, dto, CurrentUser);
         return Ok(contract);
     }

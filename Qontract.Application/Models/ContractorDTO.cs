@@ -1,5 +1,4 @@
 using Qontract.Domain.Models;
-using System.ComponentModel.DataAnnotations;
 
 namespace Qontract.Application.Models;
 
@@ -18,33 +17,23 @@ public class ContractorDTO
     public string? ModifiedBy { get; set; }
 }
 
+// Validated by ContractorCreateValidator / ContractorUpdateValidator
+// (issue #39), not DataAnnotations.
 public class ContractorCreateDTO
 {
-    [Required]
-    [MaxLength(100)]
     public string Name { get; set; } = string.Empty;
-
-    [Required]
     public ContractorType Type { get; set; }
-
-    [MaxLength(500)]
     public string? ContactInfo { get; set; }
 
     public int TenantId { get; set; }
 
-    [MaxLength(500)]
     public int? UserId { get; set; }
 }
 
 public class ContractorUpdateDTO
 {
-    [MaxLength(100)]
     public string? Name { get; set; }
-
     public ContractorType? Type { get; set; }
-
-    [MaxLength(500)]
     public string? ContactInfo { get; set; }
-
     public bool? IsActive { get; set; }
 }
