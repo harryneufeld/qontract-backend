@@ -132,6 +132,39 @@ public class AddressService : IAddressService
         return ToDto(address);
     }
 
+    public async Task<List<AddressDTO>> GetAddressesForContractorAsync(int contractorId, int tenantId, CancellationToken cancellationToken = default)
+    {
+        // Uniform 404: cross-tenant contractors are not distinguishable
+        // from unknown ids (same convention as the rest of this service).
+        var contractorExists = await _context.Contractors
+            .AsNoTracking()
+            .AnyAsync(c => c.Id == contractorId && c.TenantId == tenantId, cancellationToken);
+
+        if (!contractorExists)
+        {
+            throw new KeyNotFoundException($"Contractor with ID {contractorId} not found in tenant {tenantId}.");
+        }
+
+        return await _context.Addresses
+            .Where(a => a.IsActive
+                && a.EntityType == EntityType.Contractor
+                && a.ContractorId == contractorId)
+            .OrderBy(a => a.Id)
+            .Select(a => new AddressDTO
+            {
+                Id = a.Id,
+                EntityType = a.EntityType,
+                Street = a.Street,
+                City = a.City,
+                Zip = a.Zip,
+                Country = a.Country,
+                CreatedAt = a.CreatedAt,
+                ModifiedAt = a.ModifiedAt,
+                IsActive = a.IsActive
+            })
+            .ToListAsync(cancellationToken);
+    }
+
     private async Task<Address> FindInTenantAsync(int id, int tenantId, CancellationToken cancellationToken)
     {
         var address = await _context.Addresses

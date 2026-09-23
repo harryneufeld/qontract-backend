@@ -90,8 +90,12 @@ public class ContractorCreateValidator : AbstractValidator<ContractorCreateDTO>
         RuleFor(x => x.Type)
             .IsInEnum().WithMessage($"Type must be {nameof(ContractorType.Individual)} or {nameof(ContractorType.Company)}.");
 
-        RuleFor(x => x.ContactInfo)
-            .MaximumLength(500).When(x => x.ContactInfo is not null).WithMessage("ContactInfo cannot exceed 500 characters.");
+        RuleFor(x => x.Email)
+            .EmailAddress().When(x => !string.IsNullOrEmpty(x.Email)).WithMessage("Invalid email format.")
+            .MaximumLength(200).When(x => !string.IsNullOrEmpty(x.Email)).WithMessage("Email cannot exceed 200 characters.");
+
+        RuleFor(x => x.Phone)
+            .MaximumLength(50).When(x => !string.IsNullOrEmpty(x.Phone)).WithMessage("Phone cannot exceed 50 characters.");
     }
 }
 
@@ -105,8 +109,12 @@ public class ContractorUpdateValidator : AbstractValidator<ContractorUpdateDTO>
         RuleFor(x => x.Type)
             .IsInEnum().When(x => x.Type.HasValue).WithMessage($"Type must be {nameof(ContractorType.Individual)} or {nameof(ContractorType.Company)}.");
 
-        RuleFor(x => x.ContactInfo)
-            .MaximumLength(500).When(x => x.ContactInfo is not null).WithMessage("ContactInfo cannot exceed 500 characters.");
+        RuleFor(x => x.Email)
+            .EmailAddress().When(x => x.Email is not null && !string.IsNullOrEmpty(x.Email)).WithMessage("Invalid email format.")
+            .MaximumLength(200).When(x => x.Email is not null && !string.IsNullOrEmpty(x.Email)).WithMessage("Email cannot exceed 200 characters.");
+
+        RuleFor(x => x.Phone)
+            .MaximumLength(50).When(x => x.Phone is not null && !string.IsNullOrEmpty(x.Phone)).WithMessage("Phone cannot exceed 50 characters.");
     }
 }
 

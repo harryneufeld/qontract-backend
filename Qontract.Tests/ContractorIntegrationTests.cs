@@ -41,7 +41,8 @@ public class ContractorApiIntegrationTests : IClassFixture<QontractWebApplicatio
         int Id,
         string Name,
         string? Type,
-        string? ContactInfo,
+        string? Email,
+        string? Phone,
         int TenantId,
         int? UserId,
         bool IsActive,
@@ -49,6 +50,14 @@ public class ContractorApiIntegrationTests : IClassFixture<QontractWebApplicatio
         DateTime ModifiedAt,
         string? CreatedBy,
         string? ModifiedBy);
+
+    private record AddressJson(
+        int Id,
+        string? EntityType,
+        string? Street,
+        string? City,
+        string? Zip,
+        string? Country);
 
     [Fact]
     public async Task GetContractors_ShouldReturnUnauthorized_WithoutToken()
@@ -70,7 +79,24 @@ public class ContractorApiIntegrationTests : IClassFixture<QontractWebApplicatio
         {
             name = "",
             type = ContractorType.Individual.ToString(),
-            contactInfo = (string?)null
+            email = (string?)null,
+            phone = (string?)null
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task CreateContractor_ShouldReturn400_WhenEmailMalformed()
+    {
+        var token = await GetTokenAsync("admin@qontract.com");
+        Authenticate(token);
+
+        var response = await _client.PostAsJsonAsync("/api/contractors", new
+        {
+            name = "Bad Email Contractor",
+            type = ContractorType.Individual.ToString(),
+            email = "not-an-email"
         });
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
@@ -87,13 +113,16 @@ public class ContractorApiIntegrationTests : IClassFixture<QontractWebApplicatio
         {
             name = "Integration Plumber",
             type = ContractorType.Individual.ToString(),
-            contactInfo = "012345 67890"
+            email = "plumber@example.de",
+            phone = "012345 67890"
         });
         createResponse.StatusCode.Should().Be(HttpStatusCode.Created);
         var created = await createResponse.Content.ReadFromJsonAsync<ContractorJson>();
         created.Should().NotBeNull();
         created!.Name.Should().Be("Integration Plumber");
         created.IsActive.Should().BeTrue();
+        created.Email.Should().Be("plumber@example.de");
+        created.Phone.Should().Be("012345 67890");
 
         // Read back
         var getResponse = await _client.GetAsync($"/api/contractors/{created.Id}");
@@ -101,13 +130,16 @@ public class ContractorApiIntegrationTests : IClassFixture<QontractWebApplicatio
         var fetched = await getResponse.Content.ReadFromJsonAsync<ContractorJson>();
         fetched.Should().NotBeNull();
         fetched!.Id.Should().Be(created.Id);
+        fetched.Email.Should().Be("plumber@example.de");
+        fetched.Phone.Should().Be("012345 67890");
 
         // Update
         var updateResponse = await _client.PutAsJsonAsync($"/api/contractors/{created.Id}", new
         {
             name = "Integration Plumber GmbH",
             type = ContractorType.Company.ToString(),
-            contactInfo = (string?)null,
+            email = (string?)null,
+            phone = (string?)null,
             isActive = (bool?)null
         });
         updateResponse.StatusCode.Should().Be(HttpStatusCode.OK);

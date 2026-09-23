@@ -11,15 +11,18 @@ namespace Qontract.API.Controllers;
 public class ContractorsController : ControllerBase
 {
     private readonly IContractorService _contractorService;
+    private readonly IAddressService _addressService;
     private readonly IValidator<ContractorCreateDTO> _createValidator;
     private readonly IValidator<ContractorUpdateDTO> _updateValidator;
 
     public ContractorsController(
         IContractorService contractorService,
+        IAddressService addressService,
         IValidator<ContractorCreateDTO> createValidator,
         IValidator<ContractorUpdateDTO> updateValidator)
     {
         _contractorService = contractorService;
+        _addressService = addressService;
         _createValidator = createValidator;
         _updateValidator = updateValidator;
     }
@@ -55,6 +58,19 @@ public class ContractorsController : ControllerBase
         // ExceptionHandlingMiddleware (issue #11).
         var contractor = await _contractorService.GetContractorByIdAsync(id, CurrentTenantId);
         return Ok(contractor);
+    }
+
+    /// <summary>
+    /// Active addresses of a contractor (issue #41). The contractor must
+    /// belong to the caller's tenant — cross-tenant and unknown ids both 404.
+    /// </summary>
+    [HttpGet("{id:int}/addresses")]
+    public async Task<ActionResult<List<AddressDTO>>> GetContractorAddresses(int id)
+    {
+        // KeyNotFoundException -> 404 is handled uniformly by
+        // ExceptionHandlingMiddleware (issue #11).
+        var addresses = await _addressService.GetAddressesForContractorAsync(id, CurrentTenantId);
+        return Ok(addresses);
     }
 
     [HttpPost]

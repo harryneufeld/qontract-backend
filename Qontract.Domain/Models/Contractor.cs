@@ -18,8 +18,11 @@ public class Contractor : BaseEntity
     [StringLength(50)]
     public ContractorType Type { get; set; }
 
-    [MaxLength(500)]
-    public string? ContactInfo { get; set; }
+    [MaxLength(200)]
+    public string? Email { get; set; }
+
+    [MaxLength(50)]
+    public string? Phone { get; set; }
 
     [Required]
     public int TenantId { get; set; }

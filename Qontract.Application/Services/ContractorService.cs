@@ -21,7 +21,8 @@ public class ContractorService : IContractorService
                 Id = c.Id,
                 Name = c.Name,
                 Type = c.Type,
-                ContactInfo = c.ContactInfo,
+                Email = c.Email,
+                Phone = c.Phone,
                 TenantId = c.TenantId,
                 UserId = c.UserId,
                 IsActive = c.IsActive,
@@ -48,7 +49,8 @@ public class ContractorService : IContractorService
             Id = contractor.Id,
             Name = contractor.Name,
             Type = contractor.Type,
-            ContactInfo = contractor.ContactInfo,
+            Email = contractor.Email,
+            Phone = contractor.Phone,
             TenantId = contractor.TenantId,
             UserId = contractor.UserId,
             IsActive = contractor.IsActive,
@@ -65,7 +67,8 @@ public class ContractorService : IContractorService
         {
             Name = dto.Name,
             Type = dto.Type,
-            ContactInfo = dto.ContactInfo,
+            Email = dto.Email,
+            Phone = dto.Phone,
             TenantId = dto.TenantId,
             UserId = dto.UserId,
             IsActive = true,
@@ -95,8 +98,11 @@ public class ContractorService : IContractorService
         if (dto.Type.HasValue)
             contractor.Type = dto.Type.Value;
 
-        if (!string.IsNullOrEmpty(dto.ContactInfo))
-            contractor.ContactInfo = dto.ContactInfo;
+        if (dto.Email is not null)
+            contractor.Email = dto.Email;
+
+        if (dto.Phone is not null)
+            contractor.Phone = dto.Phone;
 
         if (dto.IsActive.HasValue)
             contractor.IsActive = dto.IsActive.Value;

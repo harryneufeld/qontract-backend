@@ -62,7 +62,8 @@ public class TenantIsolationTests : IClassFixture<QontractWebApplicationFactory>
         {
             name = $"TI-{Guid.NewGuid():N}",
             type = "Individual",
-            contactInfo = (string?)null
+            email = (string?)null,
+            phone = (string?)null
         });
         response.StatusCode.Should().Be(HttpStatusCode.Created);
         var contractor = await response.Content.ReadFromJsonAsync<ContractorDTO>(JsonOptions);
@@ -284,6 +285,65 @@ public class TenantIsolationTests : IClassFixture<QontractWebApplicationFactory>
         Authenticate(token1);
         var get1 = await _client.GetAsync($"/api/addresses/{t2!.Id}");
         get1.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    // -----------------------------------------------------------------
+    // 5b. Contractor address list endpoint (issue #41)
+    // -----------------------------------------------------------------
+
+    [Fact]
+    public async Task ContractorAddresses_ReturnsOwnAddresses_HidesDeactivated_404sCrossTenant()
+    {
+        var token1 = await GetTokenAsync("admin@qontract.com");
+        Authenticate(token1);
+        var contractor = await CreateContractorAsync();
+
+        // Two active addresses + one that gets deactivated.
+        var a1 = await _client.PostAsJsonAsync("/api/addresses", new
+        {
+            entityType = "Contractor",
+            contractorId = contractor.Id,
+            street = "Base Street 1",
+            city = "Berlin",
+            zip = "10115",
+            country = "Germany"
+        });
+        a1.StatusCode.Should().Be(HttpStatusCode.Created);
+        var addr1 = await a1.Content.ReadFromJsonAsync<AddressDTO>(JsonOptions);
+
+        var a2 = await _client.PostAsJsonAsync("/api/addresses", new
+        {
+            entityType = "Contractor",
+            contractorId = contractor.Id,
+            street = "Base Street 2",
+            city = "Potsdam",
+            zip = "14467",
+            country = "Germany"
+        });
+        a2.StatusCode.Should().Be(HttpStatusCode.Created);
+        var addr2 = await a2.Content.ReadFromJsonAsync<AddressDTO>(JsonOptions);
+
+        // Owner tenant: sees exactly its two active addresses.
+        var list = await _client.GetFromJsonAsync<List<AddressDTO>>($"/api/contractors/{contractor.Id}/addresses", JsonOptions);
+        list.Should().NotBeNull();
+        list!.Select(a => a.Id).Should().BeEquivalentTo(new[] { addr1!.Id, addr2!.Id });
+
+        // Deactivated address disappears from the list.
+        var deact = await _client.PatchAsync($"/api/addresses/{addr1.Id}/deactivate", null);
+        deact.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var listAfterDeactivate = await _client.GetFromJsonAsync<List<AddressDTO>>($"/api/contractors/{contractor.Id}/addresses", JsonOptions);
+        listAfterDeactivate!.Select(a => a.Id).Should().BeEquivalentTo(new[] { addr2!.Id });
+
+        // Cross-tenant: tenant 2 gets 404 for tenant 1's contractor (no leak).
+        var token2 = await GetTokenAsync("admin2@qontract.com");
+        Authenticate(token2);
+        var cross = await _client.GetAsync($"/api/contractors/{contractor.Id}/addresses");
+        cross.StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        // Unknown contractor id: 404 as well.
+        var unknown = await _client.GetAsync("/api/contractors/999999/addresses");
+        unknown.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     // -----------------------------------------------------------------

@@ -47,7 +47,8 @@ public class ContractorServiceTests : IDisposable
         {
             Name = "Alice Builder",
             Type = ContractorType.Individual,
-            ContactInfo = "alice@builder.de",
+            Email = "alice@builder.de",
+            Phone = "+49 1234 56789",
             TenantId = tenant.Id,
             IsActive = true
         });
@@ -92,7 +93,8 @@ public class ContractorServiceTests : IDisposable
         {
             Name = "New Roofer",
             Type = ContractorType.Company,
-            ContactInfo = "roof@example.de",
+            Email = "roof@example.de",
+            Phone = "+49 170 123456",
             TenantId = TenantA()
         };
 
@@ -103,6 +105,8 @@ public class ContractorServiceTests : IDisposable
         created.ModifiedBy.Should().Be("admin@qontract.com");
         created.CreatedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromMinutes(1));
         created.IsActive.Should().BeTrue();
+        created.Email.Should().Be("roof@example.de");
+        created.Phone.Should().Be("+49 170 123456");
     }
 
     [Fact]
@@ -117,8 +121,24 @@ public class ContractorServiceTests : IDisposable
 
         updated.Name.Should().Be("Renamed Roofer");
         updated.Type.Should().Be(ContractorType.Individual); // untouched
-        updated.ContactInfo.Should().Be("alice@builder.de"); // untouched
+        updated.Email.Should().Be("alice@builder.de"); // untouched
+        updated.Phone.Should().Be("+49 1234 56789"); // untouched
         updated.ModifiedBy.Should().Be("admin@qontract.com");
+    }
+
+    [Fact]
+    public async Task UpdateContractorAsync_UpdatesContactFields()
+    {
+        var existing = (await _service.GetContractorsAsync(TenantA())).Single();
+
+        var updated = await _service.UpdateContractorAsync(existing.Id, TenantA(), new ContractorUpdateDTO
+        {
+            Email = "new@builder.de",
+            Phone = "+49 30 987654"
+        }, "admin@qontract.com");
+
+        updated.Email.Should().Be("new@builder.de");
+        updated.Phone.Should().Be("+49 30 987654");
     }
 
     [Fact]
@@ -170,7 +190,8 @@ public class ContractorValidatorTests
         {
             Name = "Valid Contractor",
             Type = ContractorType.Company,
-            ContactInfo = "contact"
+            Email = "contact@example.de",
+            Phone = "+49 1234 56789"
         };
 
         _createValidator.Validate(dto).IsValid.Should().BeTrue();
@@ -207,16 +228,48 @@ public class ContractorValidatorTests
     }
 
     [Fact]
-    public void CreateValidator_TooLongContactInfo_ShouldFail()
+    public void CreateValidator_TooLongEmail_ShouldFail()
     {
         var dto = new ContractorCreateDTO
         {
             Name = "Valid",
             Type = ContractorType.Individual,
-            ContactInfo = new string('c', 501)
+            Email = new string('c', 201)
         };
 
         _createValidator.Validate(dto).IsValid.Should().BeFalse();
+    }
+
+    [Fact]
+    public void CreateValidator_InvalidEmailFormat_ShouldFail()
+    {
+        var dto = new ContractorCreateDTO
+        {
+            Name = "Valid",
+            Type = ContractorType.Individual,
+            Email = "not-an-email"
+        };
+
+        var result = _createValidator.Validate(dto);
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(e => e.PropertyName == nameof(ContractorCreateDTO.Email));
+    }
+
+    [Fact]
+    public void CreateValidator_TooLongPhone_ShouldFail()
+    {
+        var dto = new ContractorCreateDTO
+        {
+            Name = "Valid",
+            Type = ContractorType.Individual,
+            Phone = new string('1', 51)
+        };
+
+        var result = _createValidator.Validate(dto);
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(e => e.PropertyName == nameof(ContractorCreateDTO.Phone));
     }
 
     [Fact]
@@ -235,9 +288,25 @@ public class ContractorValidatorTests
     }
 
     [Fact]
-    public void UpdateValidator_InvalidContactInfoLength_ShouldFail()
+    public void UpdateValidator_TooLongEmail_ShouldFail()
     {
-        var dto = new ContractorUpdateDTO { ContactInfo = new string('c', 501) };
+        var dto = new ContractorUpdateDTO { Email = new string('c', 201) };
+
+        _updateValidator.Validate(dto).IsValid.Should().BeFalse();
+    }
+
+    [Fact]
+    public void UpdateValidator_InvalidEmailFormat_ShouldFail()
+    {
+        var dto = new ContractorUpdateDTO { Email = "not-an-email" };
+
+        _updateValidator.Validate(dto).IsValid.Should().BeFalse();
+    }
+
+    [Fact]
+    public void UpdateValidator_TooLongPhone_ShouldFail()
+    {
+        var dto = new ContractorUpdateDTO { Phone = new string('1', 51) };
 
         _updateValidator.Validate(dto).IsValid.Should().BeFalse();
     }

@@ -12,4 +12,11 @@ public interface IAddressService
     Task<AddressDTO> UpdateAddressAsync(int id, int tenantId, AddressCreateDTO dto, string? modifiedBy, CancellationToken cancellationToken = default);
     Task<AddressDTO> GetAddressByIdAsync(int id, int tenantId, CancellationToken cancellationToken = default);
     Task<AddressDTO> DeactivateAddressAsync(int id, int tenantId, string? modifiedBy, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Active addresses of a contractor (issue #41). The contractor must
+    /// belong to <paramref name="tenantId"/> or a <c>KeyNotFoundException</c>
+    /// is thrown — cross-tenant ids 404 like unknown ones (no existence leaks).
+    /// </summary>
+    Task<List<AddressDTO>> GetAddressesForContractorAsync(int contractorId, int tenantId, CancellationToken cancellationToken = default);
 }
