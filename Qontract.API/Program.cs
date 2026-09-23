@@ -63,7 +63,11 @@ builder.Services.AddScoped<IContractService, ContractService>();
 builder.Services.AddScoped<IDocumentService, DocumentService>();
 builder.Services.AddScoped<IAddressService, AddressService>();
 
-// Register File Storage
+// Register File Storage. The storage backend reads its settings (path +
+// max file size) from the "Storage" configuration section (issue #34), so
+// the maximum file size lives in exactly one place.
+builder.Services.Configure<FileStorageOptions>(
+    builder.Configuration.GetSection(FileStorageOptions.SectionName));
 builder.Services.AddSingleton<IFileStorage, FileStorage>();
 
 // Document deletion queue (issue #14): retention settings + the background

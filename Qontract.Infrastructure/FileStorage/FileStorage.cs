@@ -1,88 +1,73 @@
 using System.IO;
-using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using Qontract.Core.Interfaces;
 
 namespace Qontract.Infrastructure.FileStorage;
 
+/// <summary>
+/// Local-disk implementation of <see cref="IFileStorage"/> (issue #34).
+/// Files live under &lt;Storage:Path&gt;/contracts/&lt;contractId&gt;/&lt;version&gt;/&lt;fileName&gt;.
+///
+/// Deliberately lock-free: the old global <c>SemaphoreSlim(1,1)</c> serialized
+/// every read/write/delete in the process, even for unrelated files. Plain
+/// <c>File</c> I/O is safe for the concurrent use here (each document write
+/// goes to its own path); a shared storage backend (issue #25) can impose its
+/// own concurrency rules if it needs them.
+/// </summary>
 public class FileStorage : IFileStorage
 {
+    private readonly FileStorageOptions _options;
     private readonly string _storageRoot;
-    private readonly int _maxFileSize = 50 * 1024 * 1024; // 50MB
-    private readonly SemaphoreSlim _semaphore = new SemaphoreSlim(1, 1);
 
-    public FileStorage(IConfiguration configuration)
+    public FileStorage(IOptions<FileStorageOptions> options)
     {
-        var storagePath = configuration["Storage:Path"] ?? "Storage";
+        _options = options.Value;
         // Relative paths resolve against the process working directory
         // (the API project), so storage ends up next to the SQLite db.
-        _storageRoot = Path.GetFullPath(storagePath);
+        _storageRoot = Path.GetFullPath(_options.Path);
         Directory.CreateDirectory(_storageRoot);
     }
 
-    public async Task<byte[]> UploadAsync(string fileName, string fileType, long fileSize)
+    public async Task SaveAsync(byte[] content, string filePath, CancellationToken cancellationToken = default)
     {
-        await _semaphore.WaitAsync();
-        try
+        if (content.Length > _options.MaxFileSizeBytes)
         {
-            if (fileSize > _maxFileSize)
-            {
-                throw new InvalidOperationException($"File size exceeds maximum allowed size of {_maxFileSize / (1024 * 1024)}MB");
-            }
+            throw new InvalidOperationException(
+                $"File size exceeds maximum allowed size of {_options.MaxFileSizeBytes / (1024 * 1024)}MB.");
+        }
 
-            var filePath = GenerateFilePath(0, fileName, 1);
-            // Store file data
-            var fileData = new byte[0];
-            await File.WriteAllBytesAsync(filePath, fileData);
-            return await File.ReadAllBytesAsync(filePath);
-        }
-        finally
-        {
-            _semaphore.Release();
-        }
+        // Directory creation is a side effect of saving, not of path generation.
+        Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
+        await File.WriteAllBytesAsync(filePath, content, cancellationToken);
     }
 
-    public async Task<byte[]> ReadAsync(string filePath)
+    public async Task<byte[]> ReadAsync(string filePath, CancellationToken cancellationToken = default)
     {
-        await _semaphore.WaitAsync();
-        try
+        if (!File.Exists(filePath))
         {
-            if (!File.Exists(filePath))
-            {
-                throw new FileNotFoundException($"File not found: {filePath}", filePath);
-            }
+            throw new FileNotFoundException($"File not found: {filePath}", filePath);
+        }
 
-            return await File.ReadAllBytesAsync(filePath);
-        }
-        finally
-        {
-            _semaphore.Release();
-        }
+        return await File.ReadAllBytesAsync(filePath, cancellationToken);
     }
 
-    public async Task<bool> DeleteAsync(string filePath)
+    public Task<bool> DeleteAsync(string filePath, CancellationToken cancellationToken = default)
     {
-        await _semaphore.WaitAsync();
-        try
+        if (File.Exists(filePath))
         {
-            if (System.IO.File.Exists(filePath))
-            {
-                System.IO.File.Delete(filePath);
-                return true;
-            }
-            return false;
+            File.Delete(filePath);
+            return Task.FromResult(true);
         }
-        finally
-        {
-            _semaphore.Release();
-        }
+
+        return Task.FromResult(false);
     }
 
     public string GenerateFilePath(int contractId, string fileName, int version)
     {
         // Path.Combine (not literal backslashes) so the layout is correct on
         // Linux and Windows alike: <root>/contracts/<contractId>/<version>/<file>.
-        var directory = Path.Combine(_storageRoot, "contracts", contractId.ToString(), version.ToString());
-        Directory.CreateDirectory(directory);
-        return Path.Combine(directory, fileName);
+        // Pure — SaveAsync creates the directory when writing.
+        return Path.Combine(
+            _storageRoot, "contracts", contractId.ToString(), version.ToString(), fileName);
     }
 }

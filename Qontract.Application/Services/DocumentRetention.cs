@@ -120,7 +120,7 @@ public class DocumentPurgeService
             // Best effort: the row must go even if the file is already gone.
             try
             {
-                await _fileStorage.DeleteAsync(document.FilePath);
+                await _fileStorage.DeleteAsync(document.FilePath, cancellationToken);
             }
             catch (Exception ex)
             {

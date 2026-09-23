@@ -12,7 +12,6 @@ public class DocumentService : IDocumentService
 {
     private readonly IApplicationDbContext _context;
     private readonly IFileStorage _fileStorage;
-    private readonly int _maxFileSize = 50 * 1024 * 1024; // 50MB
 
     public DocumentService(IApplicationDbContext context, IFileStorage fileStorage)
     {
@@ -98,10 +97,8 @@ public class DocumentService : IDocumentService
             throw new InvalidOperationException("File data is not valid base64.");
         }
 
-        if (fileBytes.Length > _maxFileSize)
-        {
-            throw new InvalidOperationException($"File size exceeds maximum allowed size of {_maxFileSize / (1024 * 1024)}MB.");
-        }
+        // The maximum file size is enforced by IFileStorage.SaveAsync
+        // (issue #34): one definition, in the storage layer, not here.
 
         // Contract must exist and belong to the tenant.
         var contract = await _context.Contracts
@@ -120,8 +117,10 @@ public class DocumentService : IDocumentService
 
         // Version 1 for a fresh upload; later versions overwrite the file
         // at the same path (kept for API compatibility with the old layout).
+        // All file I/O goes through IFileStorage (issue #34) so a cloud
+        // backend (issue #25) can be swapped in without touching services.
         var filePath = _fileStorage.GenerateFilePath(contractId, safeFileName, 1);
-        await File.WriteAllBytesAsync(filePath, fileBytes);
+        await _fileStorage.SaveAsync(fileBytes, filePath, cancellationToken);
 
         var document = new Document
         {
@@ -207,7 +206,7 @@ public class DocumentService : IDocumentService
 
         try
         {
-            return await File.ReadAllBytesAsync(document.FilePath);
+            return await _fileStorage.ReadAsync(document.FilePath, cancellationToken);
         }
         catch (FileNotFoundException)
         {
