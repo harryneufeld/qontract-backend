@@ -5,8 +5,11 @@ using Qontract.Application.Services;
 using Qontract.Application.Interfaces;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Qontract.Core.Interfaces;
 using Qontract.Infrastructure.FileStorage;
+using Qontract.API.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -20,7 +23,13 @@ builder.Services.AddControllers()
     {
         // Enums as strings so API consumers (Flutter app) work with readable values
         options.JsonSerializerOptions.Converters.Add(
-            new System.Text.Json.Serialization.JsonStringEnumConverter());
+            new JsonStringEnumConverter());
+        // Always serialize DateTimes as UTC with an explicit 'Z' suffix so the
+        // JSON is identical between create responses (Kind=Utc) and
+        // list/detail responses (entities reloaded from SQLite come back with
+        // Kind=Unspecified) — issue #31.
+        options.JsonSerializerOptions.Converters.Add(
+            new UtcDateTimeConverter());
     });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
