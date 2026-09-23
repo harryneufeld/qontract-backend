@@ -84,6 +84,22 @@ public class DocumentsController : ControllerBase
         return CreatedAtAction(nameof(GetDocument), new { id = document.Id }, document);
     }
 
+    /// <summary>GET /api/documents/trash — soft-deleted (in-retention) documents</summary>
+    [HttpGet("trash")]
+    public async Task<ActionResult<List<DocumentDTO>>> GetDeletedDocuments()
+    {
+        var documents = await _documentService.GetDeletedDocumentsAsync(CurrentTenantId);
+        return Ok(documents);
+    }
+
+    /// <summary>POST /api/documents/{id}/restore — undo a soft delete</summary>
+    [HttpPost("{id}/restore")]
+    public async Task<ActionResult<DocumentDTO>> RestoreDocument(int id)
+    {
+        var document = await _documentService.RestoreDocumentAsync(id, CurrentTenantId, CurrentUser);
+        return Ok(document);
+    }
+
     /// <summary>PUT /api/documents/{id}</summary>
     [HttpPut("{id}")]
     public async Task<ActionResult<DocumentDTO>> UpdateDocument(int id, [FromBody] DocumentCreateDTO dto)

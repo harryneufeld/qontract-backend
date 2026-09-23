@@ -34,7 +34,9 @@ public class DocumentServiceFileStorageTests : IDisposable
             .Options;
         _context = new ApplicationDbContext(options);
         _context.Database.EnsureCreated();
-        _service = new DocumentService(_context, _fileStorage);
+        _service = new DocumentService(
+            _context, _fileStorage,
+            new Microsoft.Extensions.Options.OptionsWrapper<DocumentRetentionOptions>(new DocumentRetentionOptions()));
 
         // Seed the tenant + contract the service resolves on every call.
         _context.Tenants.Add(new Tenant

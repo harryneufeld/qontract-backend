@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Qontract.Domain.Models;
 using Qontract.Application.Models;
 using Qontract.Core.Interfaces;
+using Microsoft.Extensions.Options;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Collections.Generic;
@@ -12,11 +13,13 @@ public class DocumentService : IDocumentService
 {
     private readonly IApplicationDbContext _context;
     private readonly IFileStorage _fileStorage;
+    private readonly DocumentRetentionOptions _retentionOptions;
 
-    public DocumentService(IApplicationDbContext context, IFileStorage fileStorage)
+    public DocumentService(IApplicationDbContext context, IFileStorage fileStorage, IOptions<DocumentRetentionOptions> retentionOptions)
     {
         _context = context;
         _fileStorage = fileStorage;
+        _retentionOptions = retentionOptions.Value;
     }
 
     public async Task<List<DocumentDTO>> GetDocumentsAsync(int contractId, int tenantId, CancellationToken cancellationToken = default)
@@ -192,6 +195,70 @@ public class DocumentService : IDocumentService
         await _context.SaveChangesAsync(cancellationToken);
 
         return true;
+    }
+
+    /// <summary>
+    /// Lists the tenant's soft-deleted documents that are still in their
+    /// retention period (issue #42) — the data behind the trash view.
+    /// Documents of other tenants and documents already purged are not
+    /// returned.
+    /// </summary>
+    public async Task<List<DocumentDTO>> GetDeletedDocumentsAsync(int tenantId, CancellationToken cancellationToken = default)
+    {
+        var documents = await _context.Documents
+            .AsNoTracking()
+            .Where(d => d.IsDeleted && d.DeletedAt != null)
+            .Include(d => d.Contract)
+            .ThenInclude(c => c!.Tenant)
+            .ToListAsync(cancellationToken);
+
+        // Retention resolution (TenantSettingsParser) is not translatable to
+        // SQL, so filter/sort/project in memory — the trash list is small by
+        // construction (one tenant's in-retention soft deletes).
+        return documents
+            .Where(d => d.Contract != null && d.Contract.TenantId == tenantId)
+            .OrderByDescending(d => d.DeletedAt)
+            .Select(d =>
+            {
+                var retentionDays =
+                    TenantSettingsParser.GetDocumentRetentionDays(d.Contract!.Tenant?.Settings)
+                    ?? _retentionOptions.DefaultDays;
+                var dto = ToDto(d);
+                dto.DeletedAt = d.DeletedAt;
+                dto.ExpiresAt = d.DeletedAt!.Value.AddDays(retentionDays);
+                return dto;
+            })
+            .ToList();
+    }
+
+    /// <summary>
+    /// Restores a soft-deleted document (issue #42): clears IsDeleted/
+    /// DeletedAt so it reappears in the contract's document list. The stored
+    /// file is untouched — soft delete never removed it. Throws
+    /// KeyNotFoundException (404) for purged, unknown, or other-tenant
+    /// documents, and for documents that were never soft-deleted.
+    /// </summary>
+    public async Task<DocumentDTO> RestoreDocumentAsync(int id, int tenantId, string? modifiedBy, CancellationToken cancellationToken = default)
+    {
+        var document = await _context.Documents
+            .Include(d => d.Contract)
+            .ThenInclude(c => c!.Tenant)
+            .FirstOrDefaultAsync(d => d.Id == id && d.IsDeleted, cancellationToken);
+
+        if (document == null || document.Contract == null || document.Contract.TenantId != tenantId)
+        {
+            // Uniform 404: existence and tenant ownership are not leaked.
+            throw new KeyNotFoundException($"Document with id {id} not found in tenant {tenantId}.");
+        }
+
+        document.IsDeleted = false;
+        document.DeletedAt = null;
+        document.ModifiedBy = modifiedBy ?? "system";
+        document.ModifiedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync(cancellationToken);
+
+        return ToDto(document);
     }
 
     public async Task<byte[]> GetDocumentContentAsync(int id, int tenantId, CancellationToken cancellationToken = default)

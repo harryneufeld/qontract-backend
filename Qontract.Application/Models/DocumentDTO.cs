@@ -13,4 +13,10 @@ public class DocumentDTO
     public int Version { get; set; }
     public string? CreatedBy { get; set; }
     public string? ModifiedBy { get; set; }
+
+    /// <summary>Soft-delete timestamp (populated by the trash view only; null for active documents).</summary>
+    public DateTime? DeletedAt { get; set; }
+
+    /// <summary>When the retention purge permanently removes this document (trash view only).</summary>
+    public DateTime? ExpiresAt { get; set; }
 }
