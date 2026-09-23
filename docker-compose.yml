@@ -7,6 +7,10 @@ services:
       - "5000:8080"
     environment:
       - ConnectionStrings__DefaultConnection=Server=mssql;Database=QontractDb;User Id=sa;Password=YourStrong@Passw0rd
+      # JWT signing key (issue #36): no key is committed in appsettings.json,
+      # so the container (non-Development environment) fails fast at startup
+      # unless JWT_KEY is provided in the host environment / .env file.
+      - Jwt__Key=${JWT_KEY:?Set JWT_KEY (min. 32 characters) in the environment or a .env file}
     depends_on:
       - mssql
 

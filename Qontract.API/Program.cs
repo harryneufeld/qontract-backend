@@ -10,6 +10,7 @@ using System.Text.Json.Serialization;
 using Qontract.Core.Interfaces;
 using Qontract.Infrastructure.FileStorage;
 using Qontract.API.Serialization;
+using Qontract.Core.Security;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -39,10 +40,17 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddValidatorsFromAssembly(typeof(Qontract.Application.Services.IContractorService).Assembly);
 
 // Register DbContext
+// (issue #36) Sensitive data logging dumps SQL parameter values — including
+// password hashes on login — into the log output, so it is enabled only in
+// Development, never in Production/other environments.
+var isDevelopment = builder.Environment.EnvironmentName == "Development";
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {
     options.UseSqlite(connectionString, b => b.MigrationsAssembly("Qontract.Infrastructure"));
-    options.EnableSensitiveDataLogging();
+    if (isDevelopment)
+    {
+        options.EnableSensitiveDataLogging();
+    }
 });
 builder.Services.AddScoped<IApplicationDbContext, ApplicationDbContext>();
 
@@ -70,7 +78,11 @@ builder.Services.AddHostedService<Qontract.API.Services.DocumentRetentionWorker>
 // fast with a clear message (or falls back to a dev-only key in Development)
 // instead of blowing up with an unhandled ArgumentNullException on the
 // first authenticated request (issue #10).
-var isDevelopment = builder.Environment.EnvironmentName == "Development";
+//
+// (issue #36) Jwt:Key is NOT committed in appsettings.json — it must come
+// from an environment variable (Jwt__Key) or user secrets in every
+// non-Development environment. Development falls back to a shared
+// development-only key so the API runs out of the box.
 var jwtKey = builder.Configuration["Jwt:Key"];
 var usedJwtFallbackKey = false;
 if (string.IsNullOrWhiteSpace(jwtKey))
@@ -79,15 +91,15 @@ if (string.IsNullOrWhiteSpace(jwtKey))
     {
         // Development-only fallback so the API runs out of the box.
         // This key is NOT secret-safe and must never be used in production.
-        jwtKey = "qontract-development-fallback-key-DO-NOT-USE-IN-PROD";
+        jwtKey = JwtKeys.DevelopmentFallback;
         usedJwtFallbackKey = true;
     }
     else
     {
         throw new InvalidOperationException(
             "Jwt:Key is not configured. Set the 'Jwt:Key' configuration value " +
-            "(appsettings.json, environment variable Jwt__Key, or user secrets) " +
-            "to a secret of at least 32 characters.");
+            "(environment variable Jwt__Key or user secrets — it is intentionally " +
+            "not committed in appsettings.json) to a secret of at least 32 characters.");
     }
 }
 

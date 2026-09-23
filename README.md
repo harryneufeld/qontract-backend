@@ -52,6 +52,15 @@ dotnet restore
 
 2. (Optional) The database connection is `Data Source=QontractDb.sqlite` in `appsettings.json`. Migrations run automatically at startup.
 
+   > **JWT signing key (issue #36):** `appsettings.json` intentionally does
+   > **not** contain `Jwt:Key`. In Development the API falls back to a shared
+   > development-only key (`Qontract.Core.Security.JwtKeys`) so it runs out of
+   > the box. In every non-Development environment the API fails fast at
+   > startup unless the key is provided via the `Jwt__Key` environment
+   > variable (or user secrets), e.g.
+   > `Jwt__Key="$(openssl rand -base64 48)" dotnet run --project Qontract.API`.
+   > `docker compose` expects the host variable `JWT_KEY` for the same reason.
+
 3. Build and run:
 ```bash
 dotnet run --project Qontract.API

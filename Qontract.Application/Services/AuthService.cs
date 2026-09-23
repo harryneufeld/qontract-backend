@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Qontract.Application.Interfaces;
 using Qontract.Application.Models;
+using Qontract.Core.Security;
 using System.Security.Cryptography;
 using System.Text;
 using System.IdentityModel.Tokens.Jwt;
@@ -217,13 +218,14 @@ public class AuthService : IAuthService
 
     private string GenerateJwtToken(User user)
     {
-        // Must mirror the fallback used by the API host (Qontract.API/Program.cs)
-        // so tokens signed in a dev environment without Jwt:Key configured are
-        // still accepted by the JWT validation pipeline (issue #10).
+        // (issue #36) The development fallback key is the single shared
+        // constant Qontract.Core.Security.JwtKeys.DevelopmentFallback, also
+        // referenced by the validation pipeline (Qontract.API/Program.cs), so
+        // tokens signed here are always accepted by that pipeline.
         var jwtKey = _configuration["Jwt:Key"];
         if (string.IsNullOrWhiteSpace(jwtKey))
         {
-            jwtKey = "qontract-development-fallback-key-DO-NOT-USE-IN-PROD";
+            jwtKey = JwtKeys.DevelopmentFallback;
             _logger.LogWarning(
                 "Jwt:Key is not configured. Using the development fallback signing key. " +
                 "Set 'Jwt:Key' in configuration before deploying.");
