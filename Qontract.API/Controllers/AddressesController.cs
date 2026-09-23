@@ -54,6 +54,7 @@ public class AddressesController : ControllerBase
         {
             EntityType.Tenant => (CurrentTenantId, EntityType.Tenant),
             EntityType.Contractor => (dto.ContractorId ?? 0, EntityType.Contractor),
+            EntityType.Contract => (dto.ContractId ?? 0, EntityType.Contract),
             _ => (0, dto.EntityType)
         };
 

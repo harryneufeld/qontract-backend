@@ -44,6 +44,9 @@ public class AddressService : IAddressService
             case EntityType.Contractor:
                 address.ContractorId = entityId;
                 break;
+            case EntityType.Contract:
+                address.ContractId = entityId;
+                break;
             case EntityType.Person:
                 // No backing entity owns Person addresses; nothing to link.
                 break;
@@ -57,7 +60,10 @@ public class AddressService : IAddressService
             // (Tenant addresses are the caller's own tenant by construction).
             var owner = entityType switch
             {
-                EntityType.Contractor => await _context.Contractors
+                EntityType.Contractor => (BaseEntity?)await _context.Contractors
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(c => c.Id == entityId && c.TenantId == tenantId, cancellationToken),
+                EntityType.Contract => (BaseEntity?)await _context.Contracts
                     .AsNoTracking()
                     .FirstOrDefaultAsync(c => c.Id == entityId && c.TenantId == tenantId, cancellationToken),
                 _ => null
@@ -131,7 +137,8 @@ public class AddressService : IAddressService
         var address = await _context.Addresses
             .FirstOrDefaultAsync(a => a.Id == id && a.IsActive
                 && (a.EntityType == EntityType.Tenant && a.TenantId == tenantId
-                    || (a.EntityType == EntityType.Contractor && _context.Contractors.Any(c => c.Id == a.ContractorId && c.TenantId == tenantId))),
+                    || (a.EntityType == EntityType.Contractor && _context.Contractors.Any(c => c.Id == a.ContractorId && c.TenantId == tenantId))
+                    || (a.EntityType == EntityType.Contract && _context.Contracts.Any(c => c.Id == a.ContractId && c.TenantId == tenantId))),
                 cancellationToken);
 
         if (address == null)

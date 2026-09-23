@@ -285,4 +285,58 @@ public class TenantIsolationTests : IClassFixture<QontractWebApplicationFactory>
         var get1 = await _client.GetAsync($"/api/addresses/{t2!.Id}");
         get1.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
+
+    // -----------------------------------------------------------------
+    // 6. Contract addresses can be created (previously impossible) and are
+    //    tenant-scoped to the contract's tenant
+    // -----------------------------------------------------------------
+
+    [Fact]
+    public async Task Address_Contract_CreatesAndIsCrossTenantInvisible()
+    {
+        var token1 = await GetTokenAsync("admin@qontract.com");
+        Authenticate(token1);
+
+        var createContract = await _client.PostAsJsonAsync("/api/contracts", new
+        {
+            title = $"TI Contract {Guid.NewGuid():N}",
+            status = "Active"
+        });
+        createContract.StatusCode.Should().Be(HttpStatusCode.Created);
+        var contract = await createContract.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+        var contractId = contract.GetProperty("id").GetInt32();
+
+        // Contract address for the caller's own contract: OK.
+        var ok = await _client.PostAsJsonAsync("/api/addresses", new
+        {
+            entityType = "Contract",
+            contractId = contractId,
+            street = "Site 1",
+            city = "Berlin",
+            zip = "10115",
+            country = "Germany"
+        });
+        ok.StatusCode.Should().Be(HttpStatusCode.Created);
+        var address = await ok.Content.ReadFromJsonAsync<AddressDTO>(JsonOptions);
+        address.Should().NotBeNull();
+        address!.EntityType.Should().Be(Qontract.Domain.Models.EntityType.Contract);
+
+        // Tenant 2 cannot see or create on tenant 1's contract.
+        var token2 = await GetTokenAsync("admin2@qontract.com");
+        Authenticate(token2);
+
+        var get2 = await _client.GetAsync($"/api/addresses/{address.Id}");
+        get2.StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        var foreign = await _client.PostAsJsonAsync("/api/addresses", new
+        {
+            entityType = "Contract",
+            contractId = contractId, // tenant 1's contract
+            street = "Intrusion 2",
+            city = "Berlin",
+            zip = "10115",
+            country = "Germany"
+        });
+        foreign.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
 }

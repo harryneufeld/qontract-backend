@@ -47,5 +47,6 @@ public enum EntityType
 {
     Tenant,
     Contractor,
-    Person
+    Person,
+    Contract
 }

@@ -27,6 +27,13 @@ public class AddressCreateDTO
     /// </summary>
     public int? ContractorId { get; set; }
 
+    /// <summary>
+    /// Owning contract for <c>EntityType.Contract</c> addresses (issue #32).
+    /// Must belong to the caller's tenant — the service verifies and 404s
+    /// otherwise.
+    /// </summary>
+    public int? ContractId { get; set; }
+
     public string Street { get; set; } = string.Empty;
     public string? City { get; set; }
     public string? Zip { get; set; }

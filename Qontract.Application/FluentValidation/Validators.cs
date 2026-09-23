@@ -215,6 +215,11 @@ public class AddressCreateValidator : AbstractValidator<AddressCreateDTO>
             .When(x => x.EntityType == EntityType.Contractor)
             .WithMessage("ContractorId is required for contractor addresses.");
 
+        RuleFor(x => x.ContractId)
+            .GreaterThanOrEqualTo(1)
+            .When(x => x.EntityType == EntityType.Contract)
+            .WithMessage("ContractId is required for contract addresses.");
+
         RuleFor(x => x.Street)
             .NotEmpty().WithMessage("Street is required.")
             .MaximumLength(500).WithMessage("Street cannot exceed 500 characters.");
