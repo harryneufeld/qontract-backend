@@ -82,7 +82,6 @@ dotnet run --project Qontract.API
 
 ### Authentication
 - `POST /api/Auth/login` - Login and get JWT token
-- `POST /api/Auth/refresh-token` - Refresh JWT token
 
 ### Tenants
 - `GET /api/Tenants` - List all tenants

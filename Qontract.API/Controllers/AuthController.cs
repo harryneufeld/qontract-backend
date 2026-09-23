@@ -57,18 +57,4 @@ public class AuthController : ControllerBase
     {
         return Ok(new { message = "Logged out" });
     }
-
-    [HttpPost("refresh-token")]
-    public async Task<ActionResult<Qontract.Application.Models.AuthDTO>> RefreshToken(string refreshToken)
-    {
-        try
-        {
-            var result = await _authService.RefreshTokenAsync(refreshToken);
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            return Unauthorized(new { error = ex.Message });
-        }
-    }
 }

@@ -8,7 +8,6 @@ namespace Qontract.Application.Services;
 public interface IAuthService
 {
     Task<Qontract.Application.Models.AuthDTO> LoginAsync(Qontract.Application.Models.LoginDTO dto, CancellationToken cancellationToken = default);
-    Task<Qontract.Application.Models.AuthDTO> RefreshTokenAsync(string refreshToken, CancellationToken cancellationToken = default);
     Task<string> HashPasswordAsync(string password);
     Task<Qontract.Application.Models.AuthUserDTO?> GetCurrentUserAsync(int userId, CancellationToken cancellationToken = default);
 }

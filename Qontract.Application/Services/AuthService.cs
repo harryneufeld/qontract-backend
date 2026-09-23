@@ -81,33 +81,6 @@ public class AuthService : IAuthService
         CreatedAt = user.CreatedAt
     };
 
-    public async Task<Qontract.Application.Models.AuthDTO> RefreshTokenAsync(string refreshToken, CancellationToken cancellationToken = default)
-    {
-        // In production, validate the refresh token here
-        // For now, return a new access token
-
-        // TODO: Implement refresh token validation
-        // This would validate the JWT token and issue a new one
-
-        var user = await _context.Users
-            .FirstOrDefaultAsync(u => u.Email == "refresh@example.com", cancellationToken);
-
-        if (user == null)
-        {
-            throw new InvalidOperationException("Invalid refresh token");
-        }
-
-        var token = GenerateJwtToken(user);
-
-        return new Qontract.Application.Models.AuthDTO
-        {
-            AccessToken = token,
-            UserId = user.Id,
-            Email = user.Email,
-            ExpiresAt = DateTime.UtcNow.AddHours(24)
-        };
-    }
-
     public async Task<string> HashPasswordAsync(string password)
     {
         try
