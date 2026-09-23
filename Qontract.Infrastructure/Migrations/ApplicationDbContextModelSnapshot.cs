@@ -63,6 +63,9 @@ namespace Qontract.Infrastructure.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("INTEGER");
 
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("INTEGER");
+
                     b.Property<DateTime>("ModifiedAt")
                         .HasColumnType("TEXT");
 

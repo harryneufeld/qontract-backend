@@ -8,8 +8,8 @@ namespace Qontract.Application.Services;
 
 public interface IAddressService
 {
-    Task<AddressDTO> CreateAddressAsync(AddressCreateDTO dto, int entityId, EntityType entityType, string? createdBy, CancellationToken cancellationToken = default);
-    Task<AddressDTO> UpdateAddressAsync(int id, AddressCreateDTO dto, string? modifiedBy, CancellationToken cancellationToken = default);
-    Task<AddressDTO> GetAddressByIdAsync(int id, CancellationToken cancellationToken = default);
-    Task<AddressDTO> DeactivateAddressAsync(int id, string? modifiedBy, CancellationToken cancellationToken = default);
+    Task<AddressDTO> CreateAddressAsync(AddressCreateDTO dto, int entityId, EntityType entityType, int tenantId, string? createdBy, CancellationToken cancellationToken = default);
+    Task<AddressDTO> UpdateAddressAsync(int id, int tenantId, AddressCreateDTO dto, string? modifiedBy, CancellationToken cancellationToken = default);
+    Task<AddressDTO> GetAddressByIdAsync(int id, int tenantId, CancellationToken cancellationToken = default);
+    Task<AddressDTO> DeactivateAddressAsync(int id, int tenantId, string? modifiedBy, CancellationToken cancellationToken = default);
 }

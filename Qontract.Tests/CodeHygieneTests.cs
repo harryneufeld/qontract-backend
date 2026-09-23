@@ -209,8 +209,13 @@ public class CodeHygieneTests : IClassFixture<QontractWebApplicationFactory>
     // 3. Address deactivation returns the AddressDTO (not a bare bool)
     // -----------------------------------------------------------------
 
+    /// <summary>
+    /// 3. Address deactivation returns the deactivated AddressDTO (issue #32:
+    ///    soft delete flips IsActive, the fields are preserved) instead of
+    ///    a bare `true` (the old DeleteAddressAsync contract).
+    /// </summary>
     [Fact]
-    public async Task DeactivateAddress_Returns200_BlankedAddressDto()
+    public async Task DeactivateAddress_Returns200_InactiveAddressDto()
     {
         await AuthenticateAsAdminAsync();
 
@@ -226,6 +231,7 @@ public class CodeHygieneTests : IClassFixture<QontractWebApplicationFactory>
         var address = await create.Content.ReadFromJsonAsync<AddressDTO>(JsonOptions);
         address.Should().NotBeNull();
         address!.Street.Should().Be("Main St 1");
+        address.IsActive.Should().BeTrue();
 
         var deact = await _client.PatchAsync($"/api/addresses/{address.Id}/deactivate", new StringContent(""));
         deact.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -237,8 +243,9 @@ public class CodeHygieneTests : IClassFixture<QontractWebApplicationFactory>
         doc.RootElement.TryGetProperty("id", out var id)
             .Should().BeTrue($"deactivate should return the AddressDTO, got: {body}");
         id.GetInt32().Should().Be(address.Id);
-        doc.RootElement.GetProperty("street").GetString().Should().Be(string.Empty);
-        doc.RootElement.GetProperty("city").GetString().Should().Be(string.Empty);
+        // Soft delete (issue #32): the row keeps its fields but is inactive.
+        doc.RootElement.GetProperty("street").GetString().Should().Be("Main St 1");
+        doc.RootElement.GetProperty("isActive").GetBoolean().Should().BeFalse();
     }
 
     // -----------------------------------------------------------------

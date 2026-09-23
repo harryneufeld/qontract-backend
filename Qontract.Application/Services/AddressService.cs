@@ -1,14 +1,17 @@
 using Qontract.Domain.Models;
 using Qontract.Application.Models;
 using Qontract.Application.Interfaces;
-using Microsoft.Extensions.Logging;
 using Microsoft.EntityFrameworkCore;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Collections.Generic;
 
 namespace Qontract.Application.Services;
 
+/// <summary>
+/// All address reads and writes are scoped to the caller's tenant (issue #32):
+/// addresses are resolved through the tenant of their owning entity, and
+/// cross-tenant lookups 404 exactly like unknown ids (no existence leaks).
+/// </summary>
 public class AddressService : IAddressService
 {
     private readonly IApplicationDbContext _context;
@@ -18,15 +21,17 @@ public class AddressService : IAddressService
         _context = context;
     }
 
-    public async Task<AddressDTO> CreateAddressAsync(AddressCreateDTO dto, int entityId, EntityType entityType, string? createdBy, CancellationToken cancellationToken = default)
+    public async Task<AddressDTO> CreateAddressAsync(AddressCreateDTO dto, int entityId, EntityType entityType, int tenantId, string? createdBy, CancellationToken cancellationToken = default)
     {
         var address = new Address
         {
-            EntityType = dto.EntityType,
+            EntityType = entityType,
             Street = dto.Street,
             City = dto.City,
             Zip = dto.Zip,
             Country = dto.Country,
+            CreatedBy = createdBy,
+            ModifiedBy = createdBy,
             CreatedAt = DateTime.UtcNow,
             ModifiedAt = DateTime.UtcNow
         };
@@ -39,21 +44,39 @@ public class AddressService : IAddressService
             case EntityType.Contractor:
                 address.ContractorId = entityId;
                 break;
+            case EntityType.Person:
+                // No backing entity owns Person addresses; nothing to link.
+                break;
+            default:
+                throw new InvalidOperationException($"Unknown address entity type {entityType}.");
+        }
+
+        if (entityType != EntityType.Tenant && entityType != EntityType.Person)
+        {
+            // The owning entity must exist and belong to the caller's tenant
+            // (Tenant addresses are the caller's own tenant by construction).
+            var owner = entityType switch
+            {
+                EntityType.Contractor => await _context.Contractors
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(c => c.Id == entityId && c.TenantId == tenantId, cancellationToken),
+                _ => null
+            };
+            if (owner == null)
+            {
+                throw new KeyNotFoundException($"Address owner with ID {entityId} not found in tenant {tenantId}.");
+            }
         }
 
         _context.Addresses.Add(address);
         await _context.SaveChangesAsync(cancellationToken);
 
-        return await GetAddressByIdAsync(address.Id, cancellationToken);
+        return await GetAddressByIdAsync(address.Id, tenantId, cancellationToken);
     }
 
-    public async Task<AddressDTO> UpdateAddressAsync(int id, AddressCreateDTO dto, string? modifiedBy, CancellationToken cancellationToken = default)
+    public async Task<AddressDTO> UpdateAddressAsync(int id, int tenantId, AddressCreateDTO dto, string? modifiedBy, CancellationToken cancellationToken = default)
     {
-        var address = await _context.Addresses
-            .FirstOrDefaultAsync(a => a.Id == id, cancellationToken);
-
-        if (address == null)
-            throw new KeyNotFoundException($"Address with ID {id} not found.");
+        var address = await FindInTenantAsync(id, tenantId, cancellationToken);
 
         if (!string.IsNullOrEmpty(dto.Street))
             address.Street = dto.Street;
@@ -68,58 +91,69 @@ public class AddressService : IAddressService
             address.Country = dto.Country;
 
         address.ModifiedAt = DateTime.UtcNow;
-        address.ModifiedBy = modifiedBy ?? string.Empty;
+        address.ModifiedBy = modifiedBy;
 
         await _context.SaveChangesAsync(cancellationToken);
 
-        return await GetAddressByIdAsync(id, cancellationToken);
+        return await GetAddressByIdAsync(id, tenantId, cancellationToken);
     }
 
-    public async Task<AddressDTO> GetAddressByIdAsync(int id, CancellationToken cancellationToken = default)
+    public async Task<AddressDTO> GetAddressByIdAsync(int id, int tenantId, CancellationToken cancellationToken = default)
     {
-        var address = await _context.Addresses
-            .FirstOrDefaultAsync(a => a.Id == id, cancellationToken);
-
-        if (address == null)
-            throw new KeyNotFoundException($"Address with ID {id} not found.");
-
-        return new AddressDTO
-        {
-            Id = address.Id,
-            EntityType = address.EntityType,
-            Street = address.Street,
-            City = address.City,
-            Zip = address.Zip,
-            Country = address.Country,
-            CreatedAt = address.CreatedAt,
-            ModifiedAt = address.ModifiedAt
-        };
+        var address = await FindInTenantAsync(id, tenantId, cancellationToken);
+        return ToDto(address);
     }
 
     /// <summary>
-    /// Soft-deactivates the address: <c>Address</c> has no <c>IsActive</c>
-    /// flag (see the tenant-isolation issue), so deactivation blanks the
-    /// fields instead of deleting the row. Returns the deactivated DTO —
-    /// previously the method was misnamed <c>DeleteAddressAsync</c> and
-    /// returned a bare bool while the endpoint promised an AddressDTO.
+    /// Soft-deactivates the address (issue #32): flips <c>IsActive</c> to
+    /// false — the address keeps its fields and the row, but is hidden from
+    /// all reads. Pre-#32 this misnamed "delete" blanked Street/City/Zip/
+    /// Country instead, because Address had no IsActive flag.
     /// </summary>
-    public async Task<AddressDTO> DeactivateAddressAsync(int id, string? modifiedBy, CancellationToken cancellationToken = default)
+    public async Task<AddressDTO> DeactivateAddressAsync(int id, int tenantId, string? modifiedBy, CancellationToken cancellationToken = default)
     {
-        var address = await _context.Addresses
-            .FirstOrDefaultAsync(a => a.Id == id, cancellationToken);
+        var address = await FindInTenantAsync(id, tenantId, cancellationToken);
 
-        if (address == null)
-            throw new KeyNotFoundException($"Address with ID {id} not found.");
-
-        address.Street = string.Empty;
-        address.City = string.Empty;
-        address.Zip = string.Empty;
-        address.Country = string.Empty;
+        address.IsActive = false;
         address.ModifiedAt = DateTime.UtcNow;
-        address.ModifiedBy = modifiedBy ?? string.Empty;
+        address.ModifiedBy = modifiedBy;
 
         await _context.SaveChangesAsync(cancellationToken);
 
-        return await GetAddressByIdAsync(id, cancellationToken);
+        // The row is now inactive; build the DTO from the tracked entity
+        // instead of going through FindInTenantAsync (which filters
+        // IsActive and would 404 on the row we just deactivated).
+        return ToDto(address);
     }
+
+    private async Task<Address> FindInTenantAsync(int id, int tenantId, CancellationToken cancellationToken)
+    {
+        var address = await _context.Addresses
+            .FirstOrDefaultAsync(a => a.Id == id && a.IsActive
+                && (a.EntityType == EntityType.Tenant && a.TenantId == tenantId
+                    || (a.EntityType == EntityType.Contractor && _context.Contractors.Any(c => c.Id == a.ContractorId && c.TenantId == tenantId))),
+                cancellationToken);
+
+        if (address == null)
+        {
+            // Uniform 404: cross-tenant addresses are not distinguishable
+            // from unknown ids (same convention as DocumentService).
+            throw new KeyNotFoundException($"Address with id {id} not found in tenant {tenantId}.");
+        }
+
+        return address;
+    }
+
+    private static AddressDTO ToDto(Address a) => new()
+    {
+        Id = a.Id,
+        EntityType = a.EntityType,
+        Street = a.Street,
+        City = a.City,
+        Zip = a.Zip,
+        Country = a.Country,
+        CreatedAt = a.CreatedAt,
+        ModifiedAt = a.ModifiedAt,
+        IsActive = a.IsActive
+    };
 }

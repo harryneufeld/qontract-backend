@@ -183,12 +183,14 @@ public class UserService : IUserService
         try
         {
             var user = await _context.Users
-                .FirstOrDefaultAsync(u => u.Id == id, cancellationToken);
+                .FirstOrDefaultAsync(u => u.Id == id && u.TenantId == tenantId, cancellationToken);
 
             if (user == null)
             {
-                _logger.LogWarning("User with ID {Id} not found", id);
-                throw new KeyNotFoundException($"User with ID {id} not found.");
+                _logger.LogWarning("User with ID {Id} not found in tenant {TenantId}", id, tenantId);
+                // Uniform 404: cross-tenant users are not distinguishable
+                // from unknown ids, and (issue #32) nothing is committed.
+                throw new KeyNotFoundException($"User with ID {id} not found in tenant {tenantId}.");
             }
 
             user.IsActive = false;

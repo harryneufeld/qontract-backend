@@ -206,7 +206,14 @@ public class AddressCreateValidator : AbstractValidator<AddressCreateDTO>
     public AddressCreateValidator()
     {
         RuleFor(x => x.EntityType)
-            .IsInEnum().WithMessage("Invalid entity type.");
+            .IsInEnum().WithMessage("Invalid entity type.")
+            .Must(x => x != EntityType.Person)
+            .WithMessage("Address entity type 'Person' is not supported.");
+
+        RuleFor(x => x.ContractorId)
+            .GreaterThanOrEqualTo(1)
+            .When(x => x.EntityType == EntityType.Contractor)
+            .WithMessage("ContractorId is required for contractor addresses.");
 
         RuleFor(x => x.Street)
             .NotEmpty().WithMessage("Street is required.")

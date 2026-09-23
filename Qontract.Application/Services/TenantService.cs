@@ -83,7 +83,7 @@ public class TenantService : ITenantService
         }
     }
 
-    public async Task<TenantDTO> CreateTenantAsync(TenantCreateDTO dto, CancellationToken cancellationToken = default)
+    public async Task<TenantDTO> CreateTenantAsync(TenantCreateDTO dto, string? createdBy, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -94,8 +94,8 @@ public class TenantService : ITenantService
                 Type = dto.Type,
                 Settings = dto.Settings,
                 IsActive = dto.IsActive,
-                CreatedBy = null,
-                ModifiedBy = null,
+                CreatedBy = createdBy,
+                ModifiedBy = createdBy,
                 CreatedAt = DateTime.UtcNow,
                 ModifiedAt = DateTime.UtcNow
             };
@@ -113,7 +113,7 @@ public class TenantService : ITenantService
         }
     }
 
-    public async Task<TenantDTO> UpdateTenantAsync(int id, TenantUpdateDTO dto, CancellationToken cancellationToken = default)
+    public async Task<TenantDTO> UpdateTenantAsync(int id, TenantUpdateDTO dto, string? modifiedBy, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -148,7 +148,7 @@ public class TenantService : ITenantService
             }
 
             tenant.ModifiedAt = DateTime.UtcNow;
-            tenant.ModifiedBy = null;
+            tenant.ModifiedBy = modifiedBy;
 
             await _context.SaveChangesAsync(cancellationToken);
 

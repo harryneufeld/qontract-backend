@@ -57,6 +57,10 @@ public class UsersController : ControllerBase
         if (reject is not null)
             return reject;
 
+        // Always scope to the authenticated tenant, never trust the client
+        // (issue #32) — same convention as the contractor controller.
+        dto.TenantId = CurrentTenantId;
+
         var user = await _userService.CreateUserAsync(dto, User.Identity?.Name);
         return CreatedAtAction(nameof(GetUser), new { id = user.Id }, user);
     }

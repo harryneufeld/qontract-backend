@@ -28,6 +28,15 @@ public class TenantsController : ControllerBase
         _updateValidator = updateValidator;
     }
 
+    /// <summary>
+    /// Identity used for audit fields (CreatedBy/ModifiedBy). The JWT carries
+    /// the email claim, not name (same convention as the contractor controller).
+    /// </summary>
+    private string? CurrentUser =>
+        User.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value
+        ?? User.FindFirst("email")?.Value
+        ?? User.Identity?.Name;
+
     [HttpGet]
     public async Task<ActionResult<List<TenantDTO>>> GetTenants()
     {
@@ -49,7 +58,7 @@ public class TenantsController : ControllerBase
         if (reject is not null)
             return reject;
 
-        var tenant = await _tenantService.CreateTenantAsync(dto);
+        var tenant = await _tenantService.CreateTenantAsync(dto, CurrentUser);
         return CreatedAtAction(nameof(GetTenant), new { id = tenant.Id }, tenant);
     }
 
@@ -60,14 +69,14 @@ public class TenantsController : ControllerBase
         if (reject is not null)
             return reject;
 
-        var tenant = await _tenantService.UpdateTenantAsync(id, dto);
+        var tenant = await _tenantService.UpdateTenantAsync(id, dto, CurrentUser);
         return Ok(tenant);
     }
 
     [HttpPatch("{id}/deactivate")]
     public async Task<ActionResult<TenantDTO>> DeactivateTenant(int id)
     {
-        var tenant = await _tenantService.DeactivateTenantAsync(id, User.Identity?.Name);
+        var tenant = await _tenantService.DeactivateTenantAsync(id, CurrentUser);
         return Ok(tenant);
     }
 }
