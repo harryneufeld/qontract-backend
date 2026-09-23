@@ -1,0 +1,9 @@
+# Keep the build context small and free of machine-local state (issue #35).
+**/bin/
+**/obj/
+.git/
+*.sqlite
+Storage/
+Dockerfile
+docker-compose.yml
+*.md
