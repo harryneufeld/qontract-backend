@@ -164,3 +164,19 @@ MIT
 - Add rate limiting to API endpoints
 - Implement proper CORS policies
 - Use HTTPS in production
+
+### CORS origins in production (issue #29 review)
+
+CORS behaviour (issue #12): in **Development** any origin is allowed (the
+Flutter web dev server picks a random localhost port); in **Production** only
+the origins listed in `Cors:Origins` are allowed, with credentials enabled.
+
+- The app authenticates via a JWT `Authorization: Bearer` header (no
+  cookies), and the native iOS/Android clients are not subject to CORS at
+  all (no `Origin` header) — only the **web** deployment needs a matching
+  origin.
+- The `Cors:Origins` values in `appsettings.json` are localhost placeholders.
+  When the web app gets a production host (qontract-app#31), add that origin
+  (the scheme + host the browser will send, e.g. `https://web.qontract.example`)
+  via `ASPNETCORE_Cors__Origins` or an environment-specific appsettings file —
+  no code change is required. Until then the production list is fail-closed.
