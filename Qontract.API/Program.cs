@@ -14,6 +14,16 @@ using Qontract.Core.Security;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Configuration.AddJsonFile("debugSettings.json", optional: true, reloadOnChange: true);
+if (builder.Environment.EnvironmentName == "Development")
+{
+    var debugUrls = builder.Configuration["Urls"];
+    if (!string.IsNullOrWhiteSpace(debugUrls))
+    {
+        builder.WebHost.UseUrls(debugUrls);
+    }
+}
+
 // Get connection string from configuration
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? "Data Source=QontractDb.sqlite";
