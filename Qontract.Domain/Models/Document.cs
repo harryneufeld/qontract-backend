@@ -58,8 +58,16 @@ public class Document : BaseEntity
     /// </summary>
     public DateTime? DeletedAt { get; set; }
 
+    /// <summary>
+    /// The version that superseded this document on re-upload (issue #23).
+    /// Null for the current version of a document. Old versions stay in the
+    /// database (and on disk) and remain individually downloadable.
+    /// </summary>
+    public int? SupersededById { get; set; }
+
     // Navigation properties
     public Contract Contract { get; set; }
     public User? User { get; set; }
     public ICollection<Contract> Contracts { get; set; } = new List<Contract>();
+    public Document? SupersededBy { get; set; }
 }

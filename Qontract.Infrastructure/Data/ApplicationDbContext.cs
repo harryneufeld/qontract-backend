@@ -147,6 +147,14 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
             entity.HasOne(e => e.Contract)
                 .WithMany()
                 .HasForeignKey(e => e.ContractId);
+            // Self-referencing re-upload chain (issue #23): a superseded
+            // version points at the version that replaced it. SetNull keeps
+            // the retention purge from being blocked when a referenced row
+            // is hard-deleted.
+            entity.HasOne(e => e.SupersededBy)
+                .WithMany()
+                .HasForeignKey(e => e.SupersededById)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         // Address

@@ -287,6 +287,9 @@ namespace Qontract.Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("TEXT");
 
+                    b.Property<int?>("SupersededById")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("Title")
                         .HasMaxLength(255)
                         .HasColumnType("TEXT");
@@ -308,6 +311,8 @@ namespace Qontract.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("ContractId");
+
+                    b.HasIndex("SupersededById");
 
                     b.HasIndex("UserId");
 
@@ -495,11 +500,18 @@ namespace Qontract.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("Qontract.Domain.Models.Document", "SupersededBy")
+                        .WithMany()
+                        .HasForeignKey("SupersededById")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("Qontract.Domain.Models.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId");
 
                     b.Navigation("Contract");
+
+                    b.Navigation("SupersededBy");
 
                     b.Navigation("User");
                 });

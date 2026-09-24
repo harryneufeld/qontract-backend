@@ -32,8 +32,11 @@ public class DocumentService : IDocumentService
             throw new KeyNotFoundException($"Contract with id {contractId} not found in tenant {tenantId}.");
         }
 
+        // Only the current version of each logical document (issue #23):
+        // superseded re-upload versions are listed via
+        // GET /api/documents/{id}/versions, not here.
         var documents = await _context.Documents
-            .Where(d => d.ContractId == contractId && !d.IsDeleted)
+            .Where(d => d.ContractId == contractId && !d.IsDeleted && d.SupersededById == null)
             .OrderByDescending(d => d.ModifiedAt)
             .Select(d => new DocumentDTO
             {
@@ -151,6 +154,172 @@ public class DocumentService : IDocumentService
         await _context.SaveChangesAsync(cancellationToken);
 
         return ToDto(document);
+    }
+
+    public async Task<DocumentDTO> ReuploadDocumentAsync(int id, DocumentReuploadDTO dto, int tenantId, string? modifiedBy, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(dto.FileData))
+        {
+            throw new InvalidOperationException("File data is required.");
+        }
+
+        byte[] fileBytes;
+        try
+        {
+            fileBytes = Convert.FromBase64String(dto.FileData);
+        }
+        catch (FormatException)
+        {
+            throw new InvalidOperationException("File data is not valid base64.");
+        }
+
+        // The maximum file size is enforced by IFileStorage.SaveAsync
+        // (issue #34): one definition, in the storage layer, not here.
+
+        var current = await FindCurrentDocumentAsync(id, tenantId, cancellationToken);
+
+        // Optional overrides; blank/absent keeps the previous version's value.
+        var fileName = !string.IsNullOrWhiteSpace(dto.FileName)
+            ? SanitizeFileName(dto.FileName)
+            : current.FileName;
+        var fileType = !string.IsNullOrWhiteSpace(dto.FileType)
+            ? dto.FileType!
+            : current.FileType;
+
+        var newVersion = current.Version + 1;
+        var filePath = _fileStorage.GenerateFilePath(current.ContractId, fileName, newVersion);
+        await _fileStorage.SaveAsync(fileBytes, filePath, cancellationToken);
+
+        var document = new Document
+        {
+            FileName = fileName,
+            FileType = fileType,
+            FilePath = filePath,
+            FileSize = fileBytes.Length, // trust the actual bytes, not the client's claim
+            UploadedBy = modifiedBy ?? "system",
+            ContractId = current.ContractId,
+            UploadedAt = DateTime.UtcNow,
+            Title = dto.Title is null ? current.Title : NormalizeTitle(dto.Title),
+            DocumentDate = dto.DocumentDate ?? current.DocumentDate,
+            CreatedAt = DateTime.UtcNow,
+            ModifiedAt = DateTime.UtcNow,
+            Version = newVersion,
+            CreatedBy = modifiedBy ?? "system",
+            ModifiedBy = modifiedBy ?? "system"
+        };
+
+        await _context.Documents.AddAsync(document, cancellationToken);
+        await _context.SaveChangesAsync(cancellationToken); // assigns document.Id
+
+        // The previous version is retained (row + file) but no longer the
+        // current version of this document.
+        current.SupersededById = document.Id;
+        await _context.SaveChangesAsync(cancellationToken);
+
+        return ToDto(document);
+    }
+
+    /// <summary>
+    /// Lists every retained version of a document's version family (issue
+    /// #23), oldest first. The referenced id may be any version in the
+    /// family (current or superseded); soft-deleted versions are hidden
+    /// like everywhere else. Unknown, purged, or other-tenant documents
+    /// yield a uniform 404.
+    /// </summary>
+    public async Task<List<DocumentDTO>> GetDocumentVersionsAsync(int id, int tenantId, CancellationToken cancellationToken = default)
+    {
+        var entry = await _context.Documents
+            .AsNoTracking()
+            .FirstOrDefaultAsync(d => d.Id == id && !d.IsDeleted, cancellationToken);
+
+        if (entry == null || await IsContractInOtherTenantAsync(entry.ContractId, tenantId, cancellationToken))
+        {
+            // Uniform 404: existence and tenant ownership are not leaked.
+            throw new KeyNotFoundException($"Document with id {id} not found in tenant {tenantId}.");
+        }
+
+        // All versions of one family share the contract and version families
+        // are small, so walk the supersession chains in memory.
+        var contractDocuments = await _context.Documents
+            .AsNoTracking()
+            .Where(d => d.ContractId == entry.ContractId && !d.IsDeleted)
+            .ToListAsync(cancellationToken);
+
+        var byId = contractDocuments.ToDictionary(d => d.Id);
+        var supersededBy = contractDocuments
+            .Where(d => d.SupersededById is not null)
+            .GroupBy(d => d.SupersededById!.Value)
+            .ToDictionary(g => g.Key, g => g.First());
+
+        // Forward to the current (unsuperseded) version...
+        var current = entry;
+        var hops = 0;
+        while (current.SupersededById is int nextId
+            && byId.TryGetValue(nextId, out var next)
+            && hops++ < 100)
+        {
+            current = next;
+        }
+
+        // ...then back through the chain to the first version.
+        var family = new List<Document> { current };
+        while (supersededBy.TryGetValue(current.Id, out var previous))
+        {
+            family.Add(previous);
+            current = previous;
+        }
+
+        return family
+            .OrderBy(d => d.Version)
+            .ThenBy(d => d.UploadedAt)
+            .Select(ToDto)
+            .ToList();
+    }
+
+    /// <summary>
+    /// Resolves a document by id in the tenant and walks supersession links
+    /// forward to the current version (issue #23), so callers may reference
+    /// either the current version or an old one. Uniform 404 for unknown,
+    /// soft-deleted, or other-tenant documents.
+    /// </summary>
+    private async Task<Document> FindCurrentDocumentAsync(int id, int tenantId, CancellationToken cancellationToken)
+    {
+        var document = await _context.Documents
+            .FirstOrDefaultAsync(d => d.Id == id && !d.IsDeleted, cancellationToken);
+
+        if (document == null || await IsContractInOtherTenantAsync(document.ContractId, tenantId, cancellationToken))
+        {
+            throw new KeyNotFoundException($"Document with id {id} not found in tenant {tenantId}.");
+        }
+
+        var hops = 0;
+        while (document.SupersededById is int nextId && hops++ < 100)
+        {
+            var next = await _context.Documents
+                .FirstOrDefaultAsync(d => d.Id == nextId && !d.IsDeleted, cancellationToken);
+            // The current version was purged/retired: stop at the newest
+            // still-present version instead of failing.
+            if (next == null)
+            {
+                break;
+            }
+
+            document = next;
+        }
+
+        return document;
+    }
+
+    /// <summary>Strips directory parts from a client-supplied file name.</summary>
+    private static string SanitizeFileName(string fileName)
+    {
+        var safeFileName = Path.GetFileName(fileName);
+        if (string.IsNullOrWhiteSpace(safeFileName))
+        {
+            throw new InvalidOperationException("File name must not be empty.");
+        }
+
+        return safeFileName;
     }
 
     public async Task<DocumentDTO> UpdateDocumentAsync(int id, DocumentCreateDTO dto, int tenantId, string? modifiedBy, CancellationToken cancellationToken = default)

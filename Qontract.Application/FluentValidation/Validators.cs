@@ -219,6 +219,27 @@ public class DocumentMetadataValidator : AbstractValidator<DocumentMetadataDTO>
     }
 }
 
+public class DocumentReuploadValidator : AbstractValidator<DocumentReuploadDTO>
+{
+    public DocumentReuploadValidator()
+    {
+        RuleFor(x => x.FileData)
+            .NotEmpty().WithMessage("FileData is required.");
+
+        RuleFor(x => x.FileName)
+            .MaximumLength(255).When(x => !string.IsNullOrWhiteSpace(x.FileName))
+            .WithMessage("FileName cannot exceed 255 characters.");
+
+        RuleFor(x => x.FileType)
+            .MaximumLength(200).When(x => !string.IsNullOrWhiteSpace(x.FileType))
+            .WithMessage("FileType cannot exceed 200 characters.");
+
+        RuleFor(x => x.Title)
+            .MaximumLength(255).When(x => x.Title is not null)
+            .WithMessage("Title cannot exceed 255 characters.");
+    }
+}
+
 public class AddressCreateValidator : AbstractValidator<AddressCreateDTO>
 {
     public AddressCreateValidator()

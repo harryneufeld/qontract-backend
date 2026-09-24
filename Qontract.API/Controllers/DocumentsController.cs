@@ -13,15 +13,18 @@ public class DocumentsController : ControllerBase
     private readonly IDocumentService _documentService;
     private readonly IValidator<DocumentCreateDTO> _createValidator;
     private readonly IValidator<DocumentMetadataDTO> _metadataValidator;
+    private readonly IValidator<DocumentReuploadDTO> _reuploadValidator;
 
     public DocumentsController(
         IDocumentService documentService,
         IValidator<DocumentCreateDTO> createValidator,
-        IValidator<DocumentMetadataDTO> metadataValidator)
+        IValidator<DocumentMetadataDTO> metadataValidator,
+        IValidator<DocumentReuploadDTO> reuploadValidator)
     {
         _documentService = documentService;
         _createValidator = createValidator;
         _metadataValidator = metadataValidator;
+        _reuploadValidator = reuploadValidator;
     }
 
     /// <summary>
@@ -100,6 +103,36 @@ public class DocumentsController : ControllerBase
     public async Task<ActionResult<DocumentDTO>> RestoreDocument(int id)
     {
         var document = await _documentService.RestoreDocumentAsync(id, CurrentTenantId, CurrentUser);
+        return Ok(document);
+    }
+
+    /// <summary>
+    /// GET /api/documents/{id}/versions — the full version history of the
+    /// document's family (issue #23), oldest first. Every entry keeps its
+    /// own id, so old versions stay individually downloadable.
+    /// </summary>
+    [HttpGet("{id}/versions")]
+    public async Task<ActionResult<List<DocumentDTO>>> GetDocumentVersions(int id)
+    {
+        var versions = await _documentService.GetDocumentVersionsAsync(id, CurrentTenantId);
+        return Ok(versions);
+    }
+
+    /// <summary>
+    /// POST /api/documents/{id}/reupload — stores a new version of the
+    /// document (issue #23). The previous version is retained (listable via
+    /// GET /api/documents/{id}/versions, downloadable by its own id) and the
+    /// new version increments the version number. Ids of superseded versions
+    /// are accepted and resolved to the current version.
+    /// </summary>
+    [HttpPost("{id}/reupload")]
+    public async Task<ActionResult<DocumentDTO>> ReuploadDocument(int id, [FromBody] DocumentReuploadDTO dto)
+    {
+        var reject = await DtoValidation.RejectIfInvalidAsync(_reuploadValidator, dto);
+        if (reject is not null)
+            return reject;
+
+        var document = await _documentService.ReuploadDocumentAsync(id, dto, CurrentTenantId, CurrentUser);
         return Ok(document);
     }
 
