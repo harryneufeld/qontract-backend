@@ -38,11 +38,13 @@ public class DocumentService : IDocumentService
             .Select(d => new DocumentDTO
             {
                 Id = d.Id,
+                Title = d.Title,
                 FileName = d.FileName,
                 FileType = d.FileType,
                 FileSize = d.FileSize,
                 ContractId = d.ContractId,
                 UploadedAt = d.UploadedAt,
+                DocumentDate = d.DocumentDate,
                 CreatedAt = d.CreatedAt,
                 ModifiedAt = d.ModifiedAt,
                 Version = d.Version,
@@ -61,11 +63,13 @@ public class DocumentService : IDocumentService
             .Select(d => new DocumentDTO
             {
                 Id = d.Id,
+                Title = d.Title,
                 FileName = d.FileName,
                 FileType = d.FileType,
                 FileSize = d.FileSize,
                 ContractId = d.ContractId,
                 UploadedAt = d.UploadedAt,
+                DocumentDate = d.DocumentDate,
                 CreatedAt = d.CreatedAt,
                 ModifiedAt = d.ModifiedAt,
                 Version = d.Version,
@@ -134,6 +138,8 @@ public class DocumentService : IDocumentService
             UploadedBy = createdBy ?? "system",
             ContractId = contractId,
             UploadedAt = DateTime.UtcNow,
+            Title = NormalizeTitle(dto.Title),
+            DocumentDate = dto.DocumentDate,
             CreatedAt = DateTime.UtcNow,
             ModifiedAt = DateTime.UtcNow,
             Version = 1,
@@ -172,6 +178,38 @@ public class DocumentService : IDocumentService
 
         return ToDto(document);
     }
+
+    public async Task<DocumentDTO> UpdateMetadataAsync(int id, DocumentMetadataDTO dto, int tenantId, string? modifiedBy, CancellationToken cancellationToken = default)
+    {
+        var document = await _context.Documents
+            .FirstOrDefaultAsync(d => d.Id == id && !d.IsDeleted, cancellationToken);
+
+        if (document == null || await IsContractInOtherTenantAsync(document.ContractId, tenantId, cancellationToken))
+        {
+            throw new KeyNotFoundException($"Document with id {id} not found in tenant {tenantId}.");
+        }
+
+        // Both fields are optional: null = leave as-is. An explicit blank
+        // title clears it (the UI then falls back to the file name).
+        if (dto.Title is not null)
+        {
+            document.Title = NormalizeTitle(dto.Title);
+        }
+        if (dto.DocumentDate is not null)
+        {
+            document.DocumentDate = dto.DocumentDate;
+        }
+        document.ModifiedBy = modifiedBy ?? "system";
+        document.ModifiedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync(cancellationToken);
+
+        return ToDto(document);
+    }
+
+    /// <summary>Trims a user-supplied title; blank becomes null.</summary>
+    private static string? NormalizeTitle(string? title) =>
+        string.IsNullOrWhiteSpace(title) ? null : title.Trim();
 
     public async Task<bool> DeleteDocumentAsync(int id, int tenantId, string? modifiedBy, CancellationToken cancellationToken = default)
     {
@@ -297,11 +335,13 @@ public class DocumentService : IDocumentService
     private static DocumentDTO ToDto(Document d) => new()
     {
         Id = d.Id,
+        Title = d.Title,
         FileName = d.FileName,
         FileType = d.FileType,
         FileSize = d.FileSize,
         ContractId = d.ContractId,
         UploadedAt = d.UploadedAt,
+        DocumentDate = d.DocumentDate,
         CreatedAt = d.CreatedAt,
         ModifiedAt = d.ModifiedAt,
         Version = d.Version,

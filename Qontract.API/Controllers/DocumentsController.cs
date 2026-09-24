@@ -12,13 +12,16 @@ public class DocumentsController : ControllerBase
 {
     private readonly IDocumentService _documentService;
     private readonly IValidator<DocumentCreateDTO> _createValidator;
+    private readonly IValidator<DocumentMetadataDTO> _metadataValidator;
 
     public DocumentsController(
         IDocumentService documentService,
-        IValidator<DocumentCreateDTO> createValidator)
+        IValidator<DocumentCreateDTO> createValidator,
+        IValidator<DocumentMetadataDTO> metadataValidator)
     {
         _documentService = documentService;
         _createValidator = createValidator;
+        _metadataValidator = metadataValidator;
     }
 
     /// <summary>
@@ -112,6 +115,21 @@ public class DocumentsController : ControllerBase
             return reject;
 
         var document = await _documentService.UpdateDocumentAsync(id, dto, CurrentTenantId, CurrentUser);
+        return Ok(document);
+    }
+
+    /// <summary>
+    /// PATCH /api/documents/{id}/metadata — user-editable title and
+    /// document date (app issue #5). Null fields are left untouched.
+    /// </summary>
+    [HttpPatch("{id}/metadata")]
+    public async Task<ActionResult<DocumentDTO>> UpdateDocumentMetadata(int id, [FromBody] DocumentMetadataDTO dto)
+    {
+        var reject = await DtoValidation.RejectIfInvalidAsync(_metadataValidator, dto);
+        if (reject is not null)
+            return reject;
+
+        var document = await _documentService.UpdateMetadataAsync(id, dto, CurrentTenantId, CurrentUser);
         return Ok(document);
     }
 

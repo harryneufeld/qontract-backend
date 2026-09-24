@@ -69,7 +69,9 @@ public class DocumentApiIntegrationTests : IClassFixture<QontractWebApplicationF
         DateTime UploadedAt,
         int Version,
         string? CreatedBy,
-        string? ModifiedBy);
+        string? ModifiedBy,
+        string? Title = null,
+        DateTime? DocumentDate = null);
 
     [Fact]
     public async Task GetDocuments_ShouldReturnUnauthorized_WithoutToken()
@@ -170,6 +172,133 @@ public class DocumentApiIntegrationTests : IClassFixture<QontractWebApplicationF
         });
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task DocumentMetadata_CreateAndPatch_ShouldPersistTitleAndDate()
+    {
+        var token = await GetTokenAsync("admin@qontract.com");
+        Authenticate(token);
+
+        var contractId = await CreateContractAsync("Doc metadata contract");
+        var base64 = Convert.ToBase64String(new byte[] { 1, 2, 3 });
+
+        // Create with title + date
+        var createResponse = await _client.PostAsJsonAsync($"/api/documents/contract/{contractId}/documents", new
+        {
+            fileName = "invoice-001.pdf",
+            fileType = "application/pdf",
+            fileData = base64,
+            contractId,
+            title = "  January Invoice  ",
+            documentDate = "2026-01-15"
+        });
+        createResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+        var created = await createResponse.Content.ReadFromJsonAsync<DocumentJson>();
+        created!.Title.Should().Be("January Invoice"); // trimmed
+        created.DocumentDate.Should().Be(DateTime.Parse("2026-01-15"));
+
+        // Create without metadata -> nulls
+        var bareResponse = await _client.PostAsJsonAsync($"/api/documents/contract/{contractId}/documents", new
+        {
+            fileName = "bare.txt",
+            fileType = "text/plain",
+            fileData = base64,
+            contractId
+        });
+        bareResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+        var bare = await bareResponse.Content.ReadFromJsonAsync<DocumentJson>();
+        bare!.Title.Should().BeNull();
+        bare.DocumentDate.Should().BeNull();
+
+        // Patch: change both fields
+        var patch = await _client.PatchAsJsonAsync($"/api/documents/{created.Id}/metadata", new
+        {
+            title = "Feb Invoice",
+            documentDate = "2026-02-20"
+        });
+        patch.StatusCode.Should().Be(HttpStatusCode.OK);
+        var patched = await patch.Content.ReadFromJsonAsync<DocumentJson>();
+        patched!.Title.Should().Be("Feb Invoice");
+        patched.DocumentDate.Should().Be(DateTime.Parse("2026-02-20"));
+        patched.FileName.Should().Be("invoice-001.pdf"); // untouched
+
+        // Patch: null leaves values, blank title clears it
+        var clear = await _client.PatchAsJsonAsync($"/api/documents/{created.Id}/metadata", new
+        {
+            title = "   "
+        });
+        clear.StatusCode.Should().Be(HttpStatusCode.OK);
+        var cleared = await clear.Content.ReadFromJsonAsync<DocumentJson>();
+        cleared!.Title.Should().BeNull();
+        cleared.DocumentDate.Should().Be(DateTime.Parse("2026-02-20")); // unchanged
+
+        // The list endpoint reports the same metadata
+        var docs = await _client.GetFromJsonAsync<List<DocumentJson>>(
+            $"/api/documents/contract/{contractId}/documents");
+        docs.Should().HaveCount(2);
+        docs.Single(d => d.Id == created.Id).Title.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task DocumentMetadata_Patch_ShouldRejectTooLongTitle_AndUnknownIds()
+    {
+        var token = await GetTokenAsync("admin@qontract.com");
+        Authenticate(token);
+
+        var contractId = await CreateContractAsync("Doc metadata bad contract");
+        var base64 = Convert.ToBase64String(new byte[] { 1 });
+        var createResponse = await _client.PostAsJsonAsync($"/api/documents/contract/{contractId}/documents", new
+        {
+            fileName = "a.txt",
+            fileType = "text/plain",
+            fileData = base64,
+            contractId
+        });
+        createResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+        var created = await createResponse.Content.ReadFromJsonAsync<DocumentJson>();
+
+        // > 255 chars -> 400
+        var tooLong = await _client.PatchAsJsonAsync($"/api/documents/{created!.Id}/metadata", new
+        {
+            title = new string('x', 256)
+        });
+        tooLong.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        // Unknown document -> 404
+        var missing = await _client.PatchAsJsonAsync("/api/documents/999999/metadata", new
+        {
+            title = "ghost"
+        });
+        missing.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task DocumentMetadata_ShouldNotLeakAcrossTenants()
+    {
+        var tenant1Token = await GetTokenAsync("admin@qontract.com");
+        Authenticate(tenant1Token);
+        var tenant1Contract = await CreateContractAsync("Tenant1 metadata contract");
+        var base64 = Convert.ToBase64String(new byte[] { 9 });
+        var upload = await _client.PostAsJsonAsync($"/api/documents/contract/{tenant1Contract}/documents", new
+        {
+            fileName = "secret.txt",
+            fileType = "text/plain",
+            fileData = base64,
+            contractId = tenant1Contract,
+            title = "secret"
+        });
+        upload.StatusCode.Should().Be(HttpStatusCode.Created);
+        var doc = await upload.Content.ReadFromJsonAsync<DocumentJson>();
+
+        var tenant2Token = await GetTokenAsync("admin2@qontract.com");
+        Authenticate(tenant2Token);
+        (await _client.PatchAsJsonAsync($"/api/documents/{doc!.Id}/metadata", new { title = "hijacked" }))
+            .StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        Authenticate(tenant1Token);
+        (await (await _client.GetAsync($"/api/documents/{doc.Id}"))
+            .Content.ReadFromJsonAsync<DocumentJson>()!).Title.Should().Be("secret");
     }
 
     [Fact]

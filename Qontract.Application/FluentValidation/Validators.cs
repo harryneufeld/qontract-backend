@@ -209,6 +209,16 @@ public class DocumentCreateValidator : AbstractValidator<DocumentCreateDTO>
     }
 }
 
+public class DocumentMetadataValidator : AbstractValidator<DocumentMetadataDTO>
+{
+    public DocumentMetadataValidator()
+    {
+        RuleFor(x => x.Title)
+            .MaximumLength(255).When(x => x.Title is not null)
+            .WithMessage("Title cannot exceed 255 characters.");
+    }
+}
+
 public class AddressCreateValidator : AbstractValidator<AddressCreateDTO>
 {
     public AddressCreateValidator()

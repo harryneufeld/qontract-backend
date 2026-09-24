@@ -36,6 +36,15 @@ public class Document : BaseEntity
     [Required]
     public int Version { get; set; }
 
+    [MaxLength(255)]
+    public string? Title { get; set; }
+
+    /// <summary>
+    /// User-chosen document date (app issue #5). Nullable: legacy
+    /// documents carry no explicit date; the UI falls back to UploadedAt.
+    /// </summary>
+    public DateTime? DocumentDate { get; set; }
+
     /// <summary>
     /// Soft-delete flag (issue #14). Deleted documents stay in the database
     /// (and on disk) until the retention period has passed; list/get
