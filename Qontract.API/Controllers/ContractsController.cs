@@ -43,9 +43,17 @@ public class ContractsController : ControllerBase
         ?? User.Identity?.Name;
 
     [HttpGet]
-    public async Task<ActionResult<List<ContractDTO>>> GetContracts()
+    public async Task<ActionResult<List<ContractDTO>>> GetContracts(
+        [FromQuery] int page = 0,
+        [FromQuery] int pageSize = 0)
     {
-        var contracts = await _contractService.GetContractsAsync(CurrentTenantId);
+        // Offset paging for the dashboard (issue #43). Absent/zero params
+        // preserve the historic full-list behaviour.
+        var p = page < 0 ? 0 : page;
+        var s = pageSize < 0 ? 0 : pageSize;
+
+        var contracts = await _contractService.GetContractsAsync(
+            CurrentTenantId, p, s);
         return Ok(contracts);
     }
 

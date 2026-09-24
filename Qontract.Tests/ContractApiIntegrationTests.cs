@@ -301,7 +301,67 @@ public class ContractApiIntegrationTests : IClassFixture<QontractWebApplicationF
         });
         crossTenantUpdate.StatusCode.Should().Be(HttpStatusCode.NotFound);
 
-        var crossTenantDelete = await _client.DeleteAsync($"/api/contracts/{created.Id}");
+        var crossTenantDelete = await _client.DeleteAsync($"/api/contracts/{created!.Id}");
         crossTenantDelete.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task GetContracts_WithPaging_ShouldPageAndStayTenantIsolated()
+    {
+        var token = await GetTokenAsync("admin@qontract.com");
+        Authenticate(token);
+
+        // Distinctive prefix so these are identifiable regardless of the
+        // shared DB's other (pre-existing) contracts.
+        const string prefix = "PAGING-PROBE-";
+        var ids = new List<int>();
+        for (var i = 1; i <= 5; i++)
+        {
+            var resp = await _client.PostAsJsonAsync("/api/contracts", new
+            {
+                title = $"{prefix}{i}",
+                status = "Active"
+            });
+            resp.StatusCode.Should().Be(HttpStatusCode.Created);
+            ids.Add((await resp.Content.ReadFromJsonAsync<ContractJson>())!.Id);
+        }
+
+        // Full list (no paging params) still returns every probe contract
+        // and remains backward compatible (a plain JSON array).
+        var all = await _client.GetFromJsonAsync<List<ContractJson>>("/api/contracts");
+        all.Should().NotBeNull();
+        var allProbes = all!
+            .Where(c => c.Title.StartsWith(prefix))
+            .Select(c => c.Id)
+            .ToHashSet();
+        allProbes.Should().BeEquivalentTo(ids);
+
+        // Page 1 of 2: exactly 2 probe rows, newest-first, disjoint from
+        // page 2. (Newest-first because the list sorts by CreatedAt desc,
+        // with Id desc as a stable tiebreak.)
+        var page1 = await _client.GetFromJsonAsync<List<ContractJson>>(
+            "/api/contracts?page=1&pageSize=2");
+        page1.Should().NotBeNull();
+        page1!.Should().OnlyContain(c => c.Title.StartsWith(prefix));
+        page1.Should().HaveCount(2);
+        page1[0].Id.Should().BeGreaterThan(page1[1].Id);
+
+        var page2 = await _client.GetFromJsonAsync<List<ContractJson>>(
+            "/api/contracts?page=2&pageSize=2");
+        page2!.Should().OnlyContain(c => c.Title.StartsWith(prefix));
+        page2.Should().HaveCount(2);
+
+        // The two pages are disjoint and together hold 4 distinct probe ids
+        // (page 3 would carry the 5th).
+        var pageIds = page1.Select(c => c.Id).Concat(page2.Select(c => c.Id)).ToList();
+        pageIds.Distinct().Should().HaveCount(4);
+        (page1.Select(c => c.Id).Intersect(page2.Select(c => c.Id))).Should().BeEmpty();
+
+        // Tenant 2 must see no probe contracts even while paging.
+        var tenant2Token = await GetTokenAsync("admin2@qontract.com");
+        Authenticate(tenant2Token);
+        var tenant2Page = await _client.GetFromJsonAsync<List<ContractJson>>(
+            "/api/contracts?page=1&pageSize=50");
+        tenant2Page!.Should().NotContain(c => c.Title.StartsWith(prefix));
     }
 }

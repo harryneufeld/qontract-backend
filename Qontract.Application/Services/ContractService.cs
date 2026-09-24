@@ -13,15 +13,36 @@ public class ContractService : IContractService
         _context = context;
     }
 
-    public async Task<List<ContractDTO>> GetContractsAsync(int tenantId, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Lists a tenant's active contracts, most recently created first.
+    ///
+    /// When [page] &gt; 0 and [pageSize] &gt; 0 the result is a single page
+    /// of at most [pageSize] rows (issue #43); otherwise the full list is
+    /// returned to preserve the historic behaviour of GET /api/contracts.
+    /// </summary>
+    public async Task<List<ContractDTO>> GetContractsAsync(
+        int tenantId,
+        int page = 0,
+        int pageSize = 0,
+        CancellationToken cancellationToken = default)
     {
-        var contracts = await _context.Contracts
+        IQueryable<Contract> query = _context.Contracts
             .Include(c => c.Tenant)
             .Include(c => c.Contractor)
             .Include(c => c.Creator)
             .Include(c => c.Modifier)
             .Where(c => c.IsActive && c.TenantId == tenantId)
+            // Secondary sort keeps paging stable when CreatedAt collides
+            // (multiple rows created within the same millisecond).
             .OrderByDescending(c => c.CreatedAt)
+            .ThenByDescending(c => c.Id);
+
+        if (page > 0 && pageSize > 0)
+        {
+            query = query.Skip((page - 1) * pageSize).Take(pageSize);
+        }
+
+        var contracts = await query
             .Select(c => new ContractDTO
             {
                 Id = c.Id,
