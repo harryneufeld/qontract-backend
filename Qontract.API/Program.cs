@@ -14,6 +14,8 @@ using Qontract.Core.Interfaces;
 using Qontract.Infrastructure.FileStorage;
 using Qontract.API.Serialization;
 using Qontract.Core.Security;
+using Asp.Versioning;
+using Asp.Versioning.ApiExplorer;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -46,7 +48,44 @@ builder.Services.AddControllers()
             new UtcDateTimeConverter());
     });
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+
+// API versioning (issue #28): so a future breaking change can ship as a new
+// version WITHOUT breaking the Flutter app. The current API surface is
+// version 1.0. The version is read from the URL segment (/api/v1/...), the
+// query string (?api-version=1.0) or the X-Api-Version header; a request that
+// names no version — i.e. every existing Flutter app call and every existing
+// integration test — resolves to the default version (AssumeDefaultVersionWhen
+// Unspecified), so introducing versioning is fully backward compatible.
+// When a breaking change is needed, add a version-2.0 controller/route and
+// leave the v1.0 routes running for older clients.
+builder.Services.AddApiVersioning(options =>
+{
+    options.DefaultApiVersion = new ApiVersion(1, 0);
+    options.AssumeDefaultVersionWhenUnspecified = true;
+    // Advertise the available API versions on each response (X-AspNet-Version
+    // header) so clients can discover what is offered.
+    options.ReportApiVersions = true;
+    options.ApiVersionReader = ApiVersionReader.Combine(
+        new UrlSegmentApiVersionReader(),
+        new QueryStringApiVersionReader("api-version"),
+        new HeaderApiVersionReader("X-Api-Version"));
+})
+// Tag each endpoint with its API version so Swagger documents the endpoints
+// per API version instead of per controller (issue #28).
+.AddApiExplorer(options =>
+{
+    options.AssumeDefaultVersionWhenUnspecified = true;
+    // Render the concrete version (e.g. /api/v1/contracts) in the docs rather
+    // than the {version:apiVersion} route placeholder.
+    options.SubstituteApiVersionInUrl = true;
+});
+
+builder.Services.AddSwaggerGen(options =>
+{
+    // Stable schema ids across versioned documents (avoids duplicate-schema
+    // ids when the same type appears under more than one route).
+    options.CustomSchemaIds(type => type.FullName);
+});
 
 // Register FluentValidation validators (live in Qontract.Application;
 // IValidator<T> is resolved per-DTO in controllers)

@@ -11,6 +11,8 @@ namespace Qontract.API.Controllers;
 // admin-only operation (issue #24): only tenant admins may manage the
 // members of their tenant.
 [Authorize(Roles = AppRoles.TenantAdmin)]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/[controller]")]
 [Route("api/[controller]")]
 public class UsersController : ControllerBase
 {

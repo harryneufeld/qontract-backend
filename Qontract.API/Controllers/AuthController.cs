@@ -8,6 +8,8 @@ using Qontract.Application.Models;
 namespace Qontract.API.Controllers;
 
 [ApiController]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/[controller]")]
 [Route("api/[controller]")]
 public class AuthController : ControllerBase
 {

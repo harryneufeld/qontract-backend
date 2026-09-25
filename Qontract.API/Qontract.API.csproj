@@ -7,11 +7,18 @@
     <LangVersion>latest</LangVersion>
   </PropertyGroup>
   <ItemGroup>
+    <!-- API versioning (issue #28): makes [ApiVersion] / route version
+         attributes available across the API project without per-file usings. -->
+    <Using Include="Asp.Versioning" />
+  </ItemGroup>
+  <ItemGroup>
     <None Update="debugSettings.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="Asp.Versioning.Mvc" Version="10.2.1" />
+    <PackageReference Include="Asp.Versioning.Mvc.ApiExplorer" Version="10.2.1" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="10.0.5">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
