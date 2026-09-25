@@ -38,6 +38,17 @@ public class QontractWebApplicationFactory : WebApplicationFactory<Program>
         // Development-only `details` field of the error envelope, issue #11)
         // is deterministic in tests.
         builder.UseEnvironment("Development");
+
+        // Rate limiting (issue #27) is a per-client-IP security control. In the
+        // test suite every request originates from the same loopback IP and each
+        // test class shares one host, so a production limit (e.g. 5 logins/min
+        // per IP) would throttle the many logins the existing integration tests
+        // make. Raise both limits effectively to infinity here so rate limiting
+        // is off for the general suite; RateLimitingTests re-arms the auth limit
+        // explicitly via WithWebHostBuilder to verify the 429 behaviour.
+        builder.UseSetting("RateLimiting:Auth:PermitLimit", "1000000");
+        builder.UseSetting("RateLimiting:Global:PermitLimit", "1000000");
+
         builder.ConfigureServices(services =>
         {
             // Remove existing DbContext registration

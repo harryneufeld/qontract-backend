@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.RateLimiting;
 using Qontract.Application.Services;
 using Qontract.Application.Models;
 
@@ -21,7 +22,12 @@ public class AuthController : ControllerBase
         _changePasswordValidator = changePasswordValidator;
     }
 
+    // [EnableRateLimiting("auth")] (issue #27): the "auth" policy applies a
+    // strict per-client-IP ceiling to credential endpoints so a brute-force /
+    // credential-stuffing attempt gets a 429 + Retry-After after a few tries
+    // instead of an unbounded number of password guesses.
     [HttpPost("login")]
+    [EnableRateLimiting("auth")]
     public async Task<ActionResult<Qontract.Application.Models.AuthDTO>> Login([FromBody] Qontract.Application.Models.LoginDTO dto)
     {
         try
@@ -72,6 +78,7 @@ public class AuthController : ControllerBase
     /// </summary>
     [HttpPost("change-password")]
     [Authorize]
+    [EnableRateLimiting("auth")]
     public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDTO dto)
     {
         var reject = await DtoValidation.RejectIfInvalidAsync(_changePasswordValidator, dto);

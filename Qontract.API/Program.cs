@@ -1,4 +1,7 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.Http;
+using System.Threading.RateLimiting;
 using FluentValidation;
 using Qontract.Infrastructure.Data;
 using Qontract.Application.Services;
@@ -192,6 +195,72 @@ builder.Services.AddCors(options =>
     }
 });
 
+// Rate limiting (issue #27): ASP.NET Core's built-in rate limiter
+// (Microsoft.AspNetCore.RateLimiting, part of the shared framework — no
+// extra NuGet package). Two layers, both partitioned PER CLIENT IP so a
+// single abusive client never throttles everyone else:
+//
+//   * a generous GLOBAL ceiling on every endpoint (unbounded-abuse net), and
+//   * a STRICTER "auth" policy applied (via [EnableRateLimiting("auth")])
+//     to the credential endpoints (/auth/login, /auth/change-password) to
+//     blunt brute-force / credential-stuffing attacks.
+//
+// Limits are config-driven (RateLimiting:* in appsettings.json) with safe
+// defaults, so operators can tune per deployment without a rebuild.
+// Rejected requests get 429 (Too Many Requests) + a Retry-After hint.
+var rlGlobal = builder.Configuration.GetSection("RateLimiting:Global");
+var rlAuth = builder.Configuration.GetSection("RateLimiting:Auth");
+var globalPermit = int.TryParse(rlGlobal["PermitLimit"], out var g) ? g : 300;
+var globalWindow = TimeSpan.FromSeconds(int.TryParse(rlGlobal["WindowSeconds"], out var gw) ? gw : 60);
+var authPermit = int.TryParse(rlAuth["PermitLimit"], out var a) ? a : 5;
+var authWindow = TimeSpan.FromSeconds(int.TryParse(rlAuth["WindowSeconds"], out var aw) ? aw : 60);
+
+// All requests in the TestServer / Kestrel pipeline carry the client IP;
+// fall back to a stable sentinel when it is unavailable so partitioning
+// never throws.
+static string IpKey(HttpContext context) =>
+    context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    // Throttled responses get a 429 plus a Retry-After hint so clients know
+    // when to back off instead of hammering the endpoint blindly. The hint is
+    // the auth window (the time a fixed window stays exhausted) — a safe,
+    // predictable "wait a full window before retrying" value.
+    options.OnRejected = async (ctx, _) =>
+    {
+        ctx.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+        ctx.HttpContext.Response.Headers["Retry-After"] =
+            ((int)Math.Ceiling(authWindow.TotalSeconds)).ToString();
+    };
+
+    // Global per-IP ceiling: a broad, high bar that catches runaway clients
+    // hitting ANY endpoint, without throttling normal app traffic.
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(
+        context => RateLimitPartition.GetFixedWindowLimiter(
+            IpKey(context),
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = globalPermit,
+                Window = globalWindow,
+                QueueLimit = 0,
+            }));
+
+    // Stricter per-IP policy for credential endpoints (brute-force
+    // protection). Applied explicitly by the controllers, not globally.
+    options.AddPolicy<string>("auth", context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            IpKey(context),
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = authPermit,
+                Window = authWindow,
+                QueueLimit = 0,
+            }));
+});
+
 var app = builder.Build();
 
 if (usedJwtFallbackKey)
@@ -217,6 +286,11 @@ app.UseHttpsRedirection();
 app.UseCors("AllowLocalhost");
 app.UseAuthentication();
 app.UseAuthorization();
+// Rate limiter middleware (issue #27): placed after authentication and
+// before the controllers are mapped so per-endpoint [EnableRateLimiting]
+// policies resolve against the routed endpoint. Rejected requests short-
+// circuit here with a 429 + Retry-After, before the controller runs.
+app.UseRateLimiter();
 app.MapControllers();
 
 // Apply migrations and seed data
