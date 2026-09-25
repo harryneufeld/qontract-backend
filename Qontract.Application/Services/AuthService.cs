@@ -71,6 +71,37 @@ public class AuthService : IAuthService
         return user == null ? null : ToAuthUser(user);
     }
 
+    /// <summary>
+    /// Self-service password change (app#11). Verifies the current password
+    /// against the stored hash and — only on a match — stores the hash of the
+    /// new password. A wrong current password (or a missing user) returns
+    /// false without revealing which check failed.
+    /// </summary>
+    public async Task<bool> ChangePasswordAsync(int userId, string currentPassword, string newPassword, CancellationToken cancellationToken = default)
+    {
+        var user = await _context.Users
+            .FirstOrDefaultAsync(u => u.Id == userId && u.IsActive, cancellationToken);
+
+        if (user == null)
+        {
+            _logger.LogWarning("Password change for unknown or inactive user {UserId}", userId);
+            return false;
+        }
+
+        if (!VerifyPassword(currentPassword, user.PasswordHash))
+        {
+            _logger.LogWarning("Password change rejected for user {UserId}: current password mismatch", userId);
+            return false;
+        }
+
+        user.PasswordHash = await HashPasswordAsync(newPassword);
+        user.ModifiedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation("Password changed for user {UserId}", userId);
+        return true;
+    }
+
     private static AuthUserDTO ToAuthUser(User user) => new()
     {
         Id = user.Id,

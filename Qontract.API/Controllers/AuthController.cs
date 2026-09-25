@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Qontract.Application.Services;
 using Qontract.Application.Models;
@@ -9,10 +11,14 @@ namespace Qontract.API.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
+    private readonly IValidator<ChangePasswordDTO> _changePasswordValidator;
 
-    public AuthController(IAuthService authService)
+    public AuthController(
+        IAuthService authService,
+        IValidator<ChangePasswordDTO> changePasswordValidator)
     {
         _authService = authService;
+        _changePasswordValidator = changePasswordValidator;
     }
 
     [HttpPost("login")]
@@ -56,5 +62,39 @@ public class AuthController : ControllerBase
     public IActionResult Logout()
     {
         return Ok(new { message = "Logged out" });
+    }
+
+    /// <summary>
+    /// Self-service password change for the authenticated user (app#11).
+    /// A wrong current password yields 400 with a generic message — the
+    /// client is already authenticated, so the endpoint never reveals
+    /// anything about the stored hash.
+    /// </summary>
+    [HttpPost("change-password")]
+    [Authorize]
+    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDTO dto)
+    {
+        var reject = await DtoValidation.RejectIfInvalidAsync(_changePasswordValidator, dto);
+        if (reject is not null)
+            return reject;
+
+        var subject = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+            ?? User.FindFirst("sub")?.Value;
+
+        if (string.IsNullOrEmpty(subject) || !int.TryParse(subject, out var userId))
+        {
+            return Unauthorized(new { error = "Invalid token subject." });
+        }
+
+        var ok = await _authService.ChangePasswordAsync(userId, dto.CurrentPassword, dto.NewPassword);
+        if (ok)
+            return Ok(new { message = "Password changed." });
+
+        // Same { errors: { field: [messages] } } shape the Flutter app parses.
+        var errors = new Dictionary<string, string[]>
+        {
+            ["currentPassword"] = new[] { "Current password is incorrect." }
+        };
+        return BadRequest(new { errors });
     }
 }

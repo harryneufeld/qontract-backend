@@ -10,6 +10,12 @@ public interface IAuthService
     Task<Qontract.Application.Models.AuthDTO> LoginAsync(Qontract.Application.Models.LoginDTO dto, CancellationToken cancellationToken = default);
     Task<string> HashPasswordAsync(string password);
     Task<Qontract.Application.Models.AuthUserDTO?> GetCurrentUserAsync(int userId, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Self-service password change (app#11): verifies <paramref name="currentPassword"/>
+    /// against the user's stored hash and, when it matches, replaces it with the hash
+    /// of <paramref name="newPassword"/>. Returns true on success.
+    /// </summary>
+    Task<bool> ChangePasswordAsync(int userId, string currentPassword, string newPassword, CancellationToken cancellationToken = default);
 }
 
 public interface IUserService
