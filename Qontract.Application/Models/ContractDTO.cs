@@ -38,6 +38,22 @@ public class ContractCreateDTO
     public int? ContractorId { get; set; }
 }
 
+/// <summary>
+/// Tenant-wide contract counters for the dashboard stat chips (app#33).
+/// The dashboard list is paginated (issue #43), so the chips need totals
+/// the client cannot derive from the loaded page. The date rules mirror
+/// the app's client-side logic (Contract.isExpired / isExpiringSoon /
+/// reachesMinimumContractDateIn).
+/// </summary>
+public class ContractStatsDTO
+{
+    public int Total { get; set; }
+    public int Active { get; set; }
+    public int Expiring { get; set; }
+    public int Expired { get; set; }
+    public int MinDateApproaching { get; set; }
+}
+
 public class ContractUpdateDTO
 {
     public string? Title { get; set; }

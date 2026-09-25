@@ -57,6 +57,19 @@ public class ContractsController : ControllerBase
         return Ok(contracts);
     }
 
+    /// <summary>
+    /// Tenant-wide dashboard counters (app#33). The list above is paginated
+    /// (issue #43), so the stat chips need totals the client cannot derive
+    /// from the loaded page. Declared before the {id} route so the literal
+    /// wins.
+    /// </summary>
+    [HttpGet("stats")]
+    public async Task<ActionResult<ContractStatsDTO>> GetStats()
+    {
+        var stats = await _contractService.GetStatsAsync(CurrentTenantId);
+        return Ok(stats);
+    }
+
     [HttpGet("{id}")]
     public async Task<ActionResult<ContractDTO>> GetContract(int id)
     {

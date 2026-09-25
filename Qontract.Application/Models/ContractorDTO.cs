@@ -12,6 +12,12 @@ public class ContractorDTO
     public int TenantId { get; set; }
     public int? UserId { get; set; }
     public bool IsActive { get; set; }
+    /// <summary>
+    /// Total number of the tenant's contracts referencing this contractor
+    /// (app#33). Computed server-side because the app's contract list is
+    /// paginated, so the client cannot count from the loaded slice.
+    /// </summary>
+    public int ContractCount { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime ModifiedAt { get; set; }
     public string? CreatedBy { get; set; }

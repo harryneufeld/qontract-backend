@@ -67,6 +67,92 @@ public class ContractService : IContractService
         return contracts;
     }
 
+    /// <summary>
+    /// Dashboard counters over ALL of a tenant's contracts, not just the
+    /// loaded page (app#33). The date rules mirror the app's client-side
+    /// logic so server and client agree on the same buckets:
+    ///  - expired: end date has passed (local midnight &lt;= now), or the
+    ///    status is <see cref="ContractStatus.Expired"/>
+    ///  - expiring: end date within the next 30 days, not yet expired
+    ///    (no status filter, mirroring the app's getExpiringContracts)
+    ///  - minDateApproaching: status Active and the minimum contract date
+    ///    falls within the next 90 days (already passed counts)
+    /// </summary>
+    public async Task<ContractStatsDTO> GetStatsAsync(int tenantId, CancellationToken cancellationToken = default)
+    {
+        var now = DateTime.Now;
+        var today = now.Date;
+
+        var rows = await _context.Contracts
+            .Where(c => c.IsActive && c.TenantId == tenantId)
+            .Select(c => new
+            {
+                c.Status,
+                c.EndDate,
+                c.MinimumContractDate
+            })
+            .ToListAsync(cancellationToken);
+
+        var active = 0;
+        var expiring = 0;
+        var expired = 0;
+        var minDateApproaching = 0;
+
+        foreach (var c in rows)
+        {
+            var dateExpired = IsDateExpired(c.EndDate, now);
+            if (c.Status == ContractStatus.Active) active++;
+            if (dateExpired || c.Status == ContractStatus.Expired) expired++;
+            if (IsExpiringSoon(c.EndDate, now) && !dateExpired) expiring++;
+            if (c.Status == ContractStatus.Active &&
+                ReachesMinimumContractDate(c.MinimumContractDate, today))
+            {
+                minDateApproaching++;
+            }
+        }
+
+        return new ContractStatsDTO
+        {
+            Total = rows.Count,
+            Active = active,
+            Expiring = expiring,
+            Expired = expired,
+            MinDateApproaching = minDateApproaching
+        };
+    }
+
+    /// Parses a 'yyyy-MM-dd' (or any parseable) date string to a local
+    /// midnight, mirroring the app's Contract._parseDate.
+    private static DateTime? ParseDateOnly(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        return DateTime.TryParse(value, out var d) ? d.Date : null;
+    }
+
+    // App: end.isBefore(DateTime.now()) with end at local midnight.
+    private static bool IsDateExpired(string? endDate, DateTime now)
+    {
+        var end = ParseDateOnly(endDate);
+        return end.HasValue && end.Value <= now.Date;
+    }
+
+    // App: diff = end(midnight) - now; 0 <= diff.inDays <= 30 (truncated).
+    private static bool IsExpiringSoon(string? endDate, DateTime now)
+    {
+        var end = ParseDateOnly(endDate);
+        if (end == null) return false;
+        var days = (end.Value - now).Days; // truncates toward zero, like Dart's inDays
+        return days >= 0 && days <= 30;
+    }
+
+    // App: (minDateDay - today).inDays <= 90, both at local midnight.
+    private static bool ReachesMinimumContractDate(string? minimumContractDate, DateTime today)
+    {
+        var min = ParseDateOnly(minimumContractDate);
+        if (min == null) return false;
+        return (min.Value - today).Days <= 90;
+    }
+
     public async Task<ContractDTO> GetContractByIdAsync(int id, int tenantId, CancellationToken cancellationToken = default)
     {
         var contract = await _context.Contracts

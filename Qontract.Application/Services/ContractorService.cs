@@ -14,6 +14,8 @@ public class ContractorService : IContractorService
 
     public async Task<List<ContractorDTO>> GetContractorsAsync(int tenantId, CancellationToken cancellationToken = default)
     {
+        var counts = await GetContractCountsAsync(tenantId, cancellationToken);
+
         var contractors = await _context.Contractors
             .Where(c => c.TenantId == tenantId)
             .Select(c => new ContractorDTO
@@ -33,7 +35,27 @@ public class ContractorService : IContractorService
             })
             .ToListAsync(cancellationToken);
 
+        // app#33: total contracts per contractor (server-side; the app's
+        // contract list is paginated and cannot be used to count).
+        foreach (var c in contractors)
+        {
+            c.ContractCount = counts.TryGetValue(c.Id, out var n) ? n : 0;
+        }
+
         return contractors;
+    }
+
+    /// Active contracts of the tenant grouped by contractor, as a lookup
+    /// (contractor id -> count).
+    private async Task<Dictionary<int, int>> GetContractCountsAsync(int tenantId, CancellationToken cancellationToken)
+    {
+        var counts = await _context.Contracts
+            .Where(c => c.IsActive && c.TenantId == tenantId && c.ContractorId != null)
+            .GroupBy(c => c.ContractorId!.Value)
+            .Select(g => new { ContractorId = g.Key, Count = g.Count() })
+            .ToListAsync(cancellationToken);
+
+        return counts.ToDictionary(x => x.ContractorId, x => x.Count);
     }
 
     public async Task<ContractorDTO> GetContractorByIdAsync(int id, int tenantId, CancellationToken cancellationToken = default)
@@ -43,6 +65,8 @@ public class ContractorService : IContractorService
 
         if (contractor == null)
             throw new KeyNotFoundException($"Contractor with ID {id} not found in tenant {tenantId}.");
+
+        var counts = await GetContractCountsAsync(tenantId, cancellationToken);
 
         return new ContractorDTO
         {
@@ -54,6 +78,7 @@ public class ContractorService : IContractorService
             TenantId = contractor.TenantId,
             UserId = contractor.UserId,
             IsActive = contractor.IsActive,
+            ContractCount = counts.TryGetValue(contractor.Id, out var n) ? n : 0,
             CreatedAt = contractor.CreatedAt,
             ModifiedAt = contractor.ModifiedAt,
             CreatedBy = contractor.CreatedBy,
