@@ -61,6 +61,16 @@ dotnet restore
    > `Jwt__Key="$(openssl rand -base64 48)" dotnet run --project Qontract.API`.
    > `docker compose` expects the host variable `JWT_KEY` for the same reason.
 
+   > **File storage (issue #25):** document files are stored behind
+   > `IFileStorage`, selected by `Storage:Provider` in `appsettings.json`:
+   > `local` (default — disk under `Storage:Path`), `azure` (Azure Blob
+   > Storage, settings in `Storage:Azure`) or `s3` (Amazon S3, settings in
+   > `Storage:S3`). The provider-specific credentials are intentionally
+   > **not** committed: supply them via environment variables
+   > (`Storage__Azure__ConnectionString`; for S3, `Storage__S3__Bucket` plus
+   > the standard AWS credential chain) or user secrets. The maximum file
+   > size (`Storage:MaxFileSizeBytes`) applies to all backends.
+
 3. Build and run:
 ```bash
 dotnet run --project Qontract.API

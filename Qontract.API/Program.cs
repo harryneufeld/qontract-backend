@@ -115,12 +115,29 @@ builder.Services.AddScoped<IContractService, ContractService>();
 builder.Services.AddScoped<IDocumentService, DocumentService>();
 builder.Services.AddScoped<IAddressService, AddressService>();
 
-// Register File Storage. The storage backend reads its settings (path +
-// max file size) from the "Storage" configuration section (issue #34), so
-// the maximum file size lives in exactly one place.
+// Register File Storage. The backend is selected by "Storage:Provider"
+// (issue #25): "local" (default — disk under Storage:Path), "azure" (Azure
+// Blob Storage) or "s3" (Amazon S3). The maximum file size lives in the
+// "Storage" section for all backends (issue #34); provider-specific
+// credentials are deliberately not committed (see appsettings.json).
 builder.Services.Configure<FileStorageOptions>(
     builder.Configuration.GetSection(FileStorageOptions.SectionName));
-builder.Services.AddSingleton<IFileStorage, FileStorage>();
+switch (StorageProvider.Normalize(builder.Configuration[$"{FileStorageOptions.SectionName}:Provider"]))
+{
+    case StorageProvider.Azure:
+        builder.Services.Configure<AzureBlobStorageOptions>(
+            builder.Configuration.GetSection(AzureBlobStorageOptions.SectionName));
+        builder.Services.AddSingleton<IFileStorage, AzureBlobFileStorage>();
+        break;
+    case StorageProvider.S3:
+        builder.Services.Configure<S3StorageOptions>(
+            builder.Configuration.GetSection(S3StorageOptions.SectionName));
+        builder.Services.AddSingleton<IFileStorage, S3FileStorage>();
+        break;
+    default: // local
+        builder.Services.AddSingleton<IFileStorage, FileStorage>();
+        break;
+}
 
 // Document deletion queue (issue #14): retention settings + the background
 // worker that permanently removes expired soft-deleted documents.
