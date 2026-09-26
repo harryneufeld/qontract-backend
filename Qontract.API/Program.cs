@@ -33,6 +33,11 @@ if (builder.Environment.EnvironmentName == "Development")
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? "Data Source=QontractDb.sqlite";
 
+// Database provider (issue #26): "sqlite" (default), "postgresql" or
+// "sqlserver". Normalizing here makes a typo in Database:Provider fail fast
+// at startup with a clear message instead of at first database access.
+var databaseProvider = DatabaseProvider.Normalize(builder.Configuration["Database:Provider"]);
+
 // Add services to the container.
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
@@ -95,10 +100,12 @@ builder.Services.AddValidatorsFromAssembly(typeof(Qontract.Application.Services.
 // (issue #36) Sensitive data logging dumps SQL parameter values — including
 // password hashes on login — into the log output, so it is enabled only in
 // Development, never in Production/other environments.
+// (issue #26) The provider is selected by "Database:Provider" (default
+// "sqlite"); the shared migration chain runs on all three providers.
 var isDevelopment = builder.Environment.EnvironmentName == "Development";
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {
-    options.UseSqlite(connectionString, b => b.MigrationsAssembly("Qontract.Infrastructure"));
+    options.Configure(databaseProvider, connectionString);
     if (isDevelopment)
     {
         options.EnableSensitiveDataLogging();

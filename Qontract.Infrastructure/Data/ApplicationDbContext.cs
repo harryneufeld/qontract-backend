@@ -61,6 +61,13 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
         {
             entity.ToTable("Tenants");
             entity.HasKey(e => e.Id);
+            // Client-side key generation (issue #26): portable across SQLite,
+            // PostgreSQL and SQL Server — no provider-specific IDENTITY /
+            // AUTOINCREMENT columns, so the shared migration chain works
+            // everywhere. See ClientSideIdValueGenerator for the trade-off.
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasValueGenerator((p, t) => new ClientSideIdValueGenerator());
             entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
             entity.Property(e => e.Type).IsRequired();
             entity.Property(e => e.Settings).HasMaxLength(5000);
@@ -73,6 +80,13 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
         {
             entity.ToTable("Users");
             entity.HasKey(e => e.Id);
+            // Client-side key generation (issue #26): portable across SQLite,
+            // PostgreSQL and SQL Server — no provider-specific IDENTITY /
+            // AUTOINCREMENT columns, so the shared migration chain works
+            // everywhere. See ClientSideIdValueGenerator for the trade-off.
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasValueGenerator((p, t) => new ClientSideIdValueGenerator());
             entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
             entity.Property(e => e.Email).IsRequired().HasMaxLength(100);
             entity.Property(e => e.PasswordHash).IsRequired().HasMaxLength(255);
@@ -90,6 +104,13 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
         {
             entity.ToTable("Contractors");
             entity.HasKey(e => e.Id);
+            // Client-side key generation (issue #26): portable across SQLite,
+            // PostgreSQL and SQL Server — no provider-specific IDENTITY /
+            // AUTOINCREMENT columns, so the shared migration chain works
+            // everywhere. See ClientSideIdValueGenerator for the trade-off.
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasValueGenerator((p, t) => new ClientSideIdValueGenerator());
             entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
             entity.Property(e => e.Type).IsRequired();
             entity.Property(e => e.Email).HasMaxLength(200);
@@ -109,6 +130,13 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
         {
             entity.ToTable("Contracts");
             entity.HasKey(e => e.Id);
+            // Client-side key generation (issue #26): portable across SQLite,
+            // PostgreSQL and SQL Server — no provider-specific IDENTITY /
+            // AUTOINCREMENT columns, so the shared migration chain works
+            // everywhere. See ClientSideIdValueGenerator for the trade-off.
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasValueGenerator((p, t) => new ClientSideIdValueGenerator());
             entity.Property(e => e.Title).IsRequired().HasMaxLength(200);
             entity.Property(e => e.Description).HasMaxLength(2000);
             entity.Property(e => e.Status).IsRequired();
@@ -137,6 +165,13 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
         {
             entity.ToTable("Documents");
             entity.HasKey(e => e.Id);
+            // Client-side key generation (issue #26): portable across SQLite,
+            // PostgreSQL and SQL Server — no provider-specific IDENTITY /
+            // AUTOINCREMENT columns, so the shared migration chain works
+            // everywhere. See ClientSideIdValueGenerator for the trade-off.
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasValueGenerator((p, t) => new ClientSideIdValueGenerator());
             entity.Property(e => e.FileName).IsRequired().HasMaxLength(255);
             entity.Property(e => e.FileType).IsRequired().HasMaxLength(200);
             entity.Property(e => e.FilePath).HasMaxLength(500);
@@ -162,6 +197,13 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
         {
             entity.ToTable("Addresses");
             entity.HasKey(e => e.Id);
+            // Client-side key generation (issue #26): portable across SQLite,
+            // PostgreSQL and SQL Server — no provider-specific IDENTITY /
+            // AUTOINCREMENT columns, so the shared migration chain works
+            // everywhere. See ClientSideIdValueGenerator for the trade-off.
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasValueGenerator((p, t) => new ClientSideIdValueGenerator());
             entity.Property(e => e.EntityType).IsRequired();
             entity.Property(e => e.Street).HasMaxLength(500);
             entity.Property(e => e.City).HasMaxLength(100);
