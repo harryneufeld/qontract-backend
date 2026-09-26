@@ -154,6 +154,30 @@ dotnet test
 
 Open `https://localhost:65532/swagger` (or `http://localhost:65533/swagger`) to view interactive API documentation.
 
+## Database Provider (issue #26)
+
+The backend defaults to **SQLite** (zero-setup, file `QontractDb.sqlite` next to the API). For
+production deployments it can run on **PostgreSQL** or **SQL Server**:
+
+| `Database:Provider` | Aliases                    | `ConnectionStrings:DefaultConnection`                |
+|---------------------|----------------------------|------------------------------------------------------|
+| `sqlite` (default)  | —                          | `Data Source=QontractDb.sqlite`                     |
+| `postgresql`        | `postgres`, `pg`, `npgsql` | `Host=...;Port=5432;Database=qontract;Username=...;Password=...` |
+| `sqlserver`         | `mssql`, `sql-server`      | `Server=...;Database=qontract;User Id=...;Password=...`      |
+
+Set the value in `appsettings.json` or via the environment variable `Database__Provider`.
+The same migration chain runs on all three providers (the migrations only use DDL that is
+valid on SQLite, PostgreSQL and SQL Server), so a new database is fully set up on first start.
+
+Notes:
+
+- Primary keys are generated **client-side** (`ClientSideIdValueGenerator`): on first use per
+  table it reads `MAX(Id)` and then increments in memory. This keeps the schema portable
+  (no SQLite `AUTOINCREMENT` / PostgreSQL identity / SQL Server `IDENTITY` columns). One
+  backend instance per database is the supported deployment model.
+- The design-time migrations factory stays on SQLite (`dotnet ef migrations add`); the
+  generated DDL is provider-neutral by construction.
+
 ## Contributing
 
 1. Fork the repository
