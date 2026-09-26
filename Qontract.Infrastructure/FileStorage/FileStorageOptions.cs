@@ -10,7 +10,15 @@ public class FileStorageOptions
 {
     public const string SectionName = "Storage";
 
-    /// <summary>Root directory that stores all document files.</summary>
+    /// <summary>
+    /// The storage backend (issue #25): "local" (default — disk under
+    /// <see cref="Path"/>), "azure" (Azure Blob Storage, settings in the
+    /// "Storage:Azure" section) or "s3" (Amazon S3, settings in the
+    /// "Storage:S3" section). See <see cref="StorageProvider.Normalize"/>.
+    /// </summary>
+    public string Provider { get; set; } = StorageProvider.Local;
+
+    /// <summary>Root directory that stores all document files (local provider).</summary>
     public string Path { get; set; } = "Storage";
 
     /// <summary>Maximum allowed size of a single document in bytes (default 50 MB).</summary>
