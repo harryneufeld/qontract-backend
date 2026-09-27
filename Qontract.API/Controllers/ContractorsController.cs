@@ -115,4 +115,22 @@ public class ContractorsController : ControllerBase
             return NotFound(new { error = ex.Message });
         }
     }
+
+    /// <summary>
+    /// Re-activates a previously deactivated contractor (app#38): it becomes
+    /// selectable on new contracts again. Tenant-scoped like deactivate.
+    /// </summary>
+    [HttpPatch("{id:int}/activate")]
+    public async Task<ActionResult<ContractorDTO>> ActivateContractor(int id)
+    {
+        try
+        {
+            var contractor = await _contractorService.ActivateContractorAsync(id, CurrentTenantId, CurrentUser);
+            return Ok(contractor);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { error = ex.Message });
+        }
+    }
 }

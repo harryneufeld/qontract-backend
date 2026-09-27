@@ -176,6 +176,28 @@ public class ContractorServiceTests : IDisposable
         deactivated.IsActive.Should().BeFalse();
         deactivated.ModifiedBy.Should().Be("admin@qontract.com");
     }
+
+    [Fact]
+    public async Task ActivateContractorAsync_ScopesToTenant()
+    {
+        var existing = (await _service.GetContractorsAsync(TenantA())).Single();
+
+        // Deactivate first, then try activating from the wrong tenant
+        await _service.DeactivateContractorAsync(existing.Id, TenantA(), "admin@qontract.com");
+
+        var act = () => _service.ActivateContractorAsync(existing.Id, TenantB(), "intruder@qontract.com");
+
+        await act.Should().ThrowAsync<KeyNotFoundException>();
+
+        // The contractor must still be inactive
+        var after = await _service.GetContractorByIdAsync(existing.Id, TenantA());
+        after.IsActive.Should().BeFalse();
+
+        // Own-tenant activation works
+        var activated = await _service.ActivateContractorAsync(existing.Id, TenantA(), "admin@qontract.com");
+        activated.IsActive.Should().BeTrue();
+        activated.ModifiedBy.Should().Be("admin@qontract.com");
+    }
 }
 
 public class ContractorValidatorTests
