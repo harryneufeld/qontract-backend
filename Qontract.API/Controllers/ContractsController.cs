@@ -47,15 +47,28 @@ public class ContractsController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<List<ContractDTO>>> GetContracts(
         [FromQuery] int page = 0,
-        [FromQuery] int pageSize = 0)
+        [FromQuery] int pageSize = 0,
+        [FromQuery] string? status = null)
     {
         // Offset paging for the dashboard (issue #43). Absent/zero params
         // preserve the historic full-list behaviour.
         var p = page < 0 ? 0 : page;
         var s = pageSize < 0 ? 0 : pageSize;
 
+        // Dashboard status buckets (app#36): the list is restricted to one
+        // of the stat-chip buckets so a filtered view covers ALL of the
+        // tenant's matching contracts, not only the loaded page.
+        if (status is not null &&
+            status is not ("active" or "expiring" or "expired" or "minDate"))
+        {
+            return BadRequest(new
+            {
+                error = $"Unknown status filter '{status}'. Expected one of: active, expiring, expired, minDate."
+            });
+        }
+
         var contracts = await _contractService.GetContractsAsync(
-            CurrentTenantId, p, s);
+            CurrentTenantId, p, s, status);
         return Ok(contracts);
     }
 

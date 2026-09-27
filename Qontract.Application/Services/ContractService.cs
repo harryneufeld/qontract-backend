@@ -19,23 +19,77 @@ public class ContractService : IContractService
     /// When [page] &gt; 0 and [pageSize] &gt; 0 the result is a single page
     /// of at most [pageSize] rows (issue #43); otherwise the full list is
     /// returned to preserve the historic behaviour of GET /api/contracts.
+    ///
+    /// When [status] is one of <c>active</c>, <c>expiring</c>,
+    /// <c>expired</c> or <c>minDate</c> the list is restricted to that
+    /// dashboard bucket (app#36) using the exact same date rules as
+    /// <see cref="GetStatsAsync"/>, so the filtered rows always match the
+    /// stat-chip counters. <c>minDate</c> is ordered by the minimum
+    /// contract date (most urgent first) instead of creation date.
     /// </summary>
     public async Task<List<ContractDTO>> GetContractsAsync(
         int tenantId,
         int page = 0,
         int pageSize = 0,
+        string? status = null,
         CancellationToken cancellationToken = default)
     {
+        if (status is not null &&
+            status is not ("active" or "expiring" or "expired" or "minDate"))
+        {
+            throw new ArgumentException(
+                $"Unknown contract status filter '{status}'.", nameof(status));
+        }
+
         IQueryable<Contract> query = _context.Contracts
             .Include(c => c.Tenant)
             .Include(c => c.Contractor)
             .Include(c => c.Creator)
             .Include(c => c.Modifier)
-            .Where(c => c.IsActive && c.TenantId == tenantId)
+            .Where(c => c.IsActive && c.TenantId == tenantId);
+
+        if (status is not null)
+        {
+            var now = DateTime.Now;
+            var today = now.Date;
+            var rows = await query
+                .Select(c => new { c.Id, c.Status, c.EndDate, c.MinimumContractDate })
+                .ToListAsync(cancellationToken);
+
+            var matching = rows
+                .Where(r => status switch
+                {
+                    "active" => r.Status == ContractStatus.Active,
+                    "expiring" => IsExpiringSoon(r.EndDate, now) &&
+                                  !IsDateExpired(r.EndDate, now),
+                    "expired" => IsDateExpired(r.EndDate, now) ||
+                                 r.Status == ContractStatus.Expired,
+                    "minDate" => r.Status == ContractStatus.Active &&
+                                 ReachesMinimumContractDate(r.MinimumContractDate, today),
+                    _ => false
+                })
+                .Select(r => r.Id)
+                .ToHashSet();
+
+            query = query.Where(c => matching.Contains(c.Id));
+
+            if (status == "minDate")
+            {
+                // Most urgent first, mirroring the app's client-side sort.
+                query = query
+                    .OrderBy(c => c.MinimumContractDate)
+                    .ThenByDescending(c => c.Id);
+            }
+        }
+
+        if (status is not "minDate")
+        {
             // Secondary sort keeps paging stable when CreatedAt collides
             // (multiple rows created within the same millisecond).
-            .OrderByDescending(c => c.CreatedAt)
-            .ThenByDescending(c => c.Id);
+            query = query
+                .OrderByDescending(c => c.CreatedAt)
+                .ThenByDescending(c => c.Id);
+        }
 
         if (page > 0 && pageSize > 0)
         {
