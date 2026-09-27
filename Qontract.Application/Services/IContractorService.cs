@@ -12,4 +12,5 @@ public interface IContractorService
     Task<ContractorDTO> CreateContractorAsync(ContractorCreateDTO dto, string? createdBy, CancellationToken cancellationToken = default);
     Task<ContractorDTO> UpdateContractorAsync(int id, int tenantId, ContractorUpdateDTO dto, string? modifiedBy, CancellationToken cancellationToken = default);
     Task<ContractorDTO> DeactivateContractorAsync(int id, int tenantId, string? modifiedBy, CancellationToken cancellationToken = default);
+    Task<ContractorDTO> ActivateContractorAsync(int id, int tenantId, string? modifiedBy, CancellationToken cancellationToken = default);
 }

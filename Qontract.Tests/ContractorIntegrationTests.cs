@@ -155,6 +155,13 @@ public class ContractorApiIntegrationTests : IClassFixture<QontractWebApplicatio
         deactivated.Should().NotBeNull();
         deactivated!.IsActive.Should().BeFalse();
 
+        // Re-activate (app#38)
+        var activateResponse = await _client.PatchAsync($"/api/contractors/{created.Id}/activate", null);
+        activateResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var reactivated = await activateResponse.Content.ReadFromJsonAsync<ContractorJson>();
+        reactivated.Should().NotBeNull();
+        reactivated!.IsActive.Should().BeTrue();
+
         // Unknown id -> 404
         var notFound = await _client.GetAsync("/api/contractors/999999");
         notFound.StatusCode.Should().Be(HttpStatusCode.NotFound);
@@ -190,5 +197,8 @@ public class ContractorApiIntegrationTests : IClassFixture<QontractWebApplicatio
 
         var crossTenantDeactivate = await _client.PatchAsync($"/api/contractors/{created.Id}/deactivate", null);
         crossTenantDeactivate.StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        var crossTenantActivate = await _client.PatchAsync($"/api/contractors/{created.Id}/activate", null);
+        crossTenantActivate.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 }
