@@ -1,223 +1,84 @@
-using Qontract.Domain.Models;
-using Qontract.Application.Models;
-using Qontract.Application.Interfaces;
-using Microsoft.Extensions.Logging;
-using System.Threading;
-using System.Threading.Tasks;
-using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Qontract.Application.Interfaces;
+using Qontract.Application.Models;
+using Qontract.Domain.Models;
 
 namespace Qontract.Application.Services;
 
-public class UserService : IUserService
+public class UserService(IApplicationDbContext context, IAuthService authService, ILogger<UserService> logger) : IUserService
 {
-    private readonly IApplicationDbContext _context;
-    private readonly IAuthService _authService;
-    private readonly ILogger<UserService> _logger;
-
-    public UserService(IApplicationDbContext context, IAuthService authService, ILogger<UserService> logger)
-    {
-        _context = context;
-        _authService = authService;
-        _logger = logger;
-    }
-
-    public async Task<List<UserDTO>> GetUsersAsync(int tenantId, CancellationToken cancellationToken = default)
-    {
-        try
+    private IQueryable<UserDTO> UsersInTenant(int tenantId) => context.TenantMemberships.Where(m => m.TenantId == tenantId)
+        .Select(m => new UserDTO
         {
-            var users = await _context.Users
-                .Where(u => u.TenantId == tenantId)
-                .Select(u => new UserDTO
-                {
-                    Id = u.Id,
-                    Name = u.Name,
-                    Email = u.Email,
-                    Role = u.Role,
-                    IsActive = u.IsActive,
-                    TenantId = u.TenantId,
-                    CreatedAt = u.CreatedAt,
-                    ModifiedAt = u.ModifiedAt,
-                    CreatedBy = u.CreatedBy,
-                    ModifiedBy = u.ModifiedBy
-                })
-                .ToListAsync(cancellationToken);
+            Id = m.UserId, Name = m.User.Name, Email = m.User.Email, Role = m.Role,
+            IsActive = m.IsActive && m.User.IsActive, TenantId = m.TenantId,
+            CreatedAt = m.CreatedAt, ModifiedAt = m.ModifiedAt, CreatedBy = m.CreatedBy, ModifiedBy = m.ModifiedBy
+        });
 
-            _logger.LogInformation("Retrieved {Count} users for tenant {TenantId}", users.Count, tenantId);
-            return users;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving users for tenant {TenantId}", tenantId);
-            throw;
-        }
-    }
+    public Task<List<UserDTO>> GetUsersAsync(int tenantId, CancellationToken cancellationToken = default) =>
+        UsersInTenant(tenantId).ToListAsync(cancellationToken);
 
-    public async Task<UserDTO> GetUserByIdAsync(int id, int tenantId, CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            var user = await _context.Users
-                .FirstOrDefaultAsync(u => u.Id == id && u.TenantId == tenantId, cancellationToken);
-
-            if (user == null)
-            {
-                _logger.LogWarning("User with ID {Id} not found in tenant {TenantId}", id, tenantId);
-                throw new KeyNotFoundException($"User with ID {id} not found in tenant {tenantId}.");
-            }
-
-            return new UserDTO
-            {
-                Id = user.Id,
-                Name = user.Name,
-                Email = user.Email,
-                Role = user.Role,
-                IsActive = user.IsActive,
-                TenantId = user.TenantId,
-                CreatedAt = user.CreatedAt,
-                ModifiedAt = user.ModifiedAt,
-                CreatedBy = user.CreatedBy,
-                ModifiedBy = user.ModifiedBy
-            };
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving user with ID {Id} from tenant {TenantId}", id, tenantId);
-            throw;
-        }
-    }
+    public async Task<UserDTO> GetUserByIdAsync(int id, int tenantId, CancellationToken cancellationToken = default) =>
+        await UsersInTenant(tenantId).SingleOrDefaultAsync(u => u.Id == id, cancellationToken)
+        ?? throw new KeyNotFoundException("Member not found.");
 
     public async Task<UserDTO> CreateUserAsync(UserCreateDTO dto, string? createdBy, CancellationToken cancellationToken = default)
     {
-        try
+        var normalized = dto.Email.Trim().ToUpperInvariant();
+        if (await context.Users.AnyAsync(u => u.NormalizedEmail == normalized, cancellationToken))
+            throw new InvalidOperationException("An account already exists. Use an invitation to add an existing user.");
+        var user = new User
         {
-            // DTO validation lives in the controller layer (issue #39).
-
-            // Hash the plain password the client sent
-            var hashedPassword = await _authService.HashPasswordAsync(dto.Password);
-
-            var user = new User
-            {
-                Name = dto.Name,
-                Email = dto.Email,
-                PasswordHash = hashedPassword,
-                Role = dto.Role,
-                IsActive = true,
-                TenantId = dto.TenantId,
-                CreatedBy = createdBy,
-                ModifiedBy = createdBy,
-                CreatedAt = DateTime.UtcNow,
-                ModifiedAt = DateTime.UtcNow
-            };
-
-            _context.Users.Add(user);
-            await _context.SaveChangesAsync(cancellationToken);
-
-            _logger.LogInformation("Created user: {Name} ({Email})", user.Name, user.Email);
-            return await GetUserByIdAsync(user.Id, dto.TenantId, cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error creating user");
-            throw;
-        }
+            Name = dto.Name, Email = dto.Email.Trim(), PasswordHash = await authService.HashPasswordAsync(dto.Password),
+            Role = dto.Role, IsActive = true, TenantId = dto.TenantId, CreatedBy = createdBy, ModifiedBy = createdBy
+        };
+        context.Users.Add(user);
+        await context.SaveChangesAsync(cancellationToken);
+        logger.LogInformation("Created tenant member {UserId} in {TenantId}", user.Id, dto.TenantId);
+        return await GetUserByIdAsync(user.Id, dto.TenantId, cancellationToken);
     }
 
     public async Task<UserDTO> UpdateUserAsync(int id, int tenantId, UserUpdateDTO dto, string? modifiedBy, CancellationToken cancellationToken = default)
     {
-        try
+        await using var transaction = await context.BeginSerializableTransactionAsync(cancellationToken);
+        var membership = await context.TenantMemberships.Include(m => m.User)
+            .SingleOrDefaultAsync(m => m.UserId == id && m.TenantId == tenantId, cancellationToken)
+            ?? throw new KeyNotFoundException("Member not found.");
+        var user = membership.User;
+        var nextRole = dto.Role ?? membership.Role;
+        var nextActive = dto.IsActive ?? membership.IsActive;
+        if (membership.IsActive && membership.Role == UserRole.TenantAdmin
+            && (!nextActive || nextRole != UserRole.TenantAdmin)
+            && !await context.TenantMemberships.AnyAsync(m => m.TenantId == tenantId && m.UserId != id
+                && m.IsActive && m.User.IsActive && m.Role == UserRole.TenantAdmin, cancellationToken))
+            throw new InvalidOperationException("The tenant must retain an active administrator.");
+
+        var editsAccount = !string.IsNullOrEmpty(dto.Name) || !string.IsNullOrEmpty(dto.Email) || !string.IsNullOrEmpty(dto.Password);
+        if (editsAccount && (user.TenantId != tenantId || await context.TenantMemberships.AnyAsync(
+                m => m.UserId == id && m.TenantId != tenantId && m.IsActive, cancellationToken)))
+            throw new InvalidOperationException("Shared account details must be changed by the account owner.");
+        if (!string.IsNullOrEmpty(dto.Name)) user.Name = dto.Name;
+        if (!string.IsNullOrEmpty(dto.Email))
         {
-            var user = await _context.Users
-                .FirstOrDefaultAsync(u => u.Id == id && u.TenantId == tenantId, cancellationToken);
-
-            if (user == null)
-            {
-                _logger.LogWarning("User with ID {Id} not found in tenant {TenantId}", id, tenantId);
-                throw new KeyNotFoundException($"User with ID {id} not found in tenant {tenantId}.");
-            }
-
-            // DTO validation lives in the controller layer (issue #39).
-            if (!string.IsNullOrEmpty(dto.Name))
-            {
-                user.Name = dto.Name;
-            }
-
-            if (!string.IsNullOrEmpty(dto.Email))
-            {
-                user.Email = dto.Email;
-            }
-
-            if (!string.IsNullOrEmpty(dto.Password))
-            {
-                var hashedPassword = await _authService.HashPasswordAsync(dto.Password);
-                user.PasswordHash = hashedPassword;
-            }
-
-            if (dto.Role.HasValue)
-            {
-                user.Role = dto.Role.Value;
-            }
-
-            if (dto.IsActive.HasValue)
-            {
-                user.IsActive = dto.IsActive.Value;
-            }
-
-            // Legacy user administration still edits the primary membership.
-            // Commit its role/active state with the account, leaving any
-            // additional tenant memberships unchanged.
-            var membership = await _context.TenantMemberships.FirstOrDefaultAsync(
-                m => m.UserId == id && m.TenantId == tenantId, cancellationToken);
-            if (membership is not null)
-            {
-                membership.Role = user.Role;
-                membership.IsActive = user.IsActive;
-                membership.ModifiedBy = modifiedBy;
-            }
-
-            user.ModifiedAt = DateTime.UtcNow;
-            user.ModifiedBy = modifiedBy;
-
-            await _context.SaveChangesAsync(cancellationToken);
-
-            _logger.LogInformation("Updated user: {Name}", user.Name);
-            return await GetUserByIdAsync(id, tenantId, cancellationToken);
+            var normalized = dto.Email.Trim().ToUpperInvariant();
+            if (await context.Users.AnyAsync(u => u.Id != id && u.NormalizedEmail == normalized, cancellationToken))
+                throw new InvalidOperationException("This email is already in use.");
+            user.Email = dto.Email.Trim();
         }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error updating user with ID {Id} from tenant {TenantId}", id, tenantId);
-            throw;
-        }
+        if (!string.IsNullOrEmpty(dto.Password)) user.PasswordHash = await authService.HashPasswordAsync(dto.Password);
+        membership.Role = nextRole;
+        membership.IsActive = nextActive;
+        membership.ModifiedBy = modifiedBy;
+        // Retain the legacy primary-role projection for compatibility, but
+        // account activity is independent of membership removal.
+        if (user.TenantId == tenantId) user.Role = nextRole;
+        if (editsAccount) user.ModifiedBy = modifiedBy;
+        await context.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return await GetUserByIdAsync(id, tenantId, cancellationToken);
     }
 
-    public async Task<UserDTO> DeactivateUserAsync(int id, int tenantId, string? modifiedBy, CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            var user = await _context.Users
-                .FirstOrDefaultAsync(u => u.Id == id && u.TenantId == tenantId, cancellationToken);
-
-            if (user == null)
-            {
-                _logger.LogWarning("User with ID {Id} not found in tenant {TenantId}", id, tenantId);
-                // Uniform 404: cross-tenant users are not distinguishable
-                // from unknown ids, and (issue #32) nothing is committed.
-                throw new KeyNotFoundException($"User with ID {id} not found in tenant {tenantId}.");
-            }
-
-            user.IsActive = false;
-            user.ModifiedAt = DateTime.UtcNow;
-            user.ModifiedBy = modifiedBy;
-
-            await _context.SaveChangesAsync(cancellationToken);
-
-            _logger.LogInformation("Deactivated user: {Name}", user.Name);
-            return await GetUserByIdAsync(id, tenantId, cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error deactivating user with ID {Id}", id);
-            throw;
-        }
-    }
+    public Task<UserDTO> DeactivateUserAsync(int id, int tenantId, string? modifiedBy, CancellationToken cancellationToken = default) =>
+        UpdateUserAsync(id, tenantId, new UserUpdateDTO { IsActive = false }, modifiedBy, cancellationToken);
 }

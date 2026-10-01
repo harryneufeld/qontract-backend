@@ -13,6 +13,17 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<Tenant> Tenants { get; set; }
     public DbSet<User> Users { get; set; }
     public DbSet<TenantMembership> TenantMemberships { get; set; }
+    public DbSet<TenantInvitation> TenantInvitations { get; set; }
+
+    public Task<Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction> BeginSerializableTransactionAsync(CancellationToken cancellationToken = default) =>
+        Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, cancellationToken);
+
+    public async Task<bool> TryRedeemInvitationAsync(Guid id, int userId, DateTime now, CancellationToken cancellationToken = default) =>
+        await TenantInvitations.Where(i => i.Id == id && i.RevokedAt == null && i.RedeemedAt == null
+                && i.ExpiresAt > now && i.Tenant.IsActive)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(i => i.RedeemedAt, now)
+                .SetProperty(i => i.RedeemedByUserId, userId)
+                .SetProperty(i => i.ModifiedAt, now), cancellationToken) == 1;
     public DbSet<Contractor> Contractors { get; set; }
     public DbSet<Contract> Contracts { get; set; }
     public DbSet<Document> Documents { get; set; }
@@ -41,6 +52,12 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     // their legacy primary TenantId. Both rows are committed atomically.
     private void AddPrimaryMemberships()
     {
+        foreach (var entry in ChangeTracker.Entries<User>()
+                     .Where(e => e.State is EntityState.Added or EntityState.Modified))
+        {
+            entry.Entity.Email = entry.Entity.Email.Trim();
+            entry.Entity.NormalizedEmail = entry.Entity.Email.ToUpperInvariant();
+        }
         foreach (var entry in ChangeTracker.Entries<User>()
                      .Where(e => e.State == EntityState.Added).ToList())
         {
@@ -113,6 +130,8 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
                 .HasValueGenerator((p, t) => new ClientSideIdValueGenerator());
             entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
             entity.Property(e => e.Email).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.NormalizedEmail).IsRequired().HasMaxLength(100);
+            entity.HasIndex(e => e.NormalizedEmail).IsUnique();
             entity.Property(e => e.PasswordHash).IsRequired().HasMaxLength(255);
             entity.Property(e => e.Role).IsRequired();
             entity.Property(e => e.TenantId).IsRequired();
@@ -133,6 +152,20 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
                 .OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(e => e.Tenant).WithMany().HasForeignKey(e => e.TenantId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<TenantInvitation>(entity =>
+        {
+            entity.ToTable("TenantInvitations");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Id).ValueGeneratedNever();
+            entity.Property(e => e.CodeHash).IsRequired().HasMaxLength(64);
+            entity.HasIndex(e => e.CodeHash).IsUnique();
+            entity.Property(e => e.Email).HasMaxLength(100);
+            entity.Property(e => e.CreatedBy).HasMaxLength(500);
+            entity.Property(e => e.ModifiedBy).HasMaxLength(500);
+            entity.HasOne(e => e.Tenant).WithMany().HasForeignKey(e => e.TenantId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(e => e.RedeemedByUser).WithMany().HasForeignKey(e => e.RedeemedByUserId).OnDelete(DeleteBehavior.Restrict);
         });
 
         // Contractor

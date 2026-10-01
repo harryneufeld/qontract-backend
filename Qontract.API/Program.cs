@@ -116,6 +116,7 @@ builder.Services.AddScoped<IApplicationDbContext, ApplicationDbContext>();
 // Register services
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ITenantService, TenantService>();
+builder.Services.AddScoped<MembershipService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IContractorService, ContractorService>();
 builder.Services.AddScoped<IContractService, ContractService>();
@@ -210,6 +211,32 @@ builder.Services.AddAuthentication(options =>
         ValidAudience = jwtAudience,
         ValidateLifetime = true,
         ClockSkew = TimeSpan.Zero
+    };
+    options.Events = new JwtBearerEvents
+    {
+        OnTokenValidated = async validation =>
+        {
+            var identity = validation.Principal?.Identity as System.Security.Claims.ClaimsIdentity;
+            if (!int.TryParse(validation.Principal?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value, out var userId)
+                || !int.TryParse(validation.Principal?.FindFirst("TenantId")?.Value, out var tenantId))
+            {
+                validation.Fail("Invalid tenant identity.");
+                return;
+            }
+            var db = validation.HttpContext.RequestServices.GetRequiredService<ApplicationDbContext>();
+            var membership = await db.TenantMemberships.AsNoTracking().SingleOrDefaultAsync(m => m.UserId == userId
+                && m.TenantId == tenantId && m.IsActive && m.User.IsActive && m.Tenant.IsActive,
+                validation.HttpContext.RequestAborted);
+            if (membership is null || identity is null)
+            {
+                validation.Fail("Tenant membership is no longer active.");
+                return;
+            }
+            // Roles are membership-specific and take effect immediately,
+            // even for a token issued before a role change.
+            foreach (var claim in identity.FindAll(identity.RoleClaimType).ToList()) identity.RemoveClaim(claim);
+            identity.AddClaim(new System.Security.Claims.Claim(identity.RoleClaimType, membership.Role.ToString()));
+        }
     };
 });
 

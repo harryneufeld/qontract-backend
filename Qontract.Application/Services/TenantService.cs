@@ -23,10 +23,7 @@ public class TenantService : ITenantService
     private IQueryable<Tenant> AdministeredTenants(int userId) =>
         _context.Tenants.Where(t => _context.TenantMemberships.Any(m =>
             m.TenantId == t.Id && m.UserId == userId && m.IsActive
-            && m.Role == UserRole.TenantAdmin && m.User.IsActive
-            // During the transition, the primary role remains editable via
-            // UserService. Do not let its older membership grant stale rights.
-            && (m.User.TenantId != t.Id || m.User.Role == UserRole.TenantAdmin)));
+            && m.Role == UserRole.TenantAdmin && m.User.IsActive));
 
     public async Task<List<TenantDTO>> GetTenantsAsync(int userId, CancellationToken cancellationToken = default)
     {

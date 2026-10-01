@@ -20,19 +20,25 @@ This backend is not yet a complete replacement for it.
 - Tenant/user CRUD and role authorization exist. Tenant administration now uses
   active admin memberships; creating a tenant atomically gives its creator an
   admin membership. Migration `AddTenantMemberships` backfills existing users.
-  Login and user administration still use the legacy primary `TenantId` and role.
+  Login, user administration, and authorization use membership-specific roles.
   Multiple tenant memberships were approved by Harry in
   [#13](https://github.com/harryneufeld/qontract-backend/issues/13#issuecomment-5804173333).
-  Full membership management, switching, invitations, and registration are pending.
-- Public registration must be controlled by a backend setting. A deployment-wide
+  Membership management, switching, code invitations, and registration are implemented.
+- Public registration is controlled by `Registration:AllowPublic`, default false;
+  set `Registration__AllowPublic=true` in deployment configuration to enable it.
+  Valid invitations permit signup independently of public registration. A deployment-wide
   frontend control for a platform administrator is proposed separately from
-  tenant administration. Invitation codes/links should work for existing users
-  and new accounts, following FamilyPlanner's workflow.
+  tenant administration. Invitation codes work for existing users and new accounts;
+  invitation links and validated tenant settings remain follow-ups.
 - Tenant administrators can list/read/update/deactivate only tenants where they
   have an active admin membership, with an active account. Foreign and unknown
   IDs return the same 404; the JWT role alone does not grant tenant access.
 - Authentication currently issues 24-hour JWTs. Logout is stateless; revocable
   sessions and refresh tokens are tracked in [#44](https://github.com/harryneufeld/qontract-backend/issues/44).
+  Every authenticated request checks current account, tenant, membership activity,
+  and role. Removing a membership immediately rejects its tokens; demotion updates
+  their effective role. Membership removal preserves the account and other memberships,
+  and the final active tenant administrator cannot be removed or demoted.
 - Contract value means the amount billed per selected period. The current
   free-form `Value` has no billing-period or price-history equivalent. This is a
   parity gap tracked in [#47](https://github.com/harryneufeld/qontract-backend/issues/47),
@@ -135,13 +141,24 @@ dotnet run --project Qontract.API
 - `GET /api/Auth/me` - Validate current user/session
 - `POST /api/Auth/logout` - Stateless logout acknowledgement
 - `POST /api/Auth/change-password` - Change current user's password
+- `GET /api/Auth/registration` - Public signup policy
+- `POST /api/Auth/register` - Public or invitation-based signup
+- `GET /api/Auth/memberships` - Active memberships for the account
+- `POST /api/Auth/switch-tenant` - Issue a token for an active membership
+- `POST /api/Auth/invitations/redeem` - Join by code and issue the selected tenant's token
 
 ### Tenants
-- `GET /api/Tenants` - List all tenants
+- `GET /api/Tenants` - List tenants administered by the caller
 - `GET /api/Tenants/{id}` - Get tenant details
 - `POST /api/Tenants` - Create new tenant
 - `PUT /api/Tenants/{id}` - Update tenant
 - `PATCH /api/Tenants/{id}/deactivate` - Deactivate tenant
+- `GET /api/Tenants/{id}/members` - List members (tenant admin)
+- `PATCH /api/Tenants/{id}/members/{userId}` - Change membership role/activity
+- `DELETE /api/Tenants/{id}/members/{userId}` - Deactivate membership, preserving the account
+- `GET /api/Tenants/{id}/invitations` - List invitations without secrets
+- `POST /api/Tenants/{id}/invitations` - Create an invitation; returns the code once
+- `DELETE /api/Tenants/{id}/invitations/{invitationId}` - Revoke an unused invitation
 
 ### Users
 - `GET /api/Users` - List users in tenant
@@ -240,6 +257,21 @@ Notes:
 MIT
 
 ## Security Considerations
+
+New and changed passwords use versioned PBKDF2-SHA512 hashes with random salts
+and 210,000 iterations. Existing refactor SHA256 hashes remain accepted for login;
+FamilyPlanner credential import is still part of migration planning.
+
+Invitation codes contain 32 random bytes, are stored only as SHA256 hashes, and
+are redeemed atomically once. Optional email binding is case-insensitive. The
+default expiry is seven days; the API accepts one to thirty days.
+
+`AddRegistrationAndInvitations` backfills normalized account emails and enforces
+uniqueness. Before upgrading an existing refactor database, check for duplicate
+emails with `SELECT UPPER(TRIM("Email")), COUNT(*) FROM "Users" GROUP BY UPPER(TRIM("Email")) HAVING COUNT(*) > 1;`.
+Resolve duplicates explicitly before migration; it will fail rather than merge
+accounts or discard their access. Review non-ASCII email casing against the target
+database's `UPPER` behavior, since new writes use .NET invariant normalization.
 
 - Never commit your `appsettings.json` with real connection strings
 - Use environment variables for sensitive data

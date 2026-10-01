@@ -163,7 +163,8 @@ public class ChangePasswordTests : IClassFixture<QontractWebApplicationFactory>
 
         user.PasswordHash.Should().NotBe(ThirdPassword);
         user.PasswordHash.Should().NotBe(SeedPasswordHash);
-        user.PasswordHash.Should().MatchRegex("^[A-Za-z0-9+/=]+:[A-Za-z0-9+/=]+$");
+        user.PasswordHash.Should().StartWith("pbkdf2-sha512:");
+        Qontract.Core.Security.Passwords.Verify(ThirdPassword, user.PasswordHash).Should().BeTrue();
 
         // Restore the seeded password.
         var restoreToken = await LoginAsync(Email, ThirdPassword);

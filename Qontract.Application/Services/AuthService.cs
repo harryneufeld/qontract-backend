@@ -16,7 +16,6 @@ public class AuthService : IAuthService
 {
     private readonly IApplicationDbContext _context;
     private readonly IConfiguration _configuration;
-    private const int SaltBytesSize = 16;
     private readonly ILogger<AuthService> _logger;
 
     public AuthService(IApplicationDbContext context, IConfiguration configuration, ILogger<AuthService> logger)
@@ -31,7 +30,7 @@ public class AuthService : IAuthService
         try
         {
             var user = await _context.Users
-                .FirstOrDefaultAsync(u => u.Email == dto.Email && u.IsActive, cancellationToken);
+                .FirstOrDefaultAsync(u => u.NormalizedEmail == dto.Email.Trim().ToUpperInvariant() && u.IsActive, cancellationToken);
 
             if (user == null)
             {
@@ -45,16 +44,12 @@ public class AuthService : IAuthService
                 throw new InvalidOperationException("Invalid email or password");
             }
 
-            var token = GenerateJwtToken(user);
-
-            return new Qontract.Application.Models.AuthDTO
-            {
-                AccessToken = token,
-                UserId = user.Id,
-                Email = user.Email,
-                ExpiresAt = DateTime.UtcNow.AddHours(24),
-                User = ToAuthUser(user)
-            };
+            var membership = await _context.TenantMemberships
+                .Where(m => m.UserId == user.Id && m.IsActive && m.Tenant.IsActive)
+                .OrderByDescending(m => m.TenantId == user.TenantId).ThenBy(m => m.TenantId)
+                .FirstOrDefaultAsync(cancellationToken)
+                ?? throw new InvalidOperationException("No active tenant membership.");
+            return Session(user, membership);
         }
         catch (Exception ex)
         {
@@ -63,13 +58,28 @@ public class AuthService : IAuthService
         }
     }
 
-    public async Task<AuthUserDTO?> GetCurrentUserAsync(int userId, CancellationToken cancellationToken = default)
+    public async Task<AuthUserDTO?> GetCurrentUserAsync(int userId, int tenantId, CancellationToken cancellationToken = default)
     {
-        var user = await _context.Users
-            .FirstOrDefaultAsync(u => u.Id == userId && u.IsActive, cancellationToken);
-
-        return user == null ? null : ToAuthUser(user);
+        var membership = await ActiveMembership(userId, tenantId).FirstOrDefaultAsync(cancellationToken);
+        return membership == null ? null : ToAuthUser(membership.User, membership);
     }
+
+    private IQueryable<TenantMembership> ActiveMembership(int userId, int tenantId) =>
+        _context.TenantMemberships.Include(m => m.User).Where(m => m.UserId == userId && m.TenantId == tenantId
+            && m.IsActive && m.User.IsActive && m.Tenant.IsActive);
+
+    public async Task<AuthDTO> SwitchTenantAsync(int userId, int tenantId, CancellationToken cancellationToken = default)
+    {
+        var membership = await ActiveMembership(userId, tenantId).FirstOrDefaultAsync(cancellationToken)
+            ?? throw new KeyNotFoundException("Tenant not found.");
+        return Session(membership.User, membership);
+    }
+
+    private AuthDTO Session(User user, TenantMembership membership) => new()
+    {
+        AccessToken = GenerateJwtToken(user, membership), UserId = user.Id, Email = user.Email,
+        ExpiresAt = DateTime.UtcNow.AddHours(24), User = ToAuthUser(user, membership)
+    };
 
     /// <summary>
     /// Self-service password change (app#11). Verifies the current password
@@ -102,79 +112,22 @@ public class AuthService : IAuthService
         return true;
     }
 
-    private static AuthUserDTO ToAuthUser(User user) => new()
+    private static AuthUserDTO ToAuthUser(User user, TenantMembership membership) => new()
     {
         Id = user.Id,
         Name = user.Name,
         Email = user.Email,
-        Role = user.Role.ToString(),
-        TenantId = user.TenantId,
+        Role = membership.Role.ToString(),
+        TenantId = membership.TenantId,
         CreatedAt = user.CreatedAt
     };
 
-    public async Task<string> HashPasswordAsync(string password)
-    {
-        try
-        {
-            byte[] salt;
-            var hashParts = password.Split(':');
-
-            if (IsSaltedHash(hashParts))
-            {
-                // Already a stored "salt:hash" pair — reuse the original salt
-                // so re-hashing stays stable against the existing stored hash.
-                salt = Convert.FromBase64String(hashParts[0]);
-            }
-            else
-            {
-                // Plain (unhashed) password: generate a fresh salt. This is the
-                // normal case — DTOs carry a plain password, never a hash.
-                // (issue #40: a plain password such as "password123" is not
-                // base64, so the old "extract salt" branch threw FormatException
-                // and 500'd; it is now guarded by IsSaltedHash.)
-                salt = GenerateSalt();
-            }
-
-            var hashed = HashPassword(password, salt);
-            var saltBase64 = Convert.ToBase64String(salt);
-            return $"{saltBase64}:{hashed}";
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error hashing password");
-            throw;
-        }
-    }
-
-    /// <summary>
-    /// True only when the value is a stored "salt:hash" pair — exactly two
-    /// ':'-separated segments, both valid base64. Any plain password (no colon,
-    /// or a segment that is not base64) is treated as unhashed input and gets a
-    /// fresh salt instead of failing to decode (issue #40).
-    /// </summary>
-    private static bool IsSaltedHash(string[] hashParts)
-    {
-        return hashParts.Length == 2
-            && TryBase64Decode(hashParts[0], out _)
-            && TryBase64Decode(hashParts[1], out _);
-    }
-
-    private static bool TryBase64Decode(string value, out byte[] decoded)
-    {
-        try
-        {
-            decoded = Convert.FromBase64String(value);
-            return true;
-        }
-        catch (FormatException)
-        {
-            decoded = Array.Empty<byte>();
-            return false;
-        }
-    }
+    public Task<string> HashPasswordAsync(string password) => Task.FromResult(Passwords.Hash(password));
 
     private bool VerifyPassword(string password, string storedHash)
     {
+        if (storedHash.StartsWith("pbkdf2-sha512:", StringComparison.Ordinal))
+            return Passwords.Verify(password, storedHash);
         try
         {
             var hashParts = storedHash.Split(':');
@@ -184,30 +137,21 @@ public class AuthService : IAuthService
             }
 
             var salt = Convert.FromBase64String(hashParts[0]);
-            var hash = hashParts[1];
+            var hash = Convert.FromBase64String(hashParts[1]);
 
-            var inputHash = HashPassword(password, salt);
+            var inputHash = Convert.FromBase64String(LegacyHashPassword(password, salt));
 
-            return hash == inputHash;
+            return CryptographicOperations.FixedTimeEquals(hash, inputHash);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error verifying password for email: {Email}", password);
+            _logger.LogError(ex, "Error verifying stored password format");
             return false;
         }
     }
 
-    private byte[] GenerateSalt()
-    {
-        var salt = new byte[SaltBytesSize];
-        using (var rng = RandomNumberGenerator.Create())
-        {
-            rng.GetBytes(salt);
-        }
-        return salt;
-    }
-
-    private string HashPassword(string password, byte[] salt)
+    // Preserve the original byte layout solely for existing stored hashes.
+    private string LegacyHashPassword(string password, byte[] salt)
     {
         using (var sha256 = SHA256.Create())
         {
@@ -220,7 +164,7 @@ public class AuthService : IAuthService
         }
     }
 
-    private string GenerateJwtToken(User user)
+    private string GenerateJwtToken(User user, TenantMembership membership)
     {
         // (issue #36) The development fallback key is the single shared
         // constant Qontract.Core.Security.JwtKeys.DevelopmentFallback, also
@@ -242,8 +186,8 @@ public class AuthService : IAuthService
             new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
             new Claim(JwtRegisteredClaimNames.Email, user.Email!),
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-            new Claim(ClaimTypes.Role, user.Role.ToString()),
-            new Claim("TenantId", user.TenantId.ToString())
+            new Claim(ClaimTypes.Role, membership.Role.ToString()),
+            new Claim("TenantId", membership.TenantId.ToString())
         };
 
         var token = new JwtSecurityToken(

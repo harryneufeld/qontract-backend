@@ -360,6 +360,64 @@ namespace Qontract.Infrastructure.Migrations
                     b.ToTable("Tenants", (string)null);
                 });
 
+            modelBuilder.Entity("Qontract.Domain.Models.TenantInvitation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CodeHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("ModifiedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ModifiedBy")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("RedeemedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("RedeemedByUserId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("RevokedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Role")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("TenantId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CodeHash")
+                        .IsUnique();
+
+                    b.HasIndex("RedeemedByUserId");
+
+                    b.HasIndex("TenantId");
+
+                    b.ToTable("TenantInvitations", (string)null);
+                });
+
             modelBuilder.Entity("Qontract.Domain.Models.TenantMembership", b =>
                 {
                     b.Property<int>("UserId")
@@ -428,6 +486,11 @@ namespace Qontract.Infrastructure.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("NormalizedEmail")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasMaxLength(255)
@@ -441,6 +504,9 @@ namespace Qontract.Infrastructure.Migrations
                         .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("NormalizedEmail")
+                        .IsUnique();
 
                     b.HasIndex("TenantId");
 
@@ -549,6 +615,24 @@ namespace Qontract.Infrastructure.Migrations
                     b.Navigation("SupersededBy");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Qontract.Domain.Models.TenantInvitation", b =>
+                {
+                    b.HasOne("Qontract.Domain.Models.User", "RedeemedByUser")
+                        .WithMany()
+                        .HasForeignKey("RedeemedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Qontract.Domain.Models.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("RedeemedByUser");
+
+                    b.Navigation("Tenant");
                 });
 
             modelBuilder.Entity("Qontract.Domain.Models.TenantMembership", b =>

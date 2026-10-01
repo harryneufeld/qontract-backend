@@ -14,14 +14,17 @@ namespace Qontract.API.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
+    private readonly MembershipService _memberships;
     private readonly IValidator<ChangePasswordDTO> _changePasswordValidator;
 
     public AuthController(
         IAuthService authService,
-        IValidator<ChangePasswordDTO> changePasswordValidator)
+        IValidator<ChangePasswordDTO> changePasswordValidator,
+        MembershipService memberships)
     {
         _authService = authService;
         _changePasswordValidator = changePasswordValidator;
+        _memberships = memberships;
     }
 
     // [EnableRateLimiting("auth")] (issue #27): the "auth" policy applies a
@@ -58,7 +61,8 @@ public class AuthController : ControllerBase
             return Unauthorized(new { error = "Invalid token subject." });
         }
 
-        var user = await _authService.GetCurrentUserAsync(userId);
+        if (!int.TryParse(User.FindFirst("TenantId")?.Value, out var tenantId)) return Unauthorized();
+        var user = await _authService.GetCurrentUserAsync(userId, tenantId);
         return user is null ? Unauthorized(new { error = "User no longer active." }) : Ok(user);
     }
 
@@ -70,6 +74,38 @@ public class AuthController : ControllerBase
     public IActionResult Logout()
     {
         return Ok(new { message = "Logged out" });
+    }
+
+    private int CurrentUserId => int.Parse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value);
+
+    [HttpGet("registration")]
+    public IActionResult RegistrationPolicy() => Ok(new { allowPublic = _memberships.AllowPublicRegistration });
+
+    [HttpPost("register")]
+    [EnableRateLimiting("auth")]
+    public async Task<ActionResult<AuthDTO>> Register(RegisterDTO dto)
+    {
+        var access = await _memberships.RegisterAsync(dto);
+        return Ok(await _authService.SwitchTenantAsync(access.UserId, access.TenantId));
+    }
+
+    [HttpGet("memberships")]
+    [Authorize]
+    public async Task<ActionResult<List<MembershipDTO>>> Memberships() =>
+        Ok(await _memberships.ListAsync(CurrentUserId));
+
+    [HttpPost("switch-tenant")]
+    [Authorize]
+    public async Task<ActionResult<AuthDTO>> SwitchTenant(SwitchTenantDTO dto) =>
+        Ok(await _authService.SwitchTenantAsync(CurrentUserId, dto.TenantId));
+
+    [HttpPost("invitations/redeem")]
+    [Authorize]
+    [EnableRateLimiting("auth")]
+    public async Task<ActionResult<AuthDTO>> Redeem(InvitationRedeemDTO dto)
+    {
+        var tenantId = await _memberships.RedeemAsync(CurrentUserId, dto.Code);
+        return Ok(await _authService.SwitchTenantAsync(CurrentUserId, tenantId));
     }
 
     /// <summary>

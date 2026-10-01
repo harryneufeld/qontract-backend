@@ -144,10 +144,10 @@ public class TenantAdministrationTests : IClassFixture<QontractWebApplicationFac
             await db.SaveChangesAsync();
         }
 
-        (await _client.GetAsync($"/api/tenants/{tenant.Id}")).StatusCode.Should().Be(HttpStatusCode.NotFound);
-        (await _client.GetFromJsonAsync<List<TenantDTO>>("/api/tenants", JsonOptions)).Should().BeEmpty();
+        (await _client.GetAsync($"/api/tenants/{tenant.Id}")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        (await _client.GetAsync("/api/tenants")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
         (await _client.PostAsJsonAsync("/api/tenants", new { name = "Unauthorized tenant", type = "Family" }))
-            .StatusCode.Should().Be(HttpStatusCode.Forbidden);
+            .StatusCode.Should().Be(HttpStatusCode.Unauthorized);
         using var checkScope = _factory.Services.CreateScope();
         var checkDb = checkScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         (await checkDb.Tenants.AnyAsync(t => t.Name == "Unauthorized tenant")).Should().BeFalse();

@@ -51,8 +51,9 @@ public class UserTenantManagementTests
     private static (string Salt, string Hash) SplitHash(string hash)
     {
         var parts = hash.Split(':');
-        parts.Length.Should().Be(2, "a stored hash is always '<base64 salt>:<base64 hash>'");
-        return (parts[0], parts[1]);
+        parts.Length.Should().Be(4, "new passwords use a versioned PBKDF2 format");
+        parts[0].Should().Be("pbkdf2-sha512");
+        return (parts[2], parts[3]);
     }
 
     [Fact]
@@ -66,7 +67,9 @@ public class UserTenantManagementTests
 
         var (salt, hashPart) = SplitHash(hash);
         Convert.FromBase64String(salt).Length.Should().Be(16, "the generated salt is 16 bytes");
-        Convert.FromBase64String(hashPart).Length.Should().Be(32, "SHA256 output is 32 bytes");
+        Convert.FromBase64String(hashPart).Length.Should().Be(32);
+        Qontract.Core.Security.Passwords.Verify("password123", hash).Should().BeTrue();
+        Qontract.Core.Security.Passwords.Verify("wrong-password", hash).Should().BeFalse();
     }
 
     [Theory]

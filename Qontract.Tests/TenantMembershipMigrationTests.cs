@@ -24,6 +24,8 @@ public class TenantMembershipMigrationTests
         script.Should().Contain("TenantMemberships");
         script.Should().Contain("INSERT INTO");
         script.Should().Contain("FK_TenantMemberships_Users_UserId");
+        script.Should().Contain("TenantInvitations");
+        script.Should().Contain("IX_Users_NormalizedEmail");
     }
 
     [Fact]
@@ -57,6 +59,7 @@ public class TenantMembershipMigrationTests
         memberships[1].IsActive.Should().BeFalse();
         memberships[1].Role.Should().Be(Qontract.Domain.Models.UserRole.User);
         (await db.Users.FindAsync(11))!.PasswordHash.Should().Be("unchanged-hash");
+        (await db.Users.FindAsync(11))!.NormalizedEmail.Should().Be("EXISTING@EXAMPLE.COM");
 
         // Reapplying is a no-op rather than a duplicate backfill.
         await migrator.MigrateAsync();
