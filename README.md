@@ -179,6 +179,18 @@ dotnet run --project Qontract.API
 - `GET /api/Contractors/{id}/addresses` - List active contractor addresses
 
 ### Contracts
+
+For a dated price revision, `PUT /api/Contracts/{id}` accepts, for example:
+
+```json
+{"value":"120.50","currency":"EUR","billingPeriod":"Monthly","priceEffectiveFrom":"2026-11-01","priceNotes":"New tariff"}
+```
+
+Providing an effective date or note records a revision even when the amount is
+unchanged. Omitting all price fields during an unrelated edit leaves history alone.
+Explicit prices use plain decimal strings (a decimal comma is accepted and normalized);
+omit the period to preserve an unclassified legacy value until it is reviewed.
+
 - `GET /api/Contracts` - List all contracts
 - `GET /api/Contracts/stats` - Tenant-wide dashboard counters
 - `GET /api/Contracts/{id}` - Get single contract

@@ -62,4 +62,3 @@ namespace Qontract.Infrastructure.Migrations
         }
     }
 }
-
