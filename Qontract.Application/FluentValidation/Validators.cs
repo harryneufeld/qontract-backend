@@ -142,6 +142,7 @@ public class ContractCreateValidator : AbstractValidator<ContractCreateDTO>
 {
     public ContractCreateValidator()
     {
+        RuleFor(x => x.BillingPeriod).IsInEnum().When(x => x.BillingPeriod.HasValue);
         RuleFor(x => x.Title)
             .NotEmpty().WithMessage("Title is required.")
             .MaximumLength(200).WithMessage("Title cannot exceed 200 characters.");
@@ -176,6 +177,10 @@ public class ContractUpdateValidator : AbstractValidator<ContractUpdateDTO>
 {
     public ContractUpdateValidator()
     {
+        RuleFor(x => x.BillingPeriod).IsInEnum().When(x => x.BillingPeriod.HasValue);
+        RuleFor(x => x.PriceEffectiveFrom).Must(v => DateOnly.TryParseExact(v, "yyyy-MM-dd", out _))
+            .When(x => x.PriceEffectiveFrom != null).WithMessage("Use a valid yyyy-MM-dd price effective date.");
+        RuleFor(x => x.PriceNotes).MaximumLength(2000);
         RuleFor(x => x.Title)
             .MaximumLength(200).When(x => x.Title is not null).WithMessage("Title cannot exceed 200 characters.");
 

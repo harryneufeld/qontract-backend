@@ -31,6 +31,8 @@ public class Contract : BaseEntity
 
     [MaxLength(500)]
     public string? Value { get; set; }
+    public BillingPeriod? BillingPeriod { get; set; }
+    public ICollection<ContractPrice> PriceHistory { get; set; } = new List<ContractPrice>();
 
     [MaxLength(100)]
     public string? ContractNumber { get; set; }

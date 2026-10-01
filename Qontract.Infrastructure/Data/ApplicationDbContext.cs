@@ -26,6 +26,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
                 .SetProperty(i => i.ModifiedAt, now), cancellationToken) == 1;
     public DbSet<Contractor> Contractors { get; set; }
     public DbSet<Contract> Contracts { get; set; }
+    public DbSet<ContractPrice> ContractPrices { get; set; }
     public DbSet<Document> Documents { get; set; }
     public DbSet<Address> Addresses { get; set; }
 
@@ -227,6 +228,22 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
             entity.HasMany(e => e.Documents)
                 .WithOne(d => d.Contract)
                 .HasForeignKey(d => d.ContractId);
+        });
+
+        modelBuilder.Entity<ContractPrice>(entity =>
+        {
+            entity.HasKey(p => p.Id);
+            entity.Property(p => p.Id).ValueGeneratedNever();
+            entity.Property(p => p.Value).HasMaxLength(500);
+            entity.Property(p => p.Currency).HasMaxLength(50);
+            entity.Property(p => p.EffectiveFrom).IsRequired().HasMaxLength(10);
+            entity.Property(p => p.EffectiveUntil).HasMaxLength(10);
+            entity.Property(p => p.Notes).HasMaxLength(2000);
+            entity.Property(p => p.CreatedBy).HasMaxLength(500);
+            entity.Property(p => p.ModifiedBy).HasMaxLength(500);
+            entity.HasOne(p => p.Contract).WithMany(c => c.PriceHistory)
+                .HasForeignKey(p => p.ContractId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(p => new { p.ContractId, p.EffectiveFrom });
         });
 
         // Document

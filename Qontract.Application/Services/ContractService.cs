@@ -107,6 +107,13 @@ public class ContractService : IContractService
                 EndDate = c.EndDate,
                 Currency = c.Currency,
                 Value = c.Value,
+                BillingPeriod = c.BillingPeriod,
+                PriceHistory = c.PriceHistory.OrderBy(p => p.EffectiveFrom).ThenBy(p => p.CreatedAt).Select(p => new ContractPriceDTO
+                {
+                    Id = p.Id, Value = p.Value, Currency = p.Currency, BillingPeriod = p.BillingPeriod,
+                    EffectiveFrom = p.EffectiveFrom, EffectiveUntil = p.EffectiveUntil, Notes = p.Notes,
+                    CreatedAt = p.CreatedAt, CreatedBy = p.CreatedBy
+                }).ToList(),
                 ContractNumber = c.ContractNumber,
                 MinimumContractDate = c.MinimumContractDate,
                 ContractorId = c.ContractorId,
@@ -210,6 +217,7 @@ public class ContractService : IContractService
     public async Task<ContractDTO> GetContractByIdAsync(int id, int tenantId, CancellationToken cancellationToken = default)
     {
         var contract = await _context.Contracts
+            .Include(c => c.PriceHistory)
             .Include(c => c.Tenant)
             .Include(c => c.Contractor)
             .Include(c => c.Creator)
@@ -229,6 +237,8 @@ public class ContractService : IContractService
             EndDate = contract.EndDate,
             Currency = contract.Currency,
             Value = contract.Value,
+            BillingPeriod = contract.BillingPeriod,
+            PriceHistory = contract.PriceHistory.OrderBy(p => p.EffectiveFrom).ThenBy(p => p.CreatedAt).Select(ToPriceDto).ToList(),
             ContractNumber = contract.ContractNumber,
             MinimumContractDate = contract.MinimumContractDate,
             ContractorId = contract.ContractorId,
@@ -250,7 +260,8 @@ public class ContractService : IContractService
             StartDate = dto.StartDate,
             EndDate = dto.EndDate,
             Currency = dto.Currency,
-            Value = dto.Value,
+            Value = CanonicalValue(dto.Value, dto.BillingPeriod),
+            BillingPeriod = dto.BillingPeriod,
             ContractNumber = dto.ContractNumber,
             MinimumContractDate = dto.MinimumContractDate,
             ContractorId = dto.ContractorId,
@@ -263,6 +274,7 @@ public class ContractService : IContractService
         };
 
         _context.Contracts.Add(contract);
+        contract.PriceHistory.Add(Snapshot(contract, InitialDate(contract), createdBy, null));
         await _context.SaveChangesAsync(cancellationToken);
 
         return await GetContractByIdAsync(contract.Id, tenantId, cancellationToken);
@@ -270,11 +282,18 @@ public class ContractService : IContractService
 
     public async Task<ContractDTO> UpdateContractAsync(int id, int tenantId, ContractUpdateDTO dto, string? modifiedBy, CancellationToken cancellationToken = default)
     {
-        var contract = await _context.Contracts
+        await using var transaction = await _context.BeginSerializableTransactionAsync(cancellationToken);
+        var contract = await _context.Contracts.Include(c => c.PriceHistory)
             .FirstOrDefaultAsync(c => c.Id == id && c.IsActive && c.TenantId == tenantId, cancellationToken);
 
         if (contract == null)
             throw new KeyNotFoundException($"Contract with ID {id} not found in tenant {tenantId}.");
+
+        var oldValue = contract.Value;
+        var oldCurrency = contract.Currency;
+        var oldPeriod = contract.BillingPeriod;
+        if (contract.PriceHistory.Count == 0)
+            contract.PriceHistory.Add(Snapshot(contract, InitialDate(contract), contract.CreatedBy, null));
 
         if (!string.IsNullOrEmpty(dto.Title))
             contract.Title = dto.Title;
@@ -306,17 +325,31 @@ public class ContractService : IContractService
         if (dto.ContractorId.HasValue)
             contract.ContractorId = dto.ContractorId.Value;
 
+        if (dto.BillingPeriod.HasValue) contract.BillingPeriod = dto.BillingPeriod;
+        contract.Value = CanonicalValue(contract.Value, contract.BillingPeriod);
+        if (contract.Value != oldValue || contract.Currency != oldCurrency || contract.BillingPeriod != oldPeriod
+            || !string.IsNullOrWhiteSpace(dto.PriceNotes) || dto.PriceEffectiveFrom != null)
+        {
+            var open = contract.PriceHistory.Single(p => p.EffectiveUntil == null);
+            var from = dto.PriceEffectiveFrom ?? DateTime.UtcNow.ToString("yyyy-MM-dd");
+            if (dto.PriceEffectiveFrom is null && string.CompareOrdinal(from, open.EffectiveFrom) < 0)
+                from = open.EffectiveFrom;
+            if (!DateOnly.TryParseExact(from, "yyyy-MM-dd", out _) || string.CompareOrdinal(from, open.EffectiveFrom) < 0)
+                throw new InvalidOperationException("Price effective date must be a valid date on or after the current price starts.");
+            open.EffectiveUntil = from;
+            open.ModifiedBy = modifiedBy;
+            contract.PriceHistory.Add(Snapshot(contract, from, modifiedBy, dto.PriceNotes));
+        }
         contract.ModifiedAt = DateTime.UtcNow;
         contract.ModifiedBy = modifiedBy;
-
         await _context.SaveChangesAsync(cancellationToken);
-
+        await transaction.CommitAsync(cancellationToken);
         return await GetContractByIdAsync(id, tenantId, cancellationToken);
     }
 
     public async Task<ContractDTO> DeactivateContractAsync(int id, int tenantId, string? modifiedBy, CancellationToken cancellationToken = default)
     {
-        var contract = await _context.Contracts
+        var contract = await _context.Contracts.Include(c => c.PriceHistory)
             .FirstOrDefaultAsync(c => c.Id == id && c.IsActive && c.TenantId == tenantId, cancellationToken);
 
         if (contract == null)
@@ -341,6 +374,8 @@ public class ContractService : IContractService
             EndDate = contract.EndDate,
             Currency = contract.Currency,
             Value = contract.Value,
+            BillingPeriod = contract.BillingPeriod,
+            PriceHistory = contract.PriceHistory.OrderBy(p => p.EffectiveFrom).ThenBy(p => p.CreatedAt).Select(ToPriceDto).ToList(),
             ContractNumber = contract.ContractNumber,
             MinimumContractDate = contract.MinimumContractDate,
             ContractorId = contract.ContractorId,
@@ -352,9 +387,35 @@ public class ContractService : IContractService
         };
     }
 
+    private static string InitialDate(Contract c) => DateOnly.TryParseExact(c.StartDate, "yyyy-MM-dd", out var date)
+        ? date.ToString("yyyy-MM-dd") : c.CreatedAt.ToString("yyyy-MM-dd");
+
+    private static ContractPrice Snapshot(Contract c, string from, string? actor, string? notes) => new()
+    {
+        Contract = c, Value = c.Value, Currency = c.Currency, BillingPeriod = c.BillingPeriod,
+        EffectiveFrom = from, CreatedBy = actor, ModifiedBy = actor, Notes = notes
+    };
+
+    private static ContractPriceDTO ToPriceDto(ContractPrice p) => new()
+    {
+        Id = p.Id, Value = p.Value, Currency = p.Currency, BillingPeriod = p.BillingPeriod,
+        EffectiveFrom = p.EffectiveFrom, EffectiveUntil = p.EffectiveUntil, Notes = p.Notes,
+        CreatedAt = p.CreatedAt, CreatedBy = p.CreatedBy
+    };
+
+    private static string? CanonicalValue(string? value, BillingPeriod? period)
+    {
+        if (period is null || string.IsNullOrWhiteSpace(value)) return value;
+        if (!decimal.TryParse(value.Trim().Replace(',', '.'),
+            System.Globalization.NumberStyles.AllowLeadingSign | System.Globalization.NumberStyles.AllowDecimalPoint,
+            System.Globalization.CultureInfo.InvariantCulture, out var amount) || amount < 0)
+            throw new InvalidOperationException("Billed amount must be a non-negative number without currency symbols or grouping separators.");
+        return amount.ToString(System.Globalization.CultureInfo.InvariantCulture);
+    }
+
     public async Task<bool> DeleteContractSoftAsync(int id, int tenantId, string? modifiedBy, CancellationToken cancellationToken = default)
     {
-        var contract = await _context.Contracts
+        var contract = await _context.Contracts.Include(c => c.PriceHistory)
             .FirstOrDefaultAsync(c => c.Id == id && c.IsActive && c.TenantId == tenantId, cancellationToken);
 
         if (contract == null)

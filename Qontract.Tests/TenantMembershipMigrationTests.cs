@@ -26,6 +26,8 @@ public class TenantMembershipMigrationTests
         script.Should().Contain("FK_TenantMemberships_Users_UserId");
         script.Should().Contain("TenantInvitations");
         script.Should().Contain("IX_Users_NormalizedEmail");
+        script.Should().Contain("ContractPrices");
+        script.Should().Contain("BillingPeriod");
     }
 
     [Fact]

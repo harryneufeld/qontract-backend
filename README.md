@@ -39,10 +39,12 @@ This backend is not yet a complete replacement for it.
   and role. Removing a membership immediately rejects its tokens; demotion updates
   their effective role. Membership removal preserves the account and other memberships,
   and the final active tenant administrator cannot be removed or demoted.
-- Contract value means the amount billed per selected period. The current
-  free-form `Value` has no billing-period or price-history equivalent. This is a
-  parity gap tracked in [#47](https://github.com/harryneufeld/qontract-backend/issues/47),
-  and the app's lifetime-value proration needs replacement.
+- Contract amounts support all six legacy billing periods and dated price revisions.
+  Explicit billed values are decimal-validated invariant strings, preserving API compatibility.
+  Existing unclassified values remain unchanged with an unknown period. Contract updates
+  accept `PriceEffectiveFrom` and `PriceNotes`; details/lists return `PriceHistory`.
+  See [LEGACY-MAPPING.md](LEGACY-MAPPING.md) for date boundaries, estimates, remaining
+  legacy gaps and import assumptions, tracked in [#47](https://github.com/harryneufeld/qontract-backend/issues/47).
 - Full migration must preserve legacy memberships, recurring prices, price
   history, invoices, personal/family files, shared-file relationships, addresses,
   audit information, and credentials. See the proposed [export plan](https://github.com/harryneufeld/FamilyPlanner/issues/2).

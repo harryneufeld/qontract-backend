@@ -1,0 +1,113 @@
+# FamilyPlanner parity and migration mapping
+
+Repository inventory, 2026-10-01. This is a mapping proposal grounded in the
+legacy models and `FamilyContext`; it is not a production inventory or a cutover approval.
+Productive FamilyPlanner remains supported until all gates below pass.
+
+## Billing implemented in the refactor
+
+`Contract.Value` remains a string for API/data compatibility. With an explicit
+`BillingPeriod`, the server validates it using .NET decimal arithmetic and stores
+an invariant decimal string. Optional amounts are allowed. The six periods map:
+
+| Legacy RecurringType | Refactor BillingPeriod |
+| --- | --- |
+| Einmalig | OneTime |
+| Täglich | Daily |
+| Wöchentlich | Weekly |
+| Monatlich | Monthly |
+| Quartalsweise | Quarterly |
+| Jährlich | Yearly |
+
+`AddBillingPeriodsAndPriceHistory` adds nullable periods and a `ContractPrices`
+table. Existing values and audit timestamps remain untouched, with unknown periods;
+the migration does not fabricate past prices. New contracts get an initial price
+snapshot from a valid start date, or their creation date. The first edit of an older
+contract captures its existing price before changing it.
+
+Changes to amount, currency, or period append snapshots; explicitly providing a
+price effective date or note also creates a revision even if the amount is unchanged. `PriceEffectiveFrom` is
+an ISO date; omitted dates default to the current UTC date, or the current snapshot's
+later start date. `PriceNotes` is optional. The previous snapshot closes at this date.
+An earlier date than the latest snapshot's start is rejected. Same-day corrections
+retain superseded snapshots with zero-length intervals. Unrelated edits add no price
+revision. Price history is returned by both contract detail and list APIs, scoped to
+the caller's tenant. This is revision creation, not a general historical import API.
+
+New history intervals are start-inclusive/end-exclusive. Future-dated revisions are
+supported; the contract's value fields describe the latest revision, while cost
+estimates apply each dated snapshot only during its interval. Original recorded
+values, currencies, periods, notes, and audit fields remain in the snapshots.
+
+## Cost estimate convention
+
+The dashboard shows calendar estimates, not paid or due invoice totals. Monthly
+amounts allocate by days within each calendar month; quarterly and yearly amounts
+convert to monthly rates by dividing by 3 and 12. Daily and weekly amounts allocate
+per day (weekly divided by 7). One-time amounts occur at their snapshot's effective
+date. Contract start/end bound all estimates, with the contract end inclusive;
+missing ends do not shorten an ongoing contract to today. UTC calendar dates avoid
+daylight-saving drift. The views cover this month, this half-year, this year, or the
+next 12 months. Only Active contracts contribute, and currencies remain separate.
+Unknown periods and invalid amounts are visibly excluded in whole or part. Zero
+amounts add no cost. Real billing dates, payment schedules, and invoices need separate
+parity work; the estimates do not claim to reproduce payment timing.
+
+## Source inventory and target gaps
+
+All entities carry GUID `Id`, `Created`, and nullable `Modified`. Preserve these as
+source facts and keep durable `(source instance, entity type, GUID)` mappings to new
+integer IDs. Refactor write hooks stamp operational timestamps, so the future importer
+must explicitly preserve source audit facts without accidentally replacing them.
+
+| Source model/relationship | Required target mapping and remaining work |
+| --- | --- |
+| User: UserName, Email, PasswordHash, AddressId | Account identity and address. Legacy BCrypt verification is missing; refactor PBKDF2/SHA256 compatibility does not cover it. Duplicate identities need explicit review. |
+| User.SessionId / RefreshToken | Do not import live sessions. Reauthentication and revocable sessions are separate work. |
+| UserFamily: FamilyName, AddressId | Family tenant and tenant address; current target tenant address support is incomplete. |
+| FamilyUserList | Multiple memberships exist. The join has no explicit per-family admin role; do not infer admin from membership alone. Review ownership/admin assignment. |
+| Company: CompanyName, Description, Email, Phone, Website, Notes, AddressId, UserId, FamilyId | Legacy counterparties map to Contractors, not automatically to Company tenants. Website, notes, personal/family scope and ownership need complete parity. |
+| Contract: ContractName, Description, ContractNumber, dates, CompanyId, UserId, FamilyId, Price, Recurring, Iban, Notes, IsActive, Type | Basic names/dates/link and billing exist. IBAN, notes, type, personal scope and ownership still need target support. Preserve IsActive separately from workflow status; do not guess Terminated from inactive alone. |
+| PriceHistory: Price, DateFrom, DateTo, Notes; ContractPriceHistory | Price revisions now exist. Export every raw record and join. Import mapping and reconciliation remain unimplemented. |
+| Address: StreetName, HouseNumber, ZipCode, CityName, CountryName; references from users/families/companies | Preserve separate street and house-number source fields and every association. Contractor addresses exist; user/family addresses and complete ownership mapping remain gaps. |
+| DatabaseFile: FileName, Description, Date, Path, Category, Content, MimeType, Size | Export metadata and actual bytes. Preserve both inline and path-backed storage; report missing bytes. Category, personal/family files, ownership, and complete associations remain gaps. |
+| ContractFileList, User.DatabaseFiles, UserFamily.Files | Export all associations, including shadow relationships in the actual schema. Shared bytes must not lose multiple links when target Documents currently has a single contract. |
+| Invoice: InvoiceDate, DueDate, Amount, InvoiceNumber, Description, FileId | Invoice domain and UI remain missing; currency is not explicit on this source model and must not be guessed silently. |
+
+## Price-history import proposal and unresolved cases
+
+Legacy `PriceHistory` is many-to-many with contracts and carries no historical
+currency or recurrence. Keep the raw record, GUID, dates, notes, audit facts and
+every join in the export and reconciliation manifest. Proposed target expansion is
+one revision per contract association, with an import ledger preserving shared
+source identity. Do not count shared records as duplicated source records.
+
+The repository declares DateFrom/DateTo but does not establish their inclusivity
+through a price-history UI or calculation. Confirm that convention against real
+records before transforming it. If DateTo is inclusive, map to the following day
+as EffectiveUntil; retain original dates in the ledger. Missing/default dates,
+overlaps, gaps, shared rows, and inconsistent current Price must be review findings,
+not silently repaired. Current contract recurrence/currency may be proposed for old
+prices only with an explicit provenance assumption; history does not prove they were
+unchanged. Retain unresolved records in staging until reviewed.
+
+## Export/import gates
+
+1. Produce a complete inventory from a restored production copy: all entity/join
+   counts, orphan references, duplicate identities, scope, billing anomalies, and
+   actual file counts/sizes/checksums. This repository review cannot supply those counts.
+2. Review the authenticated export plan in FamilyPlanner #2. Use a consistent
+   snapshot, stable paging, versioned manifests, protected credential handling and
+   streamed bytes. Export must not mutate the productive system.
+3. Implement all missing target features, including credentials, invoices, scope,
+   shared files and ownership. Agree price boundaries and administrative ownership.
+4. Build a repeatable staged importer with durable source mappings, validation,
+   dry-run reports, atomic batches, retry/cancellation and reconciliation. Reruns
+   must not duplicate records or erase prior history.
+5. Reconcile every source entity and relationship, amount/period/history, audit
+   fact, and file checksum. Compare representative legacy workflows with the app.
+6. Rehearse backup/restore, bounded write freeze or verified delta export, cutover
+   and rollback. Productive cutover requires a separate concrete review.
+
+Track billing in backend #47 and the complete migration in FamilyPlanner #1/#2.
+No production database was read, exported, imported, or migrated by this work.
