@@ -163,6 +163,18 @@ public class UserService : IUserService
                 user.IsActive = dto.IsActive.Value;
             }
 
+            // Legacy user administration still edits the primary membership.
+            // Commit its role/active state with the account, leaving any
+            // additional tenant memberships unchanged.
+            var membership = await _context.TenantMemberships.FirstOrDefaultAsync(
+                m => m.UserId == id && m.TenantId == tenantId, cancellationToken);
+            if (membership is not null)
+            {
+                membership.Role = user.Role;
+                membership.IsActive = user.IsActive;
+                membership.ModifiedBy = modifiedBy;
+            }
+
             user.ModifiedAt = DateTime.UtcNow;
             user.ModifiedBy = modifiedBy;
 

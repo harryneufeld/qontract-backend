@@ -7,6 +7,7 @@ public interface IApplicationDbContext
 {
     DbSet<Tenant> Tenants { get; }
     DbSet<User> Users { get; }
+    DbSet<TenantMembership> TenantMemberships { get; }
     DbSet<Contractor> Contractors { get; }
     DbSet<Contract> Contracts { get; }
     DbSet<Document> Documents { get; }

@@ -360,6 +360,41 @@ namespace Qontract.Infrastructure.Migrations
                     b.ToTable("Tenants", (string)null);
                 });
 
+            modelBuilder.Entity("Qontract.Domain.Models.TenantMembership", b =>
+                {
+                    b.Property<int>("UserId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("TenantId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("ModifiedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ModifiedBy")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Role")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("UserId", "TenantId");
+
+                    b.HasIndex("TenantId");
+
+                    b.ToTable("TenantMemberships", (string)null);
+                });
+
             modelBuilder.Entity("Qontract.Domain.Models.User", b =>
                 {
                     b.Property<int>("Id")
@@ -512,6 +547,25 @@ namespace Qontract.Infrastructure.Migrations
                     b.Navigation("Contract");
 
                     b.Navigation("SupersededBy");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Qontract.Domain.Models.TenantMembership", b =>
+                {
+                    b.HasOne("Qontract.Domain.Models.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Qontract.Domain.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Tenant");
 
                     b.Navigation("User");
                 });

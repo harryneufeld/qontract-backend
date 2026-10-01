@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -153,6 +154,14 @@ public class SecurityConfigTests : IClassFixture<QontractWebApplicationFactory>
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
+            // Production defaults include Windows EventLog, which restricted
+            // test accounts cannot write. Keep logging portable without
+            // changing the production configuration being tested.
+            builder.ConfigureLogging(logging =>
+            {
+                logging.ClearProviders();
+                logging.AddConsole();
+            });
             builder.UseEnvironment(_environment);
             builder.UseSetting("ConnectionStrings:DefaultConnection", $"Data Source={_dbPath}");
             if (_jwtKey is not null)

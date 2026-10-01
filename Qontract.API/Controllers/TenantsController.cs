@@ -39,17 +39,24 @@ public class TenantsController : ControllerBase
         ?? User.FindFirst("email")?.Value
         ?? User.Identity?.Name;
 
+    private int CurrentUserId => int.Parse(
+        User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+        ?? throw new UnauthorizedAccessException());
+
+    private int CurrentTenantId => int.Parse(
+        User.FindFirst("TenantId")?.Value ?? throw new UnauthorizedAccessException());
+
     [HttpGet]
     public async Task<ActionResult<List<TenantDTO>>> GetTenants()
     {
-        var tenants = await _tenantService.GetTenantsAsync();
+        var tenants = await _tenantService.GetTenantsAsync(CurrentUserId);
         return Ok(tenants);
     }
 
     [HttpGet("{id}")]
     public async Task<ActionResult<TenantDTO>> GetTenant(int id)
     {
-        var tenant = await _tenantService.GetTenantByIdAsync(id);
+        var tenant = await _tenantService.GetTenantByIdAsync(id, CurrentUserId);
         return Ok(tenant);
     }
 
@@ -60,7 +67,7 @@ public class TenantsController : ControllerBase
         if (reject is not null)
             return reject;
 
-        var tenant = await _tenantService.CreateTenantAsync(dto, CurrentUser);
+        var tenant = await _tenantService.CreateTenantAsync(dto, CurrentUserId, CurrentTenantId, CurrentUser);
         return CreatedAtAction(nameof(GetTenant), new { id = tenant.Id }, tenant);
     }
 
@@ -71,14 +78,14 @@ public class TenantsController : ControllerBase
         if (reject is not null)
             return reject;
 
-        var tenant = await _tenantService.UpdateTenantAsync(id, dto, CurrentUser);
+        var tenant = await _tenantService.UpdateTenantAsync(id, CurrentUserId, dto, CurrentUser);
         return Ok(tenant);
     }
 
     [HttpPatch("{id}/deactivate")]
     public async Task<ActionResult<TenantDTO>> DeactivateTenant(int id)
     {
-        var tenant = await _tenantService.DeactivateTenantAsync(id, CurrentUser);
+        var tenant = await _tenantService.DeactivateTenantAsync(id, CurrentUserId, CurrentUser);
         return Ok(tenant);
     }
 }

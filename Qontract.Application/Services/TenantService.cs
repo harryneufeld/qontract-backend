@@ -20,11 +20,19 @@ public class TenantService : ITenantService
         _logger = logger;
     }
 
-    public async Task<List<TenantDTO>> GetTenantsAsync(CancellationToken cancellationToken = default)
+    private IQueryable<Tenant> AdministeredTenants(int userId) =>
+        _context.Tenants.Where(t => _context.TenantMemberships.Any(m =>
+            m.TenantId == t.Id && m.UserId == userId && m.IsActive
+            && m.Role == UserRole.TenantAdmin && m.User.IsActive
+            // During the transition, the primary role remains editable via
+            // UserService. Do not let its older membership grant stale rights.
+            && (m.User.TenantId != t.Id || m.User.Role == UserRole.TenantAdmin)));
+
+    public async Task<List<TenantDTO>> GetTenantsAsync(int userId, CancellationToken cancellationToken = default)
     {
         try
         {
-            var tenants = await _context.Tenants
+            var tenants = await AdministeredTenants(userId)
                 .Where(t => t.IsActive)
                 .Select(t => new TenantDTO
                 {
@@ -50,11 +58,11 @@ public class TenantService : ITenantService
         }
     }
 
-    public async Task<TenantDTO> GetTenantByIdAsync(int id, CancellationToken cancellationToken = default)
+    public async Task<TenantDTO> GetTenantByIdAsync(int id, int userId, CancellationToken cancellationToken = default)
     {
         try
         {
-            var tenant = await _context.Tenants
+            var tenant = await AdministeredTenants(userId)
                 .FirstOrDefaultAsync(t => t.Id == id && t.IsActive, cancellationToken);
 
             if (tenant == null)
@@ -83,10 +91,13 @@ public class TenantService : ITenantService
         }
     }
 
-    public async Task<TenantDTO> CreateTenantAsync(TenantCreateDTO dto, string? createdBy, CancellationToken cancellationToken = default)
+    public async Task<TenantDTO> CreateTenantAsync(TenantCreateDTO dto, int userId, int currentTenantId, string? createdBy, CancellationToken cancellationToken = default)
     {
         try
         {
+            if (!await AdministeredTenants(userId).AnyAsync(t => t.Id == currentTenantId && t.IsActive, cancellationToken))
+                throw new UnauthorizedAccessException();
+
             // DTO validation lives in the controller layer (issue #39).
             var tenant = new Tenant
             {
@@ -101,10 +112,19 @@ public class TenantService : ITenantService
             };
 
             _context.Tenants.Add(tenant);
+            _context.TenantMemberships.Add(new TenantMembership
+            {
+                UserId = userId,
+                Tenant = tenant,
+                Role = UserRole.TenantAdmin,
+                IsActive = true,
+                CreatedBy = createdBy,
+                ModifiedBy = createdBy
+            });
             await _context.SaveChangesAsync(cancellationToken);
 
             _logger.LogInformation("Created tenant: {Name}", tenant.Name);
-            return await GetTenantByIdAsync(tenant.Id, cancellationToken);
+            return ToDto(tenant);
         }
         catch (Exception ex)
         {
@@ -113,11 +133,11 @@ public class TenantService : ITenantService
         }
     }
 
-    public async Task<TenantDTO> UpdateTenantAsync(int id, TenantUpdateDTO dto, string? modifiedBy, CancellationToken cancellationToken = default)
+    public async Task<TenantDTO> UpdateTenantAsync(int id, int userId, TenantUpdateDTO dto, string? modifiedBy, CancellationToken cancellationToken = default)
     {
         try
         {
-            var tenant = await _context.Tenants
+            var tenant = await AdministeredTenants(userId)
                 .FirstOrDefaultAsync(t => t.Id == id && t.IsActive, cancellationToken);
 
             if (tenant == null)
@@ -153,7 +173,9 @@ public class TenantService : ITenantService
             await _context.SaveChangesAsync(cancellationToken);
 
             _logger.LogInformation("Updated tenant: {Name}", tenant.Name);
-            return await GetTenantByIdAsync(id, cancellationToken);
+            // A successful update may deactivate the tenant. Return its
+            // actual result rather than re-reading through the active filter.
+            return ToDto(tenant);
         }
         catch (Exception ex)
         {
@@ -162,11 +184,11 @@ public class TenantService : ITenantService
         }
     }
 
-    public async Task<TenantDTO> DeactivateTenantAsync(int id, string? modifiedBy, CancellationToken cancellationToken = default)
+    public async Task<TenantDTO> DeactivateTenantAsync(int id, int userId, string? modifiedBy, CancellationToken cancellationToken = default)
     {
         try
         {
-            var tenant = await _context.Tenants
+            var tenant = await AdministeredTenants(userId)
                 .FirstOrDefaultAsync(t => t.Id == id, cancellationToken);
 
             if (tenant == null)
@@ -206,4 +228,17 @@ public class TenantService : ITenantService
             throw;
         }
     }
+
+    private static TenantDTO ToDto(Tenant tenant) => new()
+    {
+        Id = tenant.Id,
+        Name = tenant.Name,
+        Type = tenant.Type,
+        Settings = tenant.Settings,
+        IsActive = tenant.IsActive,
+        CreatedAt = tenant.CreatedAt,
+        CreatedBy = tenant.CreatedBy,
+        ModifiedAt = tenant.ModifiedAt,
+        ModifiedBy = tenant.ModifiedBy
+    };
 }

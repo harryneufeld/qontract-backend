@@ -1,6 +1,8 @@
 # Qontract Backend - Multi-tenant Contract Management System
 
-A robust backend API for managing contracts and their associated documents with multi-tenant architecture and clean architecture principles.
+The .NET 10 API for the qontract refactor. FamilyPlanner is the production
+system and the reference for full feature parity and complete migration.
+This backend is not yet a complete replacement for it.
 
 ## Features
 
@@ -12,6 +14,43 @@ A robust backend API for managing contracts and their associated documents with 
 - ✅ JWT-based authentication and authorization
 - ✅ Soft delete for audit trails
 - ✅ Versioning for document uploads
+
+## Current limitations and agreed requirements
+
+- Tenant/user CRUD and role authorization exist. Tenant administration now uses
+  active admin memberships; creating a tenant atomically gives its creator an
+  admin membership. Migration `AddTenantMemberships` backfills existing users.
+  Login and user administration still use the legacy primary `TenantId` and role.
+  Multiple tenant memberships were approved by Harry in
+  [#13](https://github.com/harryneufeld/qontract-backend/issues/13#issuecomment-5804173333).
+  Full membership management, switching, invitations, and registration are pending.
+- Public registration must be controlled by a backend setting. A deployment-wide
+  frontend control for a platform administrator is proposed separately from
+  tenant administration. Invitation codes/links should work for existing users
+  and new accounts, following FamilyPlanner's workflow.
+- Tenant administrators can list/read/update/deactivate only tenants where they
+  have an active admin membership, with an active account. Foreign and unknown
+  IDs return the same 404; the JWT role alone does not grant tenant access.
+- Authentication currently issues 24-hour JWTs. Logout is stateless; revocable
+  sessions and refresh tokens are tracked in [#44](https://github.com/harryneufeld/qontract-backend/issues/44).
+- Contract value means the amount billed per selected period. The current
+  free-form `Value` has no billing-period or price-history equivalent. This is a
+  parity gap tracked in [#47](https://github.com/harryneufeld/qontract-backend/issues/47),
+  and the app's lifetime-value proration needs replacement.
+- Full migration must preserve legacy memberships, recurring prices, price
+  history, invoices, personal/family files, shared-file relationships, addresses,
+  audit information, and credentials. See the proposed [export plan](https://github.com/harryneufeld/FamilyPlanner/issues/2).
+- Audit cleanup is approved in [#38](https://github.com/harryneufeld/qontract-backend/issues/38#issuecomment-5784379193):
+  remove contract Creator/Modifier relationships and the unused new-backend join;
+  keep `Documents.UserId`; consolidate upload audit fields into base audit fields.
+  These schema changes are not yet implemented. Verify actual data before dropping
+  columns/tables; preserve legitimate legacy shared-file associations in migration.
+  The requested ownership investigation is tracked in [#48](https://github.com/harryneufeld/qontract-backend/issues/48).
+
+Agreed order: documentation cleanup; tenant access/membership; app usability
+([app #38](https://github.com/harryneufeld/qontract-app/issues/38)); parity/migration
+planning; revocable sessions. Staging and production target the owner's Linux
+Docker machine. GitHub Pages will not be used.
 
 ## Architecture
 
@@ -29,6 +68,7 @@ Qontract/
 │   ├── Models/                # DTOs
 │   ├── Services/              # Business logic services
 │   └── [Interfaces]
+├── Qontract.Core/             # Shared file-storage interface and security constants
 ├── Qontract.Infrastructure/   # EF Core, file storage, auth
 │   ├── Data/                  # DbContext, migrations
 │   └── FileStorage/           # File handling
@@ -92,6 +132,9 @@ dotnet run --project Qontract.API
 
 ### Authentication
 - `POST /api/Auth/login` - Login and get JWT token
+- `GET /api/Auth/me` - Validate current user/session
+- `POST /api/Auth/logout` - Stateless logout acknowledgement
+- `POST /api/Auth/change-password` - Change current user's password
 
 ### Tenants
 - `GET /api/Tenants` - List all tenants
@@ -113,9 +156,12 @@ dotnet run --project Qontract.API
 - `POST /api/Contractors` - Create new contractor
 - `PUT /api/Contractors/{id}` - Update contractor
 - `PATCH /api/Contractors/{id}/deactivate` - Deactivate contractor
+- `PATCH /api/Contractors/{id}/activate` - Reactivate contractor
+- `GET /api/Contractors/{id}/addresses` - List active contractor addresses
 
 ### Contracts
 - `GET /api/Contracts` - List all contracts
+- `GET /api/Contracts/stats` - Tenant-wide dashboard counters
 - `GET /api/Contracts/{id}` - Get single contract
 - `POST /api/Contracts` - Create new contract
 - `PUT /api/Contracts/{id}` - Update contract
@@ -123,12 +169,15 @@ dotnet run --project Qontract.API
 - `DELETE /api/Contracts/{id}` - Soft delete contract
 
 ### Documents
-- `GET /api/Contracts/{contractId}/documents` - List documents for a contract
-- `POST /api/Contracts/{contractId}/documents` - Upload document
+- `GET /api/Documents/contract/{contractId}/documents` - List documents for a contract
+- `POST /api/Documents/contract/{contractId}/documents` - Upload document (JSON/base64)
 - `GET /api/Documents/{id}` - Get document metadata
 - `GET /api/Documents/{id}/download` - Download document
 - `PUT /api/Documents/{id}` - Update document
 - `DELETE /api/Documents/{id}` - Delete document
+- `GET /api/Documents/trash` - List documents within soft-delete retention
+- `POST /api/Documents/{id}/restore` - Restore deleted document
+- `POST /api/Documents/{id}/reupload` - Upload a replacement version
 
 ### Addresses
 - `POST /api/Addresses` - Create address
@@ -210,7 +259,7 @@ the origins listed in `Cors:Origins` are allowed, with credentials enabled.
   all (no `Origin` header) — only the **web** deployment needs a matching
   origin.
 - The `Cors:Origins` values in `appsettings.json` are localhost placeholders.
-  When the web app gets a production host (qontract-app#31), add that origin
+  When the web app gets a Linux Docker production host (qontract-app#34), add that origin
   (the scheme + host the browser will send, e.g. `https://web.qontract.example`)
-  via `ASPNETCORE_Cors__Origins` or an environment-specific appsettings file —
+  via indexed environment variables such as `Cors__Origins__0` or an environment-specific appsettings file —
   no code change is required. Until then the production list is fail-closed.

@@ -12,6 +12,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
 
     public DbSet<Tenant> Tenants { get; set; }
     public DbSet<User> Users { get; set; }
+    public DbSet<TenantMembership> TenantMemberships { get; set; }
     public DbSet<Contractor> Contractors { get; set; }
     public DbSet<Contract> Contracts { get; set; }
     public DbSet<Document> Documents { get; set; }
@@ -19,12 +20,14 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
+        AddPrimaryMemberships();
         ApplyAuditTimestamps();
         return base.SaveChanges(acceptAllChangesOnSuccess);
     }
 
     public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
     {
+        AddPrimaryMemberships();
         ApplyAuditTimestamps();
         return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
     }
@@ -34,6 +37,27 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     /// new entities get their CreatedAt/ModifiedAt stamped on first save and
     /// ModifiedAt is refreshed on every update.
     /// </summary>
+    // Keep existing seed/admin-create paths working while accounts still carry
+    // their legacy primary TenantId. Both rows are committed atomically.
+    private void AddPrimaryMemberships()
+    {
+        foreach (var entry in ChangeTracker.Entries<User>()
+                     .Where(e => e.State == EntityState.Added).ToList())
+        {
+            var user = entry.Entity;
+            if (!TenantMemberships.Local.Any(m => m.User == user && m.TenantId == user.TenantId))
+                TenantMemberships.Add(new TenantMembership
+                {
+                    User = user,
+                    TenantId = user.TenantId,
+                    Role = user.Role,
+                    IsActive = user.IsActive,
+                    CreatedBy = user.CreatedBy,
+                    ModifiedBy = user.ModifiedBy
+                });
+        }
+    }
+
     private void ApplyAuditTimestamps()
     {
         var now = DateTime.UtcNow;
@@ -97,6 +121,18 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
             entity.HasOne(e => e.Tenant)
                 .WithMany()
                 .HasForeignKey(e => e.TenantId);
+        });
+
+        modelBuilder.Entity<TenantMembership>(entity =>
+        {
+            entity.ToTable("TenantMemberships");
+            entity.HasKey(e => new { e.UserId, e.TenantId });
+            entity.Property(e => e.CreatedBy).HasMaxLength(500);
+            entity.Property(e => e.ModifiedBy).HasMaxLength(500);
+            entity.HasOne(e => e.User).WithMany().HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(e => e.Tenant).WithMany().HasForeignKey(e => e.TenantId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         // Contractor
