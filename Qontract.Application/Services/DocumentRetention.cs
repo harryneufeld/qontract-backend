@@ -100,12 +100,13 @@ public class DocumentPurgeService
     {
         var now = DateTime.UtcNow;
         var candidates = await _context.Documents
-            .Where(d => d.IsDeleted && d.DeletedAt != null)
+            .Where(d => d.IsDeleted && d.DeletedAt != null && !_context.Invoices.Any(i => i.DocumentId == d.Id))
             .Include(d => d.Contract)
             .ThenInclude(c => c!.Tenant)
             .ToListAsync(cancellationToken);
 
         var purged = 0;
+        var removedIds = new HashSet<int>();
         foreach (var document in candidates)
         {
             var retentionDays =
@@ -120,7 +121,12 @@ public class DocumentPurgeService
             // Best effort: the row must go even if the file is already gone.
             try
             {
-                await _fileStorage.DeleteAsync(document.FilePath, cancellationToken);
+                // Older uploads could share a path after a same-name collision.
+                // Retained metadata/evidence must keep access to those bytes.
+                var otherUses = await _context.Documents.Where(d => d.Id != document.Id && d.FilePath == document.FilePath)
+                    .Select(d => d.Id).ToListAsync(cancellationToken);
+                if (!otherUses.Any(id => !removedIds.Contains(id)))
+                    await _fileStorage.DeleteAsync(document.FilePath, cancellationToken);
             }
             catch (Exception ex)
             {
@@ -129,6 +135,7 @@ public class DocumentPurgeService
             }
 
             _context.Documents.Remove(document);
+            removedIds.Add(document.Id);
             purged++;
             _logger.LogInformation(
                 "Purged document {Id} ({File}) from contract {ContractId} after {RetentionDays} day retention (deleted {DeletedAt:u})",

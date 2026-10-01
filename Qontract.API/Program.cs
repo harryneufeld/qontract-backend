@@ -121,6 +121,7 @@ builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IContractorService, ContractorService>();
 builder.Services.AddScoped<IContractService, ContractService>();
 builder.Services.AddScoped<IDocumentService, DocumentService>();
+builder.Services.AddScoped<InvoiceService>();
 builder.Services.AddScoped<IAddressService, AddressService>();
 
 // Register File Storage. The backend is selected by "Storage:Provider"

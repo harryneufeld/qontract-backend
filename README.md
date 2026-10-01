@@ -45,6 +45,12 @@ This backend is not yet a complete replacement for it.
   accept `PriceEffectiveFrom` and `PriceNotes`; details/lists return `PriceHistory`.
   See [LEGACY-MAPPING.md](LEGACY-MAPPING.md) for date boundaries, estimates, remaining
   legacy gaps and import assumptions, tracked in [#47](https://github.com/harryneufeld/qontract-backend/issues/47).
+- Invoice records and shared contract-document links are implemented. Invoice amounts
+  are exact signed decimal strings with optional currency; evidence references a specific
+  file version. Active evidence is protected from deletion, and archived invoice references
+  prevent physical file purge. Personal/family file scope, ownership, and staged import
+  remain gaps. See [LEGACY-MAPPING.md](LEGACY-MAPPING.md) for the implemented boundary.
+  Remaining invoice/file parity is tracked in [#50](https://github.com/harryneufeld/qontract-backend/issues/50).
 - Full migration must preserve legacy memberships, recurring prices, price
   history, invoices, personal/family files, shared-file relationships, addresses,
   audit information, and credentials. See the proposed [export plan](https://github.com/harryneufeld/FamilyPlanner/issues/2).
@@ -201,6 +207,8 @@ omit the period to preserve an unclassified legacy value until it is reviewed.
 
 ### Documents
 - `GET /api/Documents/contract/{contractId}/documents` - List documents for a contract
+- `POST /api/Documents/{id}/contracts/{contractId}` - Share the current file with another same-tenant contract (idempotent)
+- `DELETE /api/Documents/{id}/contracts/{contractId}` - Remove a secondary contract link; preserve bytes and other links
 - `POST /api/Documents/contract/{contractId}/documents` - Upload document (JSON/base64)
 - `GET /api/Documents/{id}` - Get document metadata
 - `GET /api/Documents/{id}/download` - Download document
@@ -209,6 +217,22 @@ omit the period to preserve an unclassified legacy value until it is reviewed.
 - `GET /api/Documents/trash` - List documents within soft-delete retention
 - `POST /api/Documents/{id}/restore` - Restore deleted document
 - `POST /api/Documents/{id}/reupload` - Upload a replacement version
+
+### Invoices
+
+- `GET /api/Invoices?contractId=...&deleted=false&page=1&pageSize=50` - Paged current-tenant list; contract filter optional, page size 1–200
+- `GET /api/Invoices/{id}` - Read a tenant-owned invoice, including archived records
+- `POST /api/Invoices` - Create an invoice
+- `PUT /api/Invoices/{id}` - Replace all editable fields on an active invoice
+- `DELETE /api/Invoices/{id}` - Archive an invoice; keep its evidence
+- `POST /api/Invoices/{id}/restore` - Restore an invoice (restore its evidence first if trashed)
+
+Create/update fields: `invoiceDate` (ISO date), optional `dueDate`, `amount`
+(exact signed decimal string), optional three-letter `currency`, `invoiceNumber`,
+`description`, `contractId`, and `documentId` (exact version). Omitted currency is
+unknown. Referenced contracts and documents must belong to the current tenant;
+when both are supplied the document must be associated with that contract.
+Lists return arrays; request subsequent pages until a short page is returned.
 
 ### Addresses
 - `POST /api/Addresses` - Create address

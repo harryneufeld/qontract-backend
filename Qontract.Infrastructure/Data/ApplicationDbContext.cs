@@ -28,6 +28,8 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<Contract> Contracts { get; set; }
     public DbSet<ContractPrice> ContractPrices { get; set; }
     public DbSet<Document> Documents { get; set; }
+    public DbSet<DocumentLink> DocumentLinks { get; set; }
+    public DbSet<Invoice> Invoices { get; set; }
     public DbSet<Address> Addresses { get; set; }
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
@@ -276,6 +278,31 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
                 .WithMany()
                 .HasForeignKey(e => e.SupersededById)
                 .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<DocumentLink>(entity =>
+        {
+            entity.HasKey(e => new { e.DocumentId, e.ContractId });
+            entity.Property(e => e.CreatedBy).HasMaxLength(500);
+            entity.Property(e => e.ModifiedBy).HasMaxLength(500);
+            entity.HasOne(e => e.Document).WithMany(d => d.Links).HasForeignKey(e => e.DocumentId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(e => e.Contract).WithMany().HasForeignKey(e => e.ContractId).OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<Invoice>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Id).ValueGeneratedNever();
+            // Preserve the decimal exactly across all supported database providers.
+            entity.Property(e => e.Amount).HasConversion<string>().HasMaxLength(64);
+            entity.Property(e => e.Currency).HasMaxLength(3);
+            entity.Property(e => e.InvoiceNumber).HasMaxLength(100);
+            entity.Property(e => e.Description).HasMaxLength(2000);
+            entity.Property(e => e.CreatedBy).HasMaxLength(500);
+            entity.Property(e => e.ModifiedBy).HasMaxLength(500);
+            entity.HasOne(e => e.Tenant).WithMany().HasForeignKey(e => e.TenantId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(e => e.Contract).WithMany().HasForeignKey(e => e.ContractId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(e => e.Document).WithMany().HasForeignKey(e => e.DocumentId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(e => new { e.TenantId, e.InvoiceDate });
         });
 
         // Address

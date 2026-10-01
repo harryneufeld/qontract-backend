@@ -180,4 +180,12 @@ public class DocumentsController : ControllerBase
         }
         return Ok(result);
     }
+
+    [HttpPost("{id}/contracts/{contractId}")]
+    public async Task<ActionResult<DocumentDTO>> LinkContract(int id, int contractId) =>
+        Ok(await _documentService.SetContractLinkAsync(id, contractId, CurrentTenantId, true, CurrentUser));
+
+    [HttpDelete("{id}/contracts/{contractId}")]
+    public async Task<ActionResult<DocumentDTO>> UnlinkContract(int id, int contractId) =>
+        Ok(await _documentService.SetContractLinkAsync(id, contractId, CurrentTenantId, false, CurrentUser));
 }

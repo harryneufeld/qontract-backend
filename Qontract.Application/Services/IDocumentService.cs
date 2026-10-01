@@ -7,6 +7,7 @@ namespace Qontract.Application.Services;
 
 public interface IDocumentService
 {
+    Task<DocumentDTO> SetContractLinkAsync(int id, int contractId, int tenantId, bool linked, string? actor, CancellationToken cancellationToken = default);
     Task<List<DocumentDTO>> GetDocumentsAsync(int contractId, int tenantId, CancellationToken cancellationToken = default);
     Task<DocumentDTO> GetDocumentByIdAsync(int id, int tenantId, CancellationToken cancellationToken = default);
     Task<DocumentDTO> CreateDocumentAsync(DocumentCreateDTO dto, int contractId, int tenantId, string? createdBy, CancellationToken cancellationToken = default);

@@ -71,8 +71,43 @@ must explicitly preserve source audit facts without accidentally replacing them.
 | PriceHistory: Price, DateFrom, DateTo, Notes; ContractPriceHistory | Price revisions now exist. Export every raw record and join. Import mapping and reconciliation remain unimplemented. |
 | Address: StreetName, HouseNumber, ZipCode, CityName, CountryName; references from users/families/companies | Preserve separate street and house-number source fields and every association. Contractor addresses exist; user/family addresses and complete ownership mapping remain gaps. |
 | DatabaseFile: FileName, Description, Date, Path, Category, Content, MimeType, Size | Export metadata and actual bytes. Preserve both inline and path-backed storage; report missing bytes. Category, personal/family files, ownership, and complete associations remain gaps. |
-| ContractFileList, User.DatabaseFiles, UserFamily.Files | Export all associations, including shadow relationships in the actual schema. Shared bytes must not lose multiple links when target Documents currently has a single contract. |
-| Invoice: InvoiceDate, DueDate, Amount, InvoiceNumber, Description, FileId | Invoice domain and UI remain missing; currency is not explicit on this source model and must not be guessed silently. |
+| ContractFileList, User.DatabaseFiles, UserFamily.Files | Additional contract links now share one stored Document; every link carries through re-upload. Export all original associations. Personal/family scopes and ownership remain gaps. |
+| Invoice: InvoiceDate, DueDate, Amount, InvoiceNumber, Description, FileId | Tenant-scoped invoice records and app forms now exist, with optional contract and exact document-version references. Preserve signed decimal amounts, dates and all text. Currency remains unknown unless supplied explicitly. Import identity/provenance and ambiguous source ownership still need resolution. |
+
+## Invoice and shared-file behavior
+
+Invoices support create/read/edit, paged tenant or contract lists, archive and restore.
+Amounts travel as exact invariant decimal strings and support credits. Currency is
+optional; FamilyPlanner does not declare it, so no default is inferred. Amounts that
+cannot be represented exactly as a .NET decimal are rejected rather than rounded.
+Dates are ISO calendar dates. The source model does not enforce due-date ordering;
+the target preserves that flexibility. Payment status and invoice totals are separate
+follow-ups, not substitutes for the contract cost estimates above.
+
+`Document.ContractId` remains the original storage anchor. Audited `DocumentLinks`
+records add other contracts in the same tenant, without copying bytes. Existing
+documents keep their paths and primary associations; no legacy data or unused join
+table is dropped. New uploads use unique storage keys, preventing same-name files
+from overwriting one another. Removing a secondary link retains other links and
+bytes. Removing the original anchor is rejected until ownership/storage is redesigned.
+Moving a current document to trash hides it from every linked contract; restore
+restores those links. Historical versions retain their historical associations.
+
+Re-upload commits the new version, inherited links and supersession pointer in one
+database transaction. An invoice keeps its selected version; replacing a file does
+not change historical evidence. Active invoices prevent deleting their exact evidence
+or removing its selected contract link. Archived invoices also prevent physical purge
+of referenced evidence. Trash metadata marks retained invoice files and omits their
+purge deadline. Restore the evidence before restoring an archived invoice if the
+file itself was moved to trash.
+
+The app exposes invoices from the dashboard menu and contract details, with an
+existing-file picker for the selected contract. Standalone invoices are supported;
+uploading files without a contract, personal/family file scope, full ownership,
+original-anchor removal, and the staged importer remain gaps. None of this constitutes
+a live FamilyPlanner migration or a proof of complete production parity.
+
+Remaining invoice/file parity is tracked in [backend #50](https://github.com/harryneufeld/qontract-backend/issues/50).
 
 ## Price-history import proposal and unresolved cases
 

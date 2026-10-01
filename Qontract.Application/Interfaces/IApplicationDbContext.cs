@@ -12,6 +12,8 @@ public interface IApplicationDbContext
     DbSet<Contractor> Contractors { get; }
     DbSet<Contract> Contracts { get; }
     DbSet<Document> Documents { get; }
+    DbSet<DocumentLink> DocumentLinks { get; }
+    DbSet<Invoice> Invoices { get; }
     DbSet<Address> Addresses { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);

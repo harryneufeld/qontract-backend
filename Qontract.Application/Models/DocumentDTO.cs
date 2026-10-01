@@ -8,6 +8,7 @@ public class DocumentDTO
     public string FileType { get; set; } = string.Empty;
     public long FileSize { get; set; }
     public int ContractId { get; set; }
+    public List<int> ContractIds { get; set; } = new();
     public DateTime UploadedAt { get; set; }
     public DateTime? DocumentDate { get; set; }
     public DateTime CreatedAt { get; set; }
@@ -21,4 +22,5 @@ public class DocumentDTO
 
     /// <summary>When the retention purge permanently removes this document (trash view only).</summary>
     public DateTime? ExpiresAt { get; set; }
+    public bool RetainedForInvoice { get; set; }
 }

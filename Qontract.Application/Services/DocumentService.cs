@@ -36,7 +36,8 @@ public class DocumentService : IDocumentService
         // superseded re-upload versions are listed via
         // GET /api/documents/{id}/versions, not here.
         var documents = await _context.Documents
-            .Where(d => d.ContractId == contractId && !d.IsDeleted && d.SupersededById == null)
+            .Include(d => d.Links)
+            .Where(d => d.Contract.TenantId == tenantId && (d.ContractId == contractId || d.Links.Any(l => l.ContractId == contractId)) && !d.IsDeleted && d.SupersededById == null)
             .OrderByDescending(d => d.ModifiedAt)
             .Select(d => new DocumentDTO
             {
@@ -46,6 +47,7 @@ public class DocumentService : IDocumentService
                 FileType = d.FileType,
                 FileSize = d.FileSize,
                 ContractId = d.ContractId,
+                ContractIds = d.Links.Select(l => l.ContractId).ToList(),
                 UploadedAt = d.UploadedAt,
                 DocumentDate = d.DocumentDate,
                 CreatedAt = d.CreatedAt,
@@ -56,12 +58,14 @@ public class DocumentService : IDocumentService
             })
             .ToListAsync(cancellationToken);
 
+        foreach (var dto in documents) dto.ContractIds = dto.ContractIds.Append(dto.ContractId).Distinct().ToList();
         return documents;
     }
 
     public async Task<DocumentDTO> GetDocumentByIdAsync(int id, int tenantId, CancellationToken cancellationToken = default)
     {
         var document = await _context.Documents
+            .Include(d => d.Links)
             .Where(d => d.Id == id && !d.IsDeleted)
             .Select(d => new DocumentDTO
             {
@@ -71,6 +75,7 @@ public class DocumentService : IDocumentService
                 FileType = d.FileType,
                 FileSize = d.FileSize,
                 ContractId = d.ContractId,
+                ContractIds = d.Links.Select(l => l.ContractId).ToList(),
                 UploadedAt = d.UploadedAt,
                 DocumentDate = d.DocumentDate,
                 CreatedAt = d.CreatedAt,
@@ -87,6 +92,7 @@ public class DocumentService : IDocumentService
             throw new KeyNotFoundException($"Document with id {id} not found in tenant {tenantId}.");
         }
 
+        document.ContractIds = document.ContractIds.Append(document.ContractId).Distinct().ToList();
         return document;
     }
 
@@ -125,11 +131,10 @@ public class DocumentService : IDocumentService
             throw new InvalidOperationException("File name must not be empty.");
         }
 
-        // Version 1 for a fresh upload; later versions overwrite the file
-        // at the same path (kept for API compatibility with the old layout).
+        // A unique storage key prevents same-name uploads overwriting evidence.
         // All file I/O goes through IFileStorage (issue #34) so a cloud
         // backend (issue #25) can be swapped in without touching services.
-        var filePath = _fileStorage.GenerateFilePath(contractId, safeFileName, 1);
+        var filePath = _fileStorage.GenerateFilePath(contractId, Guid.NewGuid().ToString("N") + ".bin", 1);
         await _fileStorage.SaveAsync(fileBytes, filePath, cancellationToken);
 
         var document = new Document
@@ -176,6 +181,7 @@ public class DocumentService : IDocumentService
         // The maximum file size is enforced by IFileStorage.SaveAsync
         // (issue #34): one definition, in the storage layer, not here.
 
+        await using var transaction = await _context.BeginSerializableTransactionAsync(cancellationToken);
         var current = await FindCurrentDocumentAsync(id, tenantId, cancellationToken);
 
         // Optional overrides; blank/absent keeps the previous version's value.
@@ -187,7 +193,7 @@ public class DocumentService : IDocumentService
             : current.FileType;
 
         var newVersion = current.Version + 1;
-        var filePath = _fileStorage.GenerateFilePath(current.ContractId, fileName, newVersion);
+        var filePath = _fileStorage.GenerateFilePath(current.ContractId, Guid.NewGuid().ToString("N") + ".bin", newVersion);
         await _fileStorage.SaveAsync(fileBytes, filePath, cancellationToken);
 
         var document = new Document
@@ -204,6 +210,7 @@ public class DocumentService : IDocumentService
             CreatedAt = DateTime.UtcNow,
             ModifiedAt = DateTime.UtcNow,
             Version = newVersion,
+            Links = current.Links.Select(l => new DocumentLink { ContractId = l.ContractId, CreatedBy = modifiedBy, ModifiedBy = modifiedBy }).ToList(),
             CreatedBy = modifiedBy ?? "system",
             ModifiedBy = modifiedBy ?? "system"
         };
@@ -215,6 +222,7 @@ public class DocumentService : IDocumentService
         // current version of this document.
         current.SupersededById = document.Id;
         await _context.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
 
         return ToDto(document);
     }
@@ -229,6 +237,7 @@ public class DocumentService : IDocumentService
     public async Task<List<DocumentDTO>> GetDocumentVersionsAsync(int id, int tenantId, CancellationToken cancellationToken = default)
     {
         var entry = await _context.Documents
+            .Include(d => d.Links)
             .AsNoTracking()
             .FirstOrDefaultAsync(d => d.Id == id && !d.IsDeleted, cancellationToken);
 
@@ -241,6 +250,7 @@ public class DocumentService : IDocumentService
         // All versions of one family share the contract and version families
         // are small, so walk the supersession chains in memory.
         var contractDocuments = await _context.Documents
+            .Include(d => d.Links)
             .AsNoTracking()
             .Where(d => d.ContractId == entry.ContractId && !d.IsDeleted)
             .ToListAsync(cancellationToken);
@@ -285,6 +295,7 @@ public class DocumentService : IDocumentService
     private async Task<Document> FindCurrentDocumentAsync(int id, int tenantId, CancellationToken cancellationToken)
     {
         var document = await _context.Documents
+            .Include(d => d.Links)
             .FirstOrDefaultAsync(d => d.Id == id && !d.IsDeleted, cancellationToken);
 
         if (document == null || await IsContractInOtherTenantAsync(document.ContractId, tenantId, cancellationToken))
@@ -296,6 +307,7 @@ public class DocumentService : IDocumentService
         while (document.SupersededById is int nextId && hops++ < 100)
         {
             var next = await _context.Documents
+            .Include(d => d.Links)
                 .FirstOrDefaultAsync(d => d.Id == nextId && !d.IsDeleted, cancellationToken);
             // The current version was purged/retired: stop at the newest
             // still-present version instead of failing.
@@ -325,6 +337,7 @@ public class DocumentService : IDocumentService
     public async Task<DocumentDTO> UpdateDocumentAsync(int id, DocumentCreateDTO dto, int tenantId, string? modifiedBy, CancellationToken cancellationToken = default)
     {
         var document = await _context.Documents
+            .Include(d => d.Links)
             .FirstOrDefaultAsync(d => d.Id == id && !d.IsDeleted, cancellationToken);
 
         if (document == null || await IsContractInOtherTenantAsync(document.ContractId, tenantId, cancellationToken))
@@ -351,6 +364,7 @@ public class DocumentService : IDocumentService
     public async Task<DocumentDTO> UpdateMetadataAsync(int id, DocumentMetadataDTO dto, int tenantId, string? modifiedBy, CancellationToken cancellationToken = default)
     {
         var document = await _context.Documents
+            .Include(d => d.Links)
             .FirstOrDefaultAsync(d => d.Id == id && !d.IsDeleted, cancellationToken);
 
         if (document == null || await IsContractInOtherTenantAsync(document.ContractId, tenantId, cancellationToken))
@@ -382,7 +396,9 @@ public class DocumentService : IDocumentService
 
     public async Task<bool> DeleteDocumentAsync(int id, int tenantId, string? modifiedBy, CancellationToken cancellationToken = default)
     {
+        await using var transaction = await _context.BeginSerializableTransactionAsync(cancellationToken);
         var document = await _context.Documents
+            .Include(d => d.Links)
             .FirstOrDefaultAsync(d => d.Id == id && !d.IsDeleted, cancellationToken);
 
         if (document == null || await IsContractInOtherTenantAsync(document.ContractId, tenantId, cancellationToken))
@@ -394,6 +410,8 @@ public class DocumentService : IDocumentService
         // the document can be recovered; the retention purge (deletion
         // queue) permanently removes them after the tenant's retention
         // period.
+        if (await _context.Invoices.AnyAsync(i => i.DocumentId == id && !i.IsDeleted, cancellationToken))
+            throw new InvalidOperationException("This document is evidence for an active invoice. Remove that reference or archive the invoice first.");
         document.IsDeleted = true;
         document.DeletedAt = DateTime.UtcNow;
         document.ModifiedBy = modifiedBy ?? "system";
@@ -401,7 +419,9 @@ public class DocumentService : IDocumentService
 
         await _context.SaveChangesAsync(cancellationToken);
 
+        await transaction.CommitAsync(cancellationToken);
         return true;
+
     }
 
     /// <summary>
@@ -412,7 +432,10 @@ public class DocumentService : IDocumentService
     /// </summary>
     public async Task<List<DocumentDTO>> GetDeletedDocumentsAsync(int tenantId, CancellationToken cancellationToken = default)
     {
+        var evidenceIds = await _context.Invoices.Where(i => i.TenantId == tenantId && i.DocumentId != null)
+            .Select(i => i.DocumentId!.Value).Distinct().ToListAsync(cancellationToken);
         var documents = await _context.Documents
+            .Include(d => d.Links)
             .AsNoTracking()
             .Where(d => d.IsDeleted && d.DeletedAt != null)
             .Include(d => d.Contract)
@@ -432,7 +455,8 @@ public class DocumentService : IDocumentService
                     ?? _retentionOptions.DefaultDays;
                 var dto = ToDto(d);
                 dto.DeletedAt = d.DeletedAt;
-                dto.ExpiresAt = d.DeletedAt!.Value.AddDays(retentionDays);
+                dto.RetainedForInvoice = evidenceIds.Contains(d.Id);
+                dto.ExpiresAt = dto.RetainedForInvoice ? null : d.DeletedAt!.Value.AddDays(retentionDays);
                 return dto;
             })
             .ToList();
@@ -448,6 +472,7 @@ public class DocumentService : IDocumentService
     public async Task<DocumentDTO> RestoreDocumentAsync(int id, int tenantId, string? modifiedBy, CancellationToken cancellationToken = default)
     {
         var document = await _context.Documents
+            .Include(d => d.Links)
             .Include(d => d.Contract)
             .ThenInclude(c => c!.Tenant)
             .FirstOrDefaultAsync(d => d.Id == id && d.IsDeleted, cancellationToken);
@@ -471,6 +496,7 @@ public class DocumentService : IDocumentService
     public async Task<byte[]> GetDocumentContentAsync(int id, int tenantId, CancellationToken cancellationToken = default)
     {
         var document = await _context.Documents
+            .Include(d => d.Links)
             .FirstOrDefaultAsync(d => d.Id == id && !d.IsDeleted, cancellationToken);
 
         if (document == null || await IsContractInOtherTenantAsync(document.ContractId, tenantId, cancellationToken))
@@ -501,6 +527,30 @@ public class DocumentService : IDocumentService
         return contract == null || contract.TenantId != tenantId;
     }
 
+    public async Task<DocumentDTO> SetContractLinkAsync(int id, int contractId, int tenantId, bool linked, string? actor, CancellationToken cancellationToken = default)
+    {
+        await using var transaction = await _context.BeginSerializableTransactionAsync(cancellationToken);
+        var document = await FindCurrentDocumentAsync(id, tenantId, cancellationToken);
+        if (!await _context.Contracts.AnyAsync(c => c.Id == contractId && c.TenantId == tenantId, cancellationToken))
+            throw new KeyNotFoundException("Contract not found.");
+        if (document.ContractId == contractId && !linked)
+            throw new InvalidOperationException("The original contract is the storage anchor and cannot be unlinked. You can move the document to trash instead.");
+        var existing = document.Links.SingleOrDefault(l => l.ContractId == contractId);
+        if (linked && document.ContractId != contractId && existing is null)
+            document.Links.Add(new DocumentLink { ContractId = contractId, CreatedBy = actor, ModifiedBy = actor });
+        if (!linked && existing is not null)
+        {
+            if (await _context.Invoices.AnyAsync(i => i.DocumentId == document.Id && i.ContractId == contractId && !i.IsDeleted, cancellationToken))
+                throw new InvalidOperationException("This link is used by an active invoice. Remove that invoice reference first.");
+            _context.DocumentLinks.Remove(existing);
+            document.Links.Remove(existing);
+        }
+        document.ModifiedBy = actor;
+        await _context.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return ToDto(document);
+    }
+
     private static DocumentDTO ToDto(Document d) => new()
     {
         Id = d.Id,
@@ -509,6 +559,7 @@ public class DocumentService : IDocumentService
         FileType = d.FileType,
         FileSize = d.FileSize,
         ContractId = d.ContractId,
+        ContractIds = d.Links.Select(l => l.ContractId).Append(d.ContractId).Distinct().ToList(),
         UploadedAt = d.UploadedAt,
         DocumentDate = d.DocumentDate,
         CreatedAt = d.CreatedAt,

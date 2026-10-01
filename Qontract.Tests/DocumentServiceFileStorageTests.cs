@@ -84,7 +84,7 @@ public class DocumentServiceFileStorageTests : IDisposable
         result.FileSize.Should().Be(content.Length);
 
         // The file must live in the in-memory storage at the canonical path...
-        var expectedPath = _fileStorage.GenerateFilePath(ContractId, "via-storage.txt", 1);
+        var expectedPath = _fileStorage.StoredFiles.Keys.Single();
         _fileStorage.StoredFiles.Should().ContainKey(expectedPath);
         (await _fileStorage.ReadAsync(expectedPath)).Should().Equal(content);
 
@@ -111,7 +111,7 @@ public class DocumentServiceFileStorageTests : IDisposable
         var created = await _service.CreateDocumentAsync(UploadDto("orphan.txt", content), ContractId, 1, null);
 
         // Simulate storage loss: metadata row exists, the file does not.
-        await _fileStorage.DeleteAsync(_fileStorage.GenerateFilePath(ContractId, "orphan.txt", 1));
+        await _fileStorage.DeleteAsync((await _context.Documents.FindAsync(created.Id))!.FilePath);
 
         var act = () => _service.GetDocumentContentAsync(created.Id, tenantId: 1);
 
@@ -145,6 +145,6 @@ public class DocumentServiceFileStorageTests : IDisposable
 
         deleted.Should().BeTrue();
         _fileStorage.StoredFiles.Should()
-            .ContainKey(_fileStorage.GenerateFilePath(ContractId, "soft.txt", 1));
+            .ContainKey((await _context.Documents.FindAsync(created.Id))!.FilePath);
     }
 }

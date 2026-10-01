@@ -70,4 +70,5 @@ public class Document : BaseEntity
     public User? User { get; set; }
     public ICollection<Contract> Contracts { get; set; } = new List<Contract>();
     public Document? SupersededBy { get; set; }
+    public ICollection<DocumentLink> Links { get; set; } = new List<DocumentLink>();
 }
