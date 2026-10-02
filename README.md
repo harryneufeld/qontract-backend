@@ -48,7 +48,7 @@ This backend is not yet a complete replacement for it.
 - Invoice records and shared contract-document links are implemented. Invoice amounts
   are exact signed decimal strings with optional currency; evidence references a specific
   file version. Active evidence is protected from deletion, and archived invoice references
-  prevent physical file purge. Personal/family file scope, ownership, and staged import
+  prevent physical file purge. Historical ownership/provenance and staged import
   remain gaps. See [LEGACY-MAPPING.md](LEGACY-MAPPING.md) for the implemented boundary.
   Remaining invoice/file parity is tracked in [#50](https://github.com/harryneufeld/qontract-backend/issues/50).
 - Legacy families map to refactor tenants. Tenant-shared and personal account file
