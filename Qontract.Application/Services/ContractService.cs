@@ -102,6 +102,9 @@ public class ContractService : IContractService
                 Id = c.Id,
                 Title = c.Title,
                 Description = c.Description,
+                Iban = c.Iban,
+                Notes = c.Notes,
+                Type = c.Type,
                 Status = c.Status,
                 StartDate = c.StartDate,
                 EndDate = c.EndDate,
@@ -232,6 +235,9 @@ public class ContractService : IContractService
             Id = contract.Id,
             Title = contract.Title,
             Description = contract.Description,
+            Iban = contract.Iban,
+            Notes = contract.Notes,
+            Type = contract.Type,
             Status = contract.Status,
             StartDate = contract.StartDate,
             EndDate = contract.EndDate,
@@ -256,6 +262,9 @@ public class ContractService : IContractService
         {
             Title = dto.Title,
             Description = dto.Description,
+            Iban = dto.Iban,
+            Notes = dto.Notes,
+            Type = dto.Type,
             Status = dto.Status,
             StartDate = dto.StartDate,
             EndDate = dto.EndDate,
@@ -300,6 +309,11 @@ public class ContractService : IContractService
 
         if (!string.IsNullOrEmpty(dto.Description))
             contract.Description = dto.Description;
+
+        if (dto.Iban is not null) contract.Iban = dto.Iban;
+        if (dto.Notes is not null) contract.Notes = dto.Notes;
+        if (dto.ClearType) contract.Type = null;
+        else if (dto.Type.HasValue) contract.Type = dto.Type;
 
         if (dto.Status.HasValue)
             contract.Status = dto.Status.Value;
@@ -369,6 +383,9 @@ public class ContractService : IContractService
             Id = contract.Id,
             Title = contract.Title,
             Description = contract.Description,
+            Iban = contract.Iban,
+            Notes = contract.Notes,
+            Type = contract.Type,
             Status = contract.Status,
             StartDate = contract.StartDate,
             EndDate = contract.EndDate,

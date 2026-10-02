@@ -32,6 +32,8 @@ public class TenantMembershipMigrationTests
         script.Should().Contain("DocumentLinks");
         script.Should().Contain("IX_Documents_UserId_Scope");
         script.Should().Contain("IX_Documents_TenantId_Scope");
+        script.Should().Contain("Iban");
+        script.Should().Contain("Notes");
     }
 
     [Fact]

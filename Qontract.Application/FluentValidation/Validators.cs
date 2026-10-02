@@ -142,6 +142,7 @@ public class ContractCreateValidator : AbstractValidator<ContractCreateDTO>
 {
     public ContractCreateValidator()
     {
+        RuleFor(x => x.Type).IsInEnum().When(x => x.Type.HasValue);
         RuleFor(x => x.BillingPeriod).IsInEnum().When(x => x.BillingPeriod.HasValue);
         RuleFor(x => x.Title)
             .NotEmpty().WithMessage("Title is required.")
@@ -177,6 +178,9 @@ public class ContractUpdateValidator : AbstractValidator<ContractUpdateDTO>
 {
     public ContractUpdateValidator()
     {
+        RuleFor(x => x.Type).IsInEnum().When(x => x.Type.HasValue);
+        RuleFor(x => x.ClearType).Must((dto, clear) => !clear || dto.Type is null)
+            .WithMessage("Do not specify Type together with ClearType.");
         RuleFor(x => x.BillingPeriod).IsInEnum().When(x => x.BillingPeriod.HasValue);
         RuleFor(x => x.PriceEffectiveFrom).Must(v => DateOnly.TryParseExact(v, "yyyy-MM-dd", out _))
             .When(x => x.PriceEffectiveFrom != null).WithMessage("Use a valid yyyy-MM-dd price effective date.");

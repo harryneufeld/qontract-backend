@@ -16,6 +16,10 @@ public class Contract : BaseEntity
     [MaxLength(2000)]
     public string? Description { get; set; }
 
+    public string? Iban { get; set; }
+    public string? Notes { get; set; }
+    public ContractType? Type { get; set; }
+
     [Required]
     [MaxLength(50)]
     public ContractStatus Status { get; set; }
@@ -63,4 +67,14 @@ public enum ContractStatus
     Active,
     Expired,
     Terminated
+}
+
+// Preserve FamilyPlanner ContractType values, including explicit None.
+public enum ContractType
+{
+    None = 0,
+    Insurance = 1,
+    Loan = 2,
+    Subscription = 3,
+    Other = 4
 }

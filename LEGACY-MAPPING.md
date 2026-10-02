@@ -44,6 +44,28 @@ supported; the contract's value fields describe the latest revision, while cost
 estimates apply each dated snapshot only during its interval. Original recorded
 values, currencies, periods, notes, and audit fields remain in the snapshots.
 
+## Contract metadata implemented in the refactor
+
+`Contract.Iban`, `Notes`, and nullable `Type` preserve the corresponding legacy
+fields. Type values and numeric codes match FamilyPlanner exactly: `None` (0),
+`Insurance` (1), `Loan` (2), `Subscription` (3), and `Other` (4). Null means the
+classification is unknown; it is distinct from an explicit legacy `None`.
+Business type, workflow status, and billing period are independent fields.
+
+`AddContractLegacyMetadata` adds nullable columns without classifying existing
+contracts or changing values, active state, or audit timestamps. IBAN and notes
+are stored verbatim, including whitespace, line breaks and long historical text;
+no bank-format normalization or artificial length limit is applied. These are
+stored metadata, not payment processing or bank-account validation.
+
+Create, detail, list, update and deactivate responses expose all three fields.
+On update, omitted/null IBAN or notes leaves the existing value; an empty string
+clears it. Omitted/null type leaves classification; `clearType: true` resets it
+to null and cannot be combined with a non-null type. The app supports editing,
+clearing and viewing the fields. Contract notes do not create a price revision
+and remain separate from `PriceNotes`. Source ownership, personal contract scope,
+GUID mappings and actual historical import/reconciliation remain pending.
+
 ## Cost estimate convention
 
 The dashboard shows calendar estimates, not paid or due invoice totals. Monthly
@@ -72,7 +94,7 @@ must explicitly preserve source audit facts without accidentally replacing them.
 | UserFamily: FamilyName, AddressId | Family tenant and tenant address; current target tenant address support is incomplete. |
 | FamilyUserList | Multiple memberships exist. The join has no explicit per-family admin role; do not infer admin from membership alone. Review ownership/admin assignment. |
 | Company: CompanyName, Description, Email, Phone, Website, Notes, AddressId, UserId, FamilyId | Legacy counterparties map to Contractors, not automatically to Company tenants. Website, notes, personal/family scope and ownership need complete parity. |
-| Contract: ContractName, Description, ContractNumber, dates, CompanyId, UserId, FamilyId, Price, Recurring, Iban, Notes, IsActive, Type | Basic names/dates/link and billing exist. IBAN, notes, type, personal scope and ownership still need target support. Preserve IsActive separately from workflow status; do not guess Terminated from inactive alone. |
+| Contract: ContractName, Description, ContractNumber, dates, CompanyId, UserId, FamilyId, Price, Recurring, Iban, Notes, IsActive, Type | Basic names/dates/link, billing, verbatim IBAN/notes and legacy business types exist. Personal scope, ownership and actual import/reconciliation remain pending. Preserve IsActive separately from workflow status; do not guess Terminated from inactive alone. |
 | PriceHistory: Price, DateFrom, DateTo, Notes; ContractPriceHistory | Price revisions now exist. Export every raw record and join. Import mapping and reconciliation remain unimplemented. |
 | Address: StreetName, HouseNumber, ZipCode, CityName, CountryName; references from users/families/companies | Preserve separate street and house-number source fields and every association. Contractor addresses exist; user/family addresses and complete ownership mapping remain gaps. |
 | DatabaseFile: FileName, Description, Date, Path, Category, Content, MimeType, Size | Target supports filename, description, category, document date, MIME type, size, personal and tenant libraries, and versions. Export metadata and actual bytes from both inline and path-backed storage; report missing bytes. Original ownership/provenance and association reconciliation remain import work. |

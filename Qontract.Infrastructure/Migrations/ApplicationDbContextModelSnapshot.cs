@@ -134,6 +134,9 @@ namespace Qontract.Infrastructure.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("Iban")
+                        .HasColumnType("TEXT");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("INTEGER");
 
@@ -151,6 +154,9 @@ namespace Qontract.Infrastructure.Migrations
                     b.Property<int?>("ModifierId")
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("Notes")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("StartDate")
                         .HasMaxLength(50)
                         .HasColumnType("TEXT");
@@ -166,6 +172,9 @@ namespace Qontract.Infrastructure.Migrations
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("TEXT");
+
+                    b.Property<int?>("Type")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Value")
                         .HasMaxLength(500)

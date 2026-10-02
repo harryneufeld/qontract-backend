@@ -8,6 +8,9 @@ public class ContractDTO
     public int Id { get; set; }
     public string Title { get; set; } = string.Empty;
     public string? Description { get; set; }
+    public string? Iban { get; set; }
+    public string? Notes { get; set; }
+    public ContractType? Type { get; set; }
     public ContractStatus Status { get; set; }
     public string? StartDate { get; set; }
     public string? EndDate { get; set; }
@@ -30,6 +33,9 @@ public class ContractCreateDTO
 {
     public string Title { get; set; } = string.Empty;
     public string? Description { get; set; }
+    public string? Iban { get; set; }
+    public string? Notes { get; set; }
+    public ContractType? Type { get; set; }
     public ContractStatus Status { get; set; }
     public string? StartDate { get; set; }
     public string? EndDate { get; set; }
@@ -59,10 +65,15 @@ public class ContractStatsDTO
 
 public class ContractUpdateDTO
 {
+    // Omitted/null Type preserves classification; ClearType explicitly resets it.
+    public bool ClearType { get; set; }
     public string? PriceEffectiveFrom { get; set; }
     public string? PriceNotes { get; set; }
     public string? Title { get; set; }
     public string? Description { get; set; }
+    public string? Iban { get; set; }
+    public string? Notes { get; set; }
+    public ContractType? Type { get; set; }
     public ContractStatus? Status { get; set; }
     public string? StartDate { get; set; }
     public string? EndDate { get; set; }

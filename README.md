@@ -45,6 +45,11 @@ This backend is not yet a complete replacement for it.
   accept `PriceEffectiveFrom` and `PriceNotes`; details/lists return `PriceHistory`.
   See [LEGACY-MAPPING.md](LEGACY-MAPPING.md) for date boundaries, estimates, remaining
   legacy gaps and import assumptions, tracked in [#47](https://github.com/harryneufeld/qontract-backend/issues/47).
+- Contracts support verbatim IBAN, multiline contract notes and the five legacy
+  business types, independent of workflow status and billing period. Existing
+  classifications remain unknown. Historical import, personal contract scope
+  and ownership remain pending in [#51](https://github.com/harryneufeld/qontract-backend/issues/51);
+  see [LEGACY-MAPPING.md](LEGACY-MAPPING.md).
 - Invoice records and shared contract-document links are implemented. Invoice amounts
   are exact signed decimal strings with optional currency; evidence references a specific
   file version. Active evidence is protected from deletion, and archived invoice references
