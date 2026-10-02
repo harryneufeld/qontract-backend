@@ -9,6 +9,9 @@ public class ContractorDTO
     public ContractorType Type { get; set; }
     public string? Email { get; set; }
     public string? Phone { get; set; }
+    public string? Website { get; set; }
+    public string? Description { get; set; }
+    public string? Notes { get; set; }
     public int TenantId { get; set; }
     public int? UserId { get; set; }
     public bool IsActive { get; set; }
@@ -32,6 +35,9 @@ public class ContractorCreateDTO
     public ContractorType Type { get; set; }
     public string? Email { get; set; }
     public string? Phone { get; set; }
+    public string? Website { get; set; }
+    public string? Description { get; set; }
+    public string? Notes { get; set; }
 
     public int TenantId { get; set; }
 
@@ -44,5 +50,8 @@ public class ContractorUpdateDTO
     public ContractorType? Type { get; set; }
     public string? Email { get; set; }
     public string? Phone { get; set; }
+    public string? Website { get; set; }
+    public string? Description { get; set; }
+    public string? Notes { get; set; }
     public bool? IsActive { get; set; }
 }

@@ -23,6 +23,9 @@ public class Contractor : BaseEntity
 
     [MaxLength(50)]
     public string? Phone { get; set; }
+    public string? Website { get; set; }
+    public string? Description { get; set; }
+    public string? Notes { get; set; }
 
     [Required]
     public int TenantId { get; set; }

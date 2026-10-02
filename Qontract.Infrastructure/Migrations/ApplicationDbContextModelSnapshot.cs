@@ -259,6 +259,9 @@ namespace Qontract.Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("Description")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Email")
                         .HasMaxLength(200)
                         .HasColumnType("TEXT");
@@ -278,6 +281,9 @@ namespace Qontract.Infrastructure.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("Notes")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Phone")
                         .HasMaxLength(50)
                         .HasColumnType("TEXT");
@@ -292,6 +298,9 @@ namespace Qontract.Infrastructure.Migrations
                     b.Property<int?>("UserId")
                         .HasMaxLength(500)
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("Website")
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 

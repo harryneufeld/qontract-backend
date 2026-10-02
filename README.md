@@ -50,6 +50,11 @@ This backend is not yet a complete replacement for it.
   classifications remain unknown. Historical import, personal contract scope
   and ownership remain pending in [#51](https://github.com/harryneufeld/qontract-backend/issues/51);
   see [LEGACY-MAPPING.md](LEGACY-MAPPING.md).
+- Contractors support verbatim website, description and multiline notes through
+  CRUD and activation changes. Omitted/null updates preserve text and empty strings
+  clear it. Personal/family company ownership and historical import still require
+  reconciliation in [#52](https://github.com/harryneufeld/qontract-backend/issues/52);
+  see [LEGACY-MAPPING.md](LEGACY-MAPPING.md).
 - Invoice records and shared contract-document links are implemented. Invoice amounts
   are exact signed decimal strings with optional currency; evidence references a specific
   file version. Active evidence is protected from deletion, and archived invoice references

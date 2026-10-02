@@ -66,6 +66,27 @@ clearing and viewing the fields. Contract notes do not create a price revision
 and remain separate from `PriceNotes`. Source ownership, personal contract scope,
 GUID mappings and actual historical import/reconciliation remain pending.
 
+## Contractor metadata implemented in the refactor
+
+Legacy companies map to contractors, rather than to company-type tenants.
+`Contractor.Website`, `Description`, and `Notes` now preserve source text verbatim,
+including whitespace, multiline and long descriptions/notes. The nullable columns
+added by `AddContractorLegacyMetadata` leave existing contact fields, ownership,
+active state and audit timestamps unchanged, with no fabricated metadata.
+
+Create, detail, list, update, deactivate and reactivate return all three fields.
+Omitted/null fields on update preserve existing text; empty strings clear it.
+The app creates, edits, clears and displays these fields, retaining original text.
+Only valid absolute HTTP/HTTPS websites without embedded credentials enable an
+external open action; other legacy references remain selectable plain text. The
+backend stores website text without URL normalization or fetching its contents.
+
+Historical import/provenance and personal/family company scope still require
+reconciliation. The current contractor API remains tenant-shared; a source
+`UserId` must not be treated as proof that a personal company is safe to publish
+to a tenant. Address associations, name/contact length compatibility and complete
+source ownership are still migration gates.
+
 ## Cost estimate convention
 
 The dashboard shows calendar estimates, not paid or due invoice totals. Monthly
@@ -93,7 +114,7 @@ must explicitly preserve source audit facts without accidentally replacing them.
 | User.SessionId / RefreshToken | Do not import live sessions. Reauthentication and revocable sessions are separate work. |
 | UserFamily: FamilyName, AddressId | Family tenant and tenant address; current target tenant address support is incomplete. |
 | FamilyUserList | Multiple memberships exist. The join has no explicit per-family admin role; do not infer admin from membership alone. Review ownership/admin assignment. |
-| Company: CompanyName, Description, Email, Phone, Website, Notes, AddressId, UserId, FamilyId | Legacy counterparties map to Contractors, not automatically to Company tenants. Website, notes, personal/family scope and ownership need complete parity. |
+| Company: CompanyName, Description, Email, Phone, Website, Notes, AddressId, UserId, FamilyId | Legacy counterparties map to Contractors, not automatically to Company tenants. Verbatim website, description and notes are supported. Personal/family scope, ownership, address associations and actual import/reconciliation remain pending; review existing name/contact length limits against source records. |
 | Contract: ContractName, Description, ContractNumber, dates, CompanyId, UserId, FamilyId, Price, Recurring, Iban, Notes, IsActive, Type | Basic names/dates/link, billing, verbatim IBAN/notes and legacy business types exist. Personal scope, ownership and actual import/reconciliation remain pending. Preserve IsActive separately from workflow status; do not guess Terminated from inactive alone. |
 | PriceHistory: Price, DateFrom, DateTo, Notes; ContractPriceHistory | Price revisions now exist. Export every raw record and join. Import mapping and reconciliation remain unimplemented. |
 | Address: StreetName, HouseNumber, ZipCode, CityName, CountryName; references from users/families/companies | Preserve separate street and house-number source fields and every association. Contractor addresses exist; user/family addresses and complete ownership mapping remain gaps. |
