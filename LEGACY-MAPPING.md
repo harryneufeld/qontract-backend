@@ -95,8 +95,11 @@ convert to monthly rates by dividing by 3 and 12. Daily and weekly amounts alloc
 per day (weekly divided by 7). One-time amounts occur at their snapshot's effective
 date. Contract start/end bound all estimates, with the contract end inclusive;
 missing ends do not shorten an ongoing contract to today. UTC calendar dates avoid
-daylight-saving drift. The views cover this month, this half-year, this year, or the
-next 12 months. Only Active contracts contribute, and currencies remain separate.
+daylight-saving drift. The dashboard shows this calendar month, quarter and year
+together from the complete tenant list, independent of list filters and search.
+A failed complete load shows a retry state rather than totals from a partial page.
+The calculation service also supports half-year and next-12-month windows. Only
+Active contracts contribute, and currencies remain separate.
 Unknown periods and invalid amounts are visibly excluded in whole or part. Zero
 amounts add no cost. Real billing dates, payment schedules, and invoices need separate
 parity work; the estimates do not claim to reproduce payment timing.
