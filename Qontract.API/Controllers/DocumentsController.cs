@@ -46,6 +46,19 @@ public class DocumentsController : ControllerBase
         ?? User.FindFirst("email")?.Value
         ?? User.Identity?.Name;
 
+    [HttpGet]
+    public async Task<ActionResult<List<DocumentDTO>>> GetLibrary(Qontract.Domain.Models.DocumentScope scope = Qontract.Domain.Models.DocumentScope.Tenant,
+        bool deleted = false, int page = 1, int pageSize = 50) =>
+        Ok(await _documentService.GetLibraryAsync(CurrentTenantId, scope, deleted, page, pageSize, HttpContext.RequestAborted));
+
+    [HttpPost]
+    public async Task<ActionResult<DocumentDTO>> UploadLibrary([FromBody] DocumentCreateDTO dto,
+        Qontract.Domain.Models.DocumentScope scope = Qontract.Domain.Models.DocumentScope.Tenant)
+    {
+        var document = await _documentService.CreateLibraryDocumentAsync(dto, CurrentTenantId, scope, CurrentUser, HttpContext.RequestAborted);
+        return CreatedAtAction(nameof(GetDocument), new { id = document.Id }, document);
+    }
+
     /// <summary>GET /api/documents/contract/{contractId}/documents</summary>
     [HttpGet("contract/{contractId}/documents")]
     public async Task<ActionResult<List<DocumentDTO>>> GetDocuments(int contractId)

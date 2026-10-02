@@ -51,6 +51,12 @@ This backend is not yet a complete replacement for it.
   prevent physical file purge. Personal/family file scope, ownership, and staged import
   remain gaps. See [LEGACY-MAPPING.md](LEGACY-MAPPING.md) for the implemented boundary.
   Remaining invoice/file parity is tracked in [#50](https://github.com/harryneufeld/qontract-backend/issues/50).
+- Legacy families map to refactor tenants. Tenant-shared and personal account file
+  libraries support uploads without a contract, metadata/categories, versions and
+  trash/restore. New owners come from authenticated identity; replacement versions
+  retain the original owner. Personal files follow their account across tenant switches
+  and remain private even from tenant admins. Historical ownership/provenance remains
+  tracked in [#48](https://github.com/harryneufeld/qontract-backend/issues/48).
 - Full migration must preserve legacy memberships, recurring prices, price
   history, invoices, personal/family files, shared-file relationships, addresses,
   audit information, and credentials. See the proposed [export plan](https://github.com/harryneufeld/FamilyPlanner/issues/2).
@@ -206,6 +212,9 @@ omit the period to preserve an unclassified legacy value until it is reviewed.
 - `DELETE /api/Contracts/{id}` - Soft delete contract
 
 ### Documents
+- `GET /api/Documents?scope=Tenant&deleted=false&page=1&pageSize=50` - Current tenant library (page size 1–200)
+- `GET /api/Documents?scope=Personal` - Signed-in account's private library, independent of active tenant
+- `POST /api/Documents?scope=Tenant` or `scope=Personal` - Upload without a contract; server sets tenant/owner
 - `GET /api/Documents/contract/{contractId}/documents` - List documents for a contract
 - `POST /api/Documents/{id}/contracts/{contractId}` - Share the current file with another same-tenant contract (idempotent)
 - `DELETE /api/Documents/{id}/contracts/{contractId}` - Remove a secondary contract link; preserve bytes and other links
@@ -217,6 +226,18 @@ omit the period to preserve an unclassified legacy value until it is reviewed.
 - `GET /api/Documents/trash` - List documents within soft-delete retention
 - `POST /api/Documents/{id}/restore` - Restore deleted document
 - `POST /api/Documents/{id}/reupload` - Upload a replacement version
+
+Upload/metadata payloads also accept optional `description` (up to 2,000 characters)
+and `category` (up to 100), alongside title/date. Blank metadata clears its value;
+null metadata leaves it unchanged. `UserId` and `TenantId` are server-owned. Scope
+cannot be changed through metadata. Personal files are rejected as shared contract
+links or tenant invoice evidence. Deleted library entries include `deletedAt` and
+`expiresAt`, or `retainedForInvoice=true` with no purge deadline.
+
+The library schema preserves existing paths, owner IDs and audits and backfills
+tenancy from existing primary contracts only. Unknown owners stay null. Restore a
+verified backup for rollback: this migration refuses a destructive downgrade to
+mandatory contract ownership.
 
 ### Invoices
 

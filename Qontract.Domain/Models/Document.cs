@@ -27,8 +27,13 @@ public class Document : BaseEntity
     [Required]
     public string UploadedBy { get; set; } = string.Empty;
 
-    [Required]
-    public int ContractId { get; set; }
+    public int? ContractId { get; set; }
+    public int? TenantId { get; set; }
+    public Tenant? Tenant { get; set; }
+    public int? UserId { get; set; }
+    public DocumentScope Scope { get; set; }
+    [MaxLength(2000)] public string? Description { get; set; }
+    [MaxLength(100)] public string? Category { get; set; }
 
     [Required]
     public DateTime UploadedAt { get; set; } = DateTime.UtcNow;
@@ -66,9 +71,11 @@ public class Document : BaseEntity
     public int? SupersededById { get; set; }
 
     // Navigation properties
-    public Contract Contract { get; set; }
+    public Contract? Contract { get; set; }
     public User? User { get; set; }
     public ICollection<Contract> Contracts { get; set; } = new List<Contract>();
     public Document? SupersededBy { get; set; }
     public ICollection<DocumentLink> Links { get; set; } = new List<DocumentLink>();
 }
+
+public enum DocumentScope { Tenant, Personal }

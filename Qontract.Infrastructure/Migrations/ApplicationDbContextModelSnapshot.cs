@@ -299,7 +299,11 @@ namespace Qontract.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
-                    b.Property<int>("ContractId")
+                    b.Property<string>("Category")
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("ContractId")
                         .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("CreatedAt")
@@ -310,6 +314,10 @@ namespace Qontract.Infrastructure.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(2000)
                         .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("DocumentDate")
@@ -343,7 +351,13 @@ namespace Qontract.Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("Scope")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int?>("SupersededById")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("TenantId")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("Title")
@@ -370,7 +384,9 @@ namespace Qontract.Infrastructure.Migrations
 
                     b.HasIndex("SupersededById");
 
-                    b.HasIndex("UserId");
+                    b.HasIndex("TenantId", "Scope");
+
+                    b.HasIndex("UserId", "Scope");
 
                     b.ToTable("Documents", (string)null);
                 });
@@ -761,22 +777,28 @@ namespace Qontract.Infrastructure.Migrations
                 {
                     b.HasOne("Qontract.Domain.Models.Contract", "Contract")
                         .WithMany()
-                        .HasForeignKey("ContractId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .HasForeignKey("ContractId");
 
                     b.HasOne("Qontract.Domain.Models.Document", "SupersededBy")
                         .WithMany()
                         .HasForeignKey("SupersededById")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("Qontract.Domain.Models.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Qontract.Domain.Models.User", "User")
                         .WithMany()
-                        .HasForeignKey("UserId");
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("Contract");
 
                     b.Navigation("SupersededBy");
+
+                    b.Navigation("Tenant");
 
                     b.Navigation("User");
                 });

@@ -11,4 +11,6 @@ public class DocumentMetadataDTO
     public string? Title { get; set; }
 
     public DateTime? DocumentDate { get; set; }
+    public string? Description { get; set; }
+    public string? Category { get; set; }
 }

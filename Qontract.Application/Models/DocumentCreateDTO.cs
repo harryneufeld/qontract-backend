@@ -20,4 +20,6 @@ public class DocumentCreateDTO
 
     /// <summary>Optional user-chosen document date (app issue #5).</summary>
     public DateTime? DocumentDate { get; set; }
+    public string? Description { get; set; }
+    public string? Category { get; set; }
 }

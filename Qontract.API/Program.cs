@@ -121,6 +121,8 @@ builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IContractorService, ContractorService>();
 builder.Services.AddScoped<IContractService, ContractService>();
 builder.Services.AddScoped<IDocumentService, DocumentService>();
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<IDocumentIdentity, Qontract.API.Services.DocumentIdentity>();
 builder.Services.AddScoped<InvoiceService>();
 builder.Services.AddScoped<IAddressService, AddressService>();
 

@@ -4,6 +4,11 @@ Repository inventory, 2026-10-01. This is a mapping proposal grounded in the
 legacy models and `FamilyContext`; it is not a production inventory or a cutover approval.
 Productive FamilyPlanner remains supported until all gates below pass.
 
+Legacy `UserFamily` (a family) maps to a refactor tenant, as confirmed by Harry
+on 2026-10-02. Family membership maps to tenant membership; family files map to
+tenant-shared files. Personal `User.DatabaseFiles` stays account-owned rather than
+becoming a separate tenant type or silently becoming tenant-shared.
+
 ## Billing implemented in the refactor
 
 `Contract.Value` remains a string for API/data compatibility. With an explicit
@@ -70,8 +75,8 @@ must explicitly preserve source audit facts without accidentally replacing them.
 | Contract: ContractName, Description, ContractNumber, dates, CompanyId, UserId, FamilyId, Price, Recurring, Iban, Notes, IsActive, Type | Basic names/dates/link and billing exist. IBAN, notes, type, personal scope and ownership still need target support. Preserve IsActive separately from workflow status; do not guess Terminated from inactive alone. |
 | PriceHistory: Price, DateFrom, DateTo, Notes; ContractPriceHistory | Price revisions now exist. Export every raw record and join. Import mapping and reconciliation remain unimplemented. |
 | Address: StreetName, HouseNumber, ZipCode, CityName, CountryName; references from users/families/companies | Preserve separate street and house-number source fields and every association. Contractor addresses exist; user/family addresses and complete ownership mapping remain gaps. |
-| DatabaseFile: FileName, Description, Date, Path, Category, Content, MimeType, Size | Export metadata and actual bytes. Preserve both inline and path-backed storage; report missing bytes. Category, personal/family files, ownership, and complete associations remain gaps. |
-| ContractFileList, User.DatabaseFiles, UserFamily.Files | Additional contract links now share one stored Document; every link carries through re-upload. Export all original associations. Personal/family scopes and ownership remain gaps. |
+| DatabaseFile: FileName, Description, Date, Path, Category, Content, MimeType, Size | Target supports filename, description, category, document date, MIME type, size, personal and tenant libraries, and versions. Export metadata and actual bytes from both inline and path-backed storage; report missing bytes. Original ownership/provenance and association reconciliation remain import work. |
+| ContractFileList, User.DatabaseFiles, UserFamily.Files | Additional contract links share one stored Document; every link carries through re-upload. User files are personal; family files are tenant-shared. Export all original associations. Mixed personal/shared or multiple-tenant associations need explicit access reconciliation; do not drop links or publish personal bytes silently. |
 | Invoice: InvoiceDate, DueDate, Amount, InvoiceNumber, Description, FileId | Tenant-scoped invoice records and app forms now exist, with optional contract and exact document-version references. Preserve signed decimal amounts, dates and all text. Currency remains unknown unless supplied explicitly. Import identity/provenance and ambiguous source ownership still need resolution. |
 
 ## Invoice and shared-file behavior
@@ -102,12 +107,43 @@ purge deadline. Restore the evidence before restoring an archived invoice if the
 file itself was moved to trash.
 
 The app exposes invoices from the dashboard menu and contract details, with an
-existing-file picker for the selected contract. Standalone invoices are supported;
-uploading files without a contract, personal/family file scope, full ownership,
+existing-file picker for the selected contract. Standalone invoices can select
+tenant-library evidence without a contract. Full historical ownership/provenance,
 original-anchor removal, and the staged importer remain gaps. None of this constitutes
 a live FamilyPlanner migration or a proof of complete production parity.
 
 Remaining invoice/file parity is tracked in [backend #50](https://github.com/harryneufeld/qontract-backend/issues/50).
+
+## Personal and tenant libraries (2026-10-02)
+
+Documents now have explicit `Scope`, nullable `TenantId`, and explicit nullable
+`UserId` using the existing owner column. Contract association is optional. New
+authenticated uploads set the owner from the verified user claim; payload owner
+and tenant IDs are ignored. Re-upload keeps the original owner's ID, scope,
+description/category and tenant, while recording the uploading actor in the new
+version's audit fields. Unknown historical owners stay unknown, including when a
+different member uploads a replacement. Ownership and creation identity are distinct.
+
+Tenant documents are available to members of the active tenant. Personal documents
+are available only to their owner, including across tenant switches; tenant admin
+status does not bypass privacy. Access is enforced for metadata, downloads, updates,
+versions, trash, restore and links. Private files cannot be linked to shared contracts
+or tenant invoices. Changing personal/shared scope is deliberately unavailable;
+an explicit sharing/provenance workflow remains future work. Personal invoice scope
+and ambiguous legacy invoice ownership still need migration reconciliation.
+
+The **Files** menu offers Tenant files and My files, contract-free uploads, paged
+lists, title/date/description/category editing, version replacement/history,
+contract links on shared files, and trash/restore. Personal retention uses the global
+default; shared files use the tenant setting. Invoice evidence is retained as before.
+
+`AddDocumentLibrariesAndOwnership` preserves existing file paths, original contract
+links, owner IDs and audit fields. It backfills tenant ID only from the existing
+primary contract. Orphan or unknown associations remain unresolved, and user IDs are
+never inferred from email audit text. Existing owner indexes/FKs are updated without
+dropping the owner column. Downgrade to mandatory contract ownership is refused;
+rollback requires a verified pre-upgrade backup. No production owner counts or source
+associations have been inspected; #48 remains open for that audit and staged backfill.
 
 ## Price-history import proposal and unresolved cases
 

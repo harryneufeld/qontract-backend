@@ -7,6 +7,8 @@ namespace Qontract.Application.Services;
 
 public interface IDocumentService
 {
+    Task<List<DocumentDTO>> GetLibraryAsync(int tenantId, Qontract.Domain.Models.DocumentScope scope, bool deleted, int page, int pageSize, CancellationToken cancellationToken = default);
+    Task<DocumentDTO> CreateLibraryDocumentAsync(DocumentCreateDTO dto, int tenantId, Qontract.Domain.Models.DocumentScope scope, string? actor, CancellationToken cancellationToken = default);
     Task<DocumentDTO> SetContractLinkAsync(int id, int contractId, int tenantId, bool linked, string? actor, CancellationToken cancellationToken = default);
     Task<List<DocumentDTO>> GetDocumentsAsync(int contractId, int tenantId, CancellationToken cancellationToken = default);
     Task<DocumentDTO> GetDocumentByIdAsync(int id, int tenantId, CancellationToken cancellationToken = default);

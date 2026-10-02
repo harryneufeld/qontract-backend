@@ -103,6 +103,7 @@ public class DocumentPurgeService
             .Where(d => d.IsDeleted && d.DeletedAt != null && !_context.Invoices.Any(i => i.DocumentId == d.Id))
             .Include(d => d.Contract)
             .ThenInclude(c => c!.Tenant)
+            .Include(d => d.Tenant)
             .ToListAsync(cancellationToken);
 
         var purged = 0;
@@ -110,7 +111,7 @@ public class DocumentPurgeService
         foreach (var document in candidates)
         {
             var retentionDays =
-                TenantSettingsParser.GetDocumentRetentionDays(document.Contract?.Tenant?.Settings)
+                TenantSettingsParser.GetDocumentRetentionDays(document.Tenant?.Settings ?? document.Contract?.Tenant?.Settings)
                 ?? _options.DefaultDays;
             var expiresAt = document.DeletedAt!.Value.AddDays(retentionDays);
             if (expiresAt > now)

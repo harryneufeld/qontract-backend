@@ -46,7 +46,8 @@ public class InvoiceService(IApplicationDbContext db)
         if (input.DocumentId.HasValue)
         {
             var document = await db.Documents.Include(d => d.Links).SingleOrDefaultAsync(d => d.Id == input.DocumentId
-                && d.Contract.TenantId == tenantId && !d.IsDeleted);
+                && d.Scope == DocumentScope.Tenant
+                && (d.TenantId == tenantId || (d.TenantId == null && d.Contract != null && d.Contract.TenantId == tenantId)) && !d.IsDeleted);
             if (document is null || (input.ContractId.HasValue && document.ContractId != input.ContractId
                     && !document.Links.Any(l => l.ContractId == input.ContractId)))
                 throw new KeyNotFoundException("Document not found for this invoice.");

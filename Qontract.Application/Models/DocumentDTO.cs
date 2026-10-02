@@ -7,7 +7,12 @@ public class DocumentDTO
     public string FileName { get; set; } = string.Empty;
     public string FileType { get; set; } = string.Empty;
     public long FileSize { get; set; }
-    public int ContractId { get; set; }
+    public int? ContractId { get; set; }
+    public int? TenantId { get; set; }
+    public int? UserId { get; set; }
+    public string Scope { get; set; } = "Tenant";
+    public string? Description { get; set; }
+    public string? Category { get; set; }
     public List<int> ContractIds { get; set; } = new();
     public DateTime UploadedAt { get; set; }
     public DateTime? DocumentDate { get; set; }

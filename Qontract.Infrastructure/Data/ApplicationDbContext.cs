@@ -266,7 +266,12 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
             entity.Property(e => e.UploadedBy).HasMaxLength(500);
             entity.Property(e => e.CreatedBy).HasMaxLength(500);
             entity.Property(e => e.ModifiedBy).HasMaxLength(500);
-            entity.Property(e => e.ContractId).IsRequired();
+            entity.Property(e => e.Description).HasMaxLength(2000);
+            entity.Property(e => e.Category).HasMaxLength(100);
+            entity.HasOne(e => e.Tenant).WithMany().HasForeignKey(e => e.TenantId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(e => e.User).WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(e => new { e.TenantId, e.Scope });
+            entity.HasIndex(e => new { e.UserId, e.Scope });
             entity.HasOne(e => e.Contract)
                 .WithMany()
                 .HasForeignKey(e => e.ContractId);
