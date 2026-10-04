@@ -191,7 +191,23 @@ dropping the owner column. Downgrade to mandatory contract ownership is refused;
 rollback requires a verified pre-upgrade backup. No production owner counts or source
 associations have been inspected; #48 remains open for that audit and staged backfill.
 
-## Price-history import proposal and unresolved cases
+## Approved production migration exclusions (2026-10-04)
+
+Harry confirmed that production does not use invoices or price history and
+explicitly approved skipping `Invoices`, `PriceHistories` and
+`ContractPriceHistory`. Their export/import, source mappings, date-boundary and
+ownership reconciliation are outside the current migration scope and do not block
+readiness. Existing target invoice/history features remain available; this does
+not delete any source data or change target runtime behavior. The prior proposals
+below are reference material only, superseded for this production migration.
+
+Keep current contract amounts and billed periods, every `DatabaseFiles` record,
+document bytes, and in-scope document associations, including documents categorized
+as invoices. Retain excluded tables in the full source backup and declare the
+exclusions in export manifests/import reports. This records the operator's decision;
+it is not evidence of a production database inspection.
+
+## Price-history import proposal and unresolved cases (deferred, outside scope)
 
 Legacy `PriceHistory` is many-to-many with contracts and carries no historical
 currency or recurrence. Keep the raw record, GUID, dates, notes, audit facts and
@@ -216,12 +232,12 @@ unchanged. Retain unresolved records in staging until reviewed.
 2. Review the authenticated export plan in FamilyPlanner #2. Use a consistent
    snapshot, stable paging, versioned manifests, protected credential handling and
    streamed bytes. Export must not mutate the productive system.
-3. Implement all missing target features, including credentials, invoices, scope,
-   shared files and ownership. Agree price boundaries and administrative ownership.
+3. Implement missing in-scope target features, including email password setup,
+   personal/tenant scope, shared files and ownership. Agree administrative ownership.
 4. Build a repeatable staged importer with durable source mappings, validation,
    dry-run reports, atomic batches, retry/cancellation and reconciliation. Reruns
    must not duplicate records or erase prior history.
-5. Reconcile every source entity and relationship, amount/period/history, audit
+5. Reconcile every in-scope source entity and relationship, current amount/period, audit
    fact, and file checksum. Compare representative legacy workflows with the app.
 6. Rehearse backup/restore, bounded write freeze or verified delta export, cutover
    and rollback. Productive cutover requires a separate concrete review.
