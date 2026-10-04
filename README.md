@@ -329,7 +329,14 @@ MIT
 
 New and changed passwords use versioned PBKDF2-SHA512 hashes with random salts
 and 210,000 iterations. Existing refactor SHA256 hashes remain accepted for login;
-FamilyPlanner credential import is still part of migration planning.
+FamilyPlanner BCrypt hashes are not supported. Harry confirmed two legacy users
+and selected email password setup instead of importing their hashes on 2026-10-04.
+Preserve the migrated accounts and their relationships, require password setup
+before login, and deliver expiring one-use links through the existing SMTP service.
+This flow is not implemented yet; see [#54](https://github.com/harryneufeld/qontract-backend/issues/54).
+Session revocation in [#44](https://github.com/harryneufeld/qontract-backend/issues/44)
+must invalidate old tokens when passwords are reset. SMTP settings/secrets and
+trusted frontend reset URLs require deployment configuration.
 
 Invitation codes contain 32 random bytes, are stored only as SHA256 hashes, and
 are redeemed atomically once. Optional email binding is case-insensitive. The

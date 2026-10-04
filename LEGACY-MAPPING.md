@@ -113,7 +113,7 @@ must explicitly preserve source audit facts without accidentally replacing them.
 
 | Source model/relationship | Required target mapping and remaining work |
 | --- | --- |
-| User: UserName, Email, PasswordHash, AddressId | Account identity and address. Legacy BCrypt verification is missing; refactor PBKDF2/SHA256 compatibility does not cover it. Duplicate identities need explicit review. |
+| User: UserName, Email, PasswordHash, AddressId | Preserve account identity and address. For the two legacy users, use email password setup rather than import BCrypt hashes (decision 2026-10-04). Setup/reset is pending in #54; preserve source IDs and resolve duplicate identities explicitly. |
 | User.SessionId / RefreshToken | Do not import live sessions. Reauthentication and revocable sessions are separate work. |
 | UserFamily: FamilyName, AddressId | Family tenant and tenant address; current target tenant address support is incomplete. |
 | FamilyUserList | Multiple memberships exist. The join has no explicit per-family admin role; do not infer admin from membership alone. Review ownership/admin assignment. |
