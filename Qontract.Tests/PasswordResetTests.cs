@@ -218,7 +218,7 @@ public class PasswordResetTests : IDisposable
         using (var scope = _host.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-            var tenant = (await db.Users.SingleAsync(u => u.Id == _userId)).TenantId;
+            var tenant = (await db.Users.SingleAsync(u => u.Id == _userId)).TenantId!.Value;
             var users = scope.ServiceProvider.GetRequiredService<IUserService>();
             await users.UpdateUserAsync(_userId, tenant, new UserUpdateDTO { Email = "changed@example.test" }, "admin");
             await users.UpdateUserAsync(_userId, tenant, new UserUpdateDTO { Email = _email }, "admin");

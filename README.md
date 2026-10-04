@@ -7,6 +7,7 @@ This backend is not yet a complete replacement for it.
 ## Features
 
 - ✅ Multi-tenant data model (Family & Company tenants)
+- ✅ Personal workspaces with owner-only contracts, contractors and documents
 - ✅ Clean Architecture with Domain/Application/Infrastructure separation
 - ✅ Entity Framework Core with migration support
 - ✅ File upload/download for contract documents
@@ -39,8 +40,8 @@ This backend is not yet a complete replacement for it.
   increments the account authentication version, invalidating all earlier sessions.
   The app then requires a fresh login. Refresh tokens and session-management UI
   remain follow-ups in [#44](https://github.com/harryneufeld/qontract-backend/issues/44).
-  Every authenticated request checks current account, tenant, membership activity,
-  and role. Removing a membership immediately rejects its tokens; demotion updates
+  Every authenticated request checks account and session activity; tenant requests
+  also check membership, tenant activity and role. Removing a membership immediately rejects its tokens; demotion updates
   their effective role. Membership removal preserves the account and other memberships,
   and the final active tenant administrator cannot be removed or demoted.
 - Contract amounts support all six legacy billing periods and dated price revisions.
@@ -51,8 +52,8 @@ This backend is not yet a complete replacement for it.
   legacy gaps and import assumptions, tracked in [#47](https://github.com/harryneufeld/qontract-backend/issues/47).
 - Contracts support verbatim IBAN, multiline contract notes and the five legacy
   business types, independent of workflow status and billing period. Existing
-  classifications remain unknown. Historical import, personal contract scope
-  and ownership remain pending in [#51](https://github.com/harryneufeld/qontract-backend/issues/51);
+  classifications remain unknown. Personal ownership is implemented; historical
+  import and source ownership reconciliation remain pending in [#51](https://github.com/harryneufeld/qontract-backend/issues/51);
   see [LEGACY-MAPPING.md](LEGACY-MAPPING.md).
 - Contractors support verbatim website, description and multiline notes through
   CRUD and activation changes. Omitted/null updates preserve text and empty strings
@@ -71,9 +72,17 @@ This backend is not yet a complete replacement for it.
   retain the original owner. Personal files follow their account across tenant switches
   and remain private even from tenant admins. Historical ownership/provenance remains
   tracked in [#48](https://github.com/harryneufeld/qontract-backend/issues/48).
-- Full migration must preserve legacy memberships, recurring prices, price
-  history, invoices, personal/family files, shared-file relationships, addresses,
-  audit information, and credentials. See the proposed [export plan](https://github.com/harryneufeld/FamilyPlanner/issues/2).
+- Personal contracts and contractors are owner-only, with immutable scope and
+  same-workspace contractor references. Account → Workspaces selects Personal or
+  a tenant; accounts without memberships can log in to Personal. Private contract
+  documents and addresses enforce the same boundary. Tenant admins cannot bypass
+  it. Migration adds explicit ownership without inferring or changing historical
+  rows. See [LEGACY-MAPPING.md](LEGACY-MAPPING.md) for the API and rollback requirements.
+- Current migration scope preserves memberships, current prices and periods,
+  personal/tenant documents, shared-file relationships, addresses and audit data.
+  Credentials use email password setup. Unused production `Invoices`, `PriceHistories`
+  and `ContractPriceHistory` are excluded by agreement. See the proposed
+  [export plan](https://github.com/harryneufeld/FamilyPlanner/issues/2).
 - Audit cleanup is approved in [#38](https://github.com/harryneufeld/qontract-backend/issues/38#issuecomment-5784379193):
   remove contract Creator/Modifier relationships and the unused new-backend join;
   keep `Documents.UserId`; consolidate upload audit fields into base audit fields.

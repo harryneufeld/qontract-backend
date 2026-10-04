@@ -63,8 +63,8 @@ On update, omitted/null IBAN or notes leaves the existing value; an empty string
 clears it. Omitted/null type leaves classification; `clearType: true` resets it
 to null and cannot be combined with a non-null type. The app supports editing,
 clearing and viewing the fields. Contract notes do not create a price revision
-and remain separate from `PriceNotes`. Source ownership, personal contract scope,
-GUID mappings and actual historical import/reconciliation remain pending.
+and remain separate from `PriceNotes`. Personal contract scope is implemented below;
+source ownership reconciliation, GUID mappings and historical import remain pending.
 
 ## Contractor metadata implemented in the refactor
 
@@ -81,11 +81,64 @@ Only valid absolute HTTP/HTTPS websites without embedded credentials enable an
 external open action; other legacy references remain selectable plain text. The
 backend stores website text without URL normalization or fetching its contents.
 
-Historical import/provenance and personal/family company scope still require
-reconciliation. The current contractor API remains tenant-shared; a source
-`UserId` must not be treated as proof that a personal company is safe to publish
-to a tenant. Address associations, name/contact length compatibility and complete
-source ownership are still migration gates.
+Personal contractor scope is implemented below. Historical import/provenance still
+requires reconciliation: a source `UserId` must not be treated as proof that a
+personal company is safe to publish to a tenant. Address associations, name/contact
+length compatibility and complete source ownership remain migration gates.
+
+## Personal contracts and contractors (2026-10-04)
+
+Contracts and contractors now support two exclusive application scopes:
+
+| Workspace | Persisted scope | Access |
+| --- | --- | --- |
+| Personal | `TenantId = null`, `OwnerUserId = authenticated account ID` | Owner only |
+| Tenant | Positive `TenantId`, `OwnerUserId = null` | Active members of that tenant |
+
+The API sets scope at creation from the authenticated workspace. Clients cannot
+choose an owner, move a record to another scope, or reference a contractor outside
+that workspace. Lists, details, changes, activation, deletion, contract counts,
+statistics, documents, and contract/contractor addresses enforce this boundary.
+Tenant administrators have no override for another account's personal records.
+Unresolved records with neither owner nor tenant, and inconsistent records with
+both, stay inaccessible. These checks are application access rules, not an importer.
+
+`PersonalRecordOwnership` adds nullable owner FKs and scope indexes, makes
+contractor tenancy and the user's legacy primary tenant nullable, and leaves all
+existing rows, IDs, audit fields and associations unchanged. It never infers an
+owner from `CreatedBy`, `ModifiedBy`, or the existing contractor `UserId`. Existing
+tenant contractors retain that separate association and remain tenant-shared.
+Accounts without a primary tenant do not receive an invented tenant or membership.
+Schema downgrade is refused; restore a matching pre-upgrade database and document
+backup for rollback. Deploy the API before the matching Flutter client.
+
+Authentication selects an existing active tenant on login when available, otherwise
+Personal. `POST /api/auth/switch-tenant` accepts `tenantId: 0` to select Personal;
+zero is a signed workspace marker and is never stored as a tenant FK. It preserves
+session expiry and revocation. Personal tokens carry `access_scope: personal`, an
+effective `User` role, and can access account and ownership-aware endpoints, but
+not tenant administration or the tenant-only invoice API. Removed membership tokens
+still fail immediately; a fresh login can reach Personal if no memberships remain.
+
+Uploads on personal contracts create owner-only documents. Re-upload retains
+scope, owner and links. Personal documents can link only to that owner's personal
+contracts while Personal is selected; they cannot become tenant-shared or invoice
+evidence by linking. Existing tenant document behavior and private library access
+across workspace switches remain supported. Invoice scope/redesign is deferred (#53).
+
+The app's Account → Workspaces screen always offers Personal, including accounts
+with no memberships. Switching clears scoped providers and navigation; forms and
+workspace guidance explain visibility before saving. Dashboard costs cover the
+selected workspace. Personal contract details omit the tenant invoice action.
+
+Legacy reconciliation remains explicit: `FamilyId` is a tenant association;
+`UserId` can coexist with it (contract holder/responsible person, and company
+creator association). Neither a populated `UserId` nor audit text alone implies
+private scope. Export must retain both source IDs and a source mapping ledger.
+Missing owners, conflicting relationships, and private contractors referenced by
+shared contracts must be reported for review, without widening visibility or
+silently duplicating records. User/tenant addresses, long legacy values, full
+ownership reconciliation and the exporter/importer are still prerequisites.
 
 ## Cost estimate convention
 

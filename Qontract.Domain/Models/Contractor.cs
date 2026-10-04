@@ -27,14 +27,16 @@ public class Contractor : BaseEntity
     public string? Description { get; set; }
     public string? Notes { get; set; }
 
-    [Required]
-    public int TenantId { get; set; }
+    public int? TenantId { get; set; }
 
     [MaxLength(500)]
     public int? UserId { get; set; }
 
     [Required]
     public bool IsActive { get; set; }
+
+    public int? OwnerUserId { get; set; }
+    public User? Owner { get; set; }
 
     // Navigation properties
     public Tenant? Tenant { get; set; }

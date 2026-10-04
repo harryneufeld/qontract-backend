@@ -26,10 +26,10 @@ public class DocumentService : IDocumentService
 
     public async Task<List<DocumentDTO>> GetDocumentsAsync(int contractId, int tenantId, CancellationToken cancellationToken = default)
     {
-        if (!await _context.Contracts.AnyAsync(c => c.Id == contractId && c.TenantId == tenantId, cancellationToken))
+        if (!await _context.Contracts.VisibleIn(tenantId, _identity?.UserId).AnyAsync(c => c.Id == contractId, cancellationToken))
             throw new KeyNotFoundException($"Contract with id {contractId} not found in tenant {tenantId}.");
         var documents = await VisibleDocuments(tenantId).AsNoTracking().Include(d => d.Links)
-            .Where(d => d.Scope == DocumentScope.Tenant
+            .Where(d => d.Scope == (tenantId == 0 ? DocumentScope.Personal : DocumentScope.Tenant)
                 && (d.ContractId == contractId || d.Links.Any(l => l.ContractId == contractId))
                 && !d.IsDeleted && d.SupersededById == null)
             .OrderByDescending(d => d.ModifiedAt).ToListAsync(cancellationToken);
@@ -44,7 +44,7 @@ public class DocumentService : IDocumentService
         return ToDto(document);
     }
     public async Task<DocumentDTO> CreateDocumentAsync(DocumentCreateDTO dto, int contractId, int tenantId, string? createdBy, CancellationToken cancellationToken = default)
-        => await StoreUploadAsync(dto, contractId, tenantId, DocumentScope.Tenant, createdBy, cancellationToken);
+        => await StoreUploadAsync(dto, contractId, tenantId, tenantId == 0 ? DocumentScope.Personal : DocumentScope.Tenant, createdBy, cancellationToken);
 
     public async Task<DocumentDTO> CreateLibraryDocumentAsync(DocumentCreateDTO dto, int tenantId, DocumentScope scope, string? actor, CancellationToken cancellationToken = default)
     {
@@ -55,6 +55,8 @@ public class DocumentService : IDocumentService
 
     private async Task<DocumentDTO> StoreUploadAsync(DocumentCreateDTO dto, int? contractId, int tenantId, DocumentScope scope, string? createdBy, CancellationToken cancellationToken)
     {
+        if (scope == DocumentScope.Tenant && tenantId <= 0 || scope == DocumentScope.Personal && _identity?.UserId is not > 0)
+            throw new InvalidOperationException("A valid document workspace is required.");
         if (string.IsNullOrWhiteSpace(dto.FileName) || string.IsNullOrWhiteSpace(dto.FileType))
             throw new InvalidOperationException("File name and type are required.");
         ValidateMetadata(dto.FileName, dto.FileType, dto.Title, dto.Description, dto.Category);
@@ -77,8 +79,8 @@ public class DocumentService : IDocumentService
         // (issue #34): one definition, in the storage layer, not here.
 
         // Contract must exist and belong to the tenant.
-        var contract = await _context.Contracts
-            .FirstOrDefaultAsync(c => c.Id == contractId && c.TenantId == tenantId, cancellationToken);
+        var contract = await _context.Contracts.VisibleIn(tenantId, _identity?.UserId)
+            .FirstOrDefaultAsync(c => c.Id == contractId, cancellationToken);
         if (contractId.HasValue && contract == null)
         {
             throw new KeyNotFoundException($"Contract with id {contractId} not found in tenant {tenantId}.");
@@ -468,9 +470,9 @@ public class DocumentService : IDocumentService
     {
         await using var transaction = await _context.BeginSerializableTransactionAsync(cancellationToken);
         var document = await FindCurrentDocumentAsync(id, tenantId, cancellationToken);
-        if (document.Scope == DocumentScope.Personal)
+        if (document.Scope != (tenantId == 0 ? DocumentScope.Personal : DocumentScope.Tenant))
             throw new InvalidOperationException("Personal files cannot be linked to shared contracts.");
-        if (!await _context.Contracts.AnyAsync(c => c.Id == contractId && c.TenantId == tenantId, cancellationToken))
+        if (!await _context.Contracts.VisibleIn(tenantId, _identity?.UserId).AnyAsync(c => c.Id == contractId, cancellationToken))
             throw new KeyNotFoundException("Contract not found.");
         if (document.ContractId == contractId && !linked)
             throw new InvalidOperationException("The original contract is the storage anchor and cannot be unlinked. You can move the document to trash instead.");
@@ -493,7 +495,7 @@ public class DocumentService : IDocumentService
     private IQueryable<Document> VisibleDocuments(int tenantId)
     {
         var userId = _identity?.UserId;
-        return _context.Documents.Where(d => (d.Scope == DocumentScope.Tenant
+        return _context.Documents.Where(d => (tenantId > 0 && d.Scope == DocumentScope.Tenant
                 && (d.TenantId == tenantId || (d.TenantId == null && d.Contract != null && d.Contract.TenantId == tenantId)))
             || (d.Scope == DocumentScope.Personal && userId != null && d.UserId == userId));
     }

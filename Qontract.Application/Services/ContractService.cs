@@ -7,10 +7,12 @@ namespace Qontract.Application.Services;
 public class ContractService : IContractService
 {
     private readonly IApplicationDbContext _context;
+    private readonly Qontract.Application.Interfaces.IDocumentIdentity? _identity;
 
-    public ContractService(IApplicationDbContext context)
+    public ContractService(IApplicationDbContext context, Qontract.Application.Interfaces.IDocumentIdentity? identity = null)
     {
         _context = context;
+        _identity = identity;
     }
 
     /// <summary>
@@ -41,12 +43,12 @@ public class ContractService : IContractService
                 $"Unknown contract status filter '{status}'.", nameof(status));
         }
 
-        IQueryable<Contract> query = _context.Contracts
+        IQueryable<Contract> query = _context.Contracts.VisibleIn(tenantId, _identity?.UserId)
             .Include(c => c.Tenant)
             .Include(c => c.Contractor)
             .Include(c => c.Creator)
             .Include(c => c.Modifier)
-            .Where(c => c.IsActive && c.TenantId == tenantId);
+            .Where(c => c.IsActive);
 
         if (status is not null)
         {
@@ -100,6 +102,7 @@ public class ContractService : IContractService
             .Select(c => new ContractDTO
             {
                 Id = c.Id,
+                TenantId = c.TenantId, OwnerUserId = c.OwnerUserId,
                 Title = c.Title,
                 Description = c.Description,
                 Iban = c.Iban,
@@ -147,8 +150,8 @@ public class ContractService : IContractService
         var now = DateTime.Now;
         var today = now.Date;
 
-        var rows = await _context.Contracts
-            .Where(c => c.IsActive && c.TenantId == tenantId)
+        var rows = await _context.Contracts.VisibleIn(tenantId, _identity?.UserId)
+            .Where(c => c.IsActive)
             .Select(c => new
             {
                 c.Status,
@@ -219,13 +222,13 @@ public class ContractService : IContractService
 
     public async Task<ContractDTO> GetContractByIdAsync(int id, int tenantId, CancellationToken cancellationToken = default)
     {
-        var contract = await _context.Contracts
+        var contract = await _context.Contracts.VisibleIn(tenantId, _identity?.UserId)
             .Include(c => c.PriceHistory)
             .Include(c => c.Tenant)
             .Include(c => c.Contractor)
             .Include(c => c.Creator)
             .Include(c => c.Modifier)
-            .FirstOrDefaultAsync(c => c.Id == id && c.IsActive && c.TenantId == tenantId, cancellationToken);
+            .FirstOrDefaultAsync(c => c.Id == id && c.IsActive, cancellationToken);
 
         if (contract == null)
             throw new KeyNotFoundException($"Contract with ID {id} not found in tenant {tenantId}.");
@@ -233,6 +236,7 @@ public class ContractService : IContractService
         return new ContractDTO
         {
             Id = contract.Id,
+            TenantId = contract.TenantId, OwnerUserId = contract.OwnerUserId,
             Title = contract.Title,
             Description = contract.Description,
             Iban = contract.Iban,
@@ -258,6 +262,7 @@ public class ContractService : IContractService
 
     public async Task<ContractDTO> CreateContractAsync(int tenantId, ContractCreateDTO dto, string? createdBy, CancellationToken cancellationToken = default)
     {
+        await ValidateContractorAsync(dto.ContractorId, tenantId, cancellationToken);
         var contract = new Contract
         {
             Title = dto.Title,
@@ -274,7 +279,8 @@ public class ContractService : IContractService
             ContractNumber = dto.ContractNumber,
             MinimumContractDate = dto.MinimumContractDate,
             ContractorId = dto.ContractorId,
-            TenantId = tenantId,
+            TenantId = tenantId == 0 ? null : tenantId,
+            OwnerUserId = RecordAccess.Owner(tenantId, _identity?.UserId),
             IsActive = true,
             CreatedBy = createdBy,
             ModifiedBy = createdBy,
@@ -292,12 +298,13 @@ public class ContractService : IContractService
     public async Task<ContractDTO> UpdateContractAsync(int id, int tenantId, ContractUpdateDTO dto, string? modifiedBy, CancellationToken cancellationToken = default)
     {
         await using var transaction = await _context.BeginSerializableTransactionAsync(cancellationToken);
-        var contract = await _context.Contracts.Include(c => c.PriceHistory)
-            .FirstOrDefaultAsync(c => c.Id == id && c.IsActive && c.TenantId == tenantId, cancellationToken);
+        var contract = await _context.Contracts.VisibleIn(tenantId, _identity?.UserId).Include(c => c.PriceHistory)
+            .FirstOrDefaultAsync(c => c.Id == id && c.IsActive, cancellationToken);
 
         if (contract == null)
             throw new KeyNotFoundException($"Contract with ID {id} not found in tenant {tenantId}.");
 
+        await ValidateContractorAsync(dto.ContractorId ?? contract.ContractorId, tenantId, cancellationToken);
         var oldValue = contract.Value;
         var oldCurrency = contract.Currency;
         var oldPeriod = contract.BillingPeriod;
@@ -363,8 +370,8 @@ public class ContractService : IContractService
 
     public async Task<ContractDTO> DeactivateContractAsync(int id, int tenantId, string? modifiedBy, CancellationToken cancellationToken = default)
     {
-        var contract = await _context.Contracts.Include(c => c.PriceHistory)
-            .FirstOrDefaultAsync(c => c.Id == id && c.IsActive && c.TenantId == tenantId, cancellationToken);
+        var contract = await _context.Contracts.VisibleIn(tenantId, _identity?.UserId).Include(c => c.PriceHistory)
+            .FirstOrDefaultAsync(c => c.Id == id && c.IsActive, cancellationToken);
 
         if (contract == null)
             throw new KeyNotFoundException($"Contract with ID {id} not found in tenant {tenantId}.");
@@ -381,6 +388,7 @@ public class ContractService : IContractService
         return new ContractDTO
         {
             Id = contract.Id,
+            TenantId = contract.TenantId, OwnerUserId = contract.OwnerUserId,
             Title = contract.Title,
             Description = contract.Description,
             Iban = contract.Iban,
@@ -402,6 +410,12 @@ public class ContractService : IContractService
             ModifiedBy = contract.ModifiedBy,
             CreatedAtUTC = contract.CreatedAt
         };
+    }
+
+    private async Task ValidateContractorAsync(int? id, int tenantId, CancellationToken ct)
+    {
+        if (id.HasValue && !await _context.Contractors.VisibleIn(tenantId, _identity?.UserId).AnyAsync(c => c.Id == id, ct))
+            throw new KeyNotFoundException("Contractor not found in this workspace.");
     }
 
     private static string InitialDate(Contract c) => DateOnly.TryParseExact(c.StartDate, "yyyy-MM-dd", out var date)
@@ -432,8 +446,8 @@ public class ContractService : IContractService
 
     public async Task<bool> DeleteContractSoftAsync(int id, int tenantId, string? modifiedBy, CancellationToken cancellationToken = default)
     {
-        var contract = await _context.Contracts.Include(c => c.PriceHistory)
-            .FirstOrDefaultAsync(c => c.Id == id && c.IsActive && c.TenantId == tenantId, cancellationToken);
+        var contract = await _context.Contracts.VisibleIn(tenantId, _identity?.UserId).Include(c => c.PriceHistory)
+            .FirstOrDefaultAsync(c => c.Id == id && c.IsActive, cancellationToken);
 
         if (contract == null)
             throw new KeyNotFoundException($"Contract with ID {id} not found in tenant {tenantId}.");

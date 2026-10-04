@@ -250,7 +250,8 @@ builder.Services.AddAuthentication(options =>
             if (!int.TryParse(validation.Principal?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value, out var userId)
                 || !int.TryParse(validation.Principal?.FindFirst("TenantId")?.Value, out var tenantId)
                 || !Guid.TryParse(validation.Principal?.FindFirst("sid")?.Value, out var sessionId)
-                || !int.TryParse(validation.Principal?.FindFirst("auth_version")?.Value, out var authVersion))
+                || !int.TryParse(validation.Principal?.FindFirst("auth_version")?.Value, out var authVersion)
+                || userId <= 0 || tenantId < 0)
             {
                 validation.Fail("Invalid tenant identity.");
                 return;
@@ -263,6 +264,12 @@ builder.Services.AddAuthentication(options =>
             if (session is null || session.ExpiresAt <= DateTime.UtcNow)
             {
                 validation.Fail("Session is no longer active.");
+                return;
+            }
+            if (tenantId == 0 && identity is not null && validation.Principal?.FindFirst("access_scope")?.Value == "personal")
+            {
+                foreach (var claim in identity.FindAll(identity.RoleClaimType).ToList()) identity.RemoveClaim(claim);
+                identity.AddClaim(new System.Security.Claims.Claim(identity.RoleClaimType, "User"));
                 return;
             }
             var membership = await db.TenantMemberships.AsNoTracking().SingleOrDefaultAsync(m => m.UserId == userId
@@ -279,6 +286,14 @@ builder.Services.AddAuthentication(options =>
             identity.AddClaim(new System.Security.Claims.Claim(identity.RoleClaimType, membership.Role.ToString()));
         }
     };
+});
+
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("Account", policy => policy.RequireAuthenticatedUser());
+    options.DefaultPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser().RequireAssertion(context =>
+            int.TryParse(context.User.FindFirst("TenantId")?.Value, out var tenantId) && tenantId > 0).Build();
 });
 
 // Add CORS

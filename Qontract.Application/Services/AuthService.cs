@@ -48,8 +48,7 @@ public class AuthService : IAuthService
             var membership = await _context.TenantMemberships
                 .Where(m => m.UserId == user.Id && m.IsActive && m.Tenant.IsActive)
                 .OrderByDescending(m => m.TenantId == user.TenantId).ThenBy(m => m.TenantId)
-                .FirstOrDefaultAsync(cancellationToken)
-                ?? throw new InvalidOperationException("No active tenant membership.");
+                .FirstOrDefaultAsync(cancellationToken);
             return await SessionAsync(user, membership, cancellationToken);
         }
         catch (Exception ex)
@@ -61,6 +60,11 @@ public class AuthService : IAuthService
 
     public async Task<AuthUserDTO?> GetCurrentUserAsync(int userId, int tenantId, CancellationToken cancellationToken = default)
     {
+        if (tenantId == 0)
+        {
+            var user = await _context.Users.AsNoTracking().SingleOrDefaultAsync(u => u.Id == userId && u.IsActive && !u.RequiresPasswordSetup, cancellationToken);
+            return user is null ? null : ToAuthUser(user, null);
+        }
         var membership = await ActiveMembership(userId, tenantId).FirstOrDefaultAsync(cancellationToken);
         return membership == null ? null : ToAuthUser(membership.User, membership);
     }
@@ -71,12 +75,18 @@ public class AuthService : IAuthService
 
     public async Task<AuthDTO> SwitchTenantAsync(int userId, int tenantId, CancellationToken cancellationToken = default, Guid? sessionId = null)
     {
+        if (tenantId == 0)
+        {
+            var user = await _context.Users.AsNoTracking().SingleOrDefaultAsync(u => u.Id == userId && u.IsActive && !u.RequiresPasswordSetup, cancellationToken)
+                ?? throw new KeyNotFoundException("Account not found.");
+            return await SessionAsync(user, null, cancellationToken, sessionId);
+        }
         var membership = await ActiveMembership(userId, tenantId).FirstOrDefaultAsync(cancellationToken)
             ?? throw new KeyNotFoundException("Tenant not found.");
         return await SessionAsync(membership.User, membership, cancellationToken, sessionId);
     }
 
-    private async Task<AuthDTO> SessionAsync(User user, TenantMembership membership,
+    private async Task<AuthDTO> SessionAsync(User user, TenantMembership? membership,
         CancellationToken cancellationToken, Guid? sessionId = null)
     {
         var now = DateTime.UtcNow;
@@ -151,13 +161,13 @@ public class AuthService : IAuthService
         return true;
     }
 
-    private static AuthUserDTO ToAuthUser(User user, TenantMembership membership) => new()
+    private static AuthUserDTO ToAuthUser(User user, TenantMembership? membership) => new()
     {
         Id = user.Id,
         Name = user.Name,
         Email = user.Email,
-        Role = membership.Role.ToString(),
-        TenantId = membership.TenantId,
+        Role = (membership?.Role ?? UserRole.User).ToString(),
+        TenantId = membership?.TenantId ?? 0,
         CreatedAt = user.CreatedAt
     };
 
@@ -203,7 +213,7 @@ public class AuthService : IAuthService
         }
     }
 
-    private string GenerateJwtToken(User user, TenantMembership membership, AuthSession session)
+    private string GenerateJwtToken(User user, TenantMembership? membership, AuthSession session)
     {
         // (issue #36) The development fallback key is the single shared
         // constant Qontract.Core.Security.JwtKeys.DevelopmentFallback, also
@@ -227,8 +237,9 @@ public class AuthService : IAuthService
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
             new Claim("sid", session.Id.ToString()),
             new Claim("auth_version", session.AuthVersion.ToString(System.Globalization.CultureInfo.InvariantCulture)),
-            new Claim(ClaimTypes.Role, membership.Role.ToString()),
-            new Claim("TenantId", membership.TenantId.ToString())
+            new Claim(ClaimTypes.Role, (membership?.Role ?? UserRole.User).ToString()),
+            new Claim("TenantId", (membership?.TenantId ?? 0).ToString()),
+            new Claim("access_scope", membership is null ? "personal" : "tenant")
         };
 
         var token = new JwtSecurityToken(

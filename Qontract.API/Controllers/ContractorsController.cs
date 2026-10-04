@@ -6,7 +6,7 @@ using Qontract.Application.Services;
 namespace Qontract.API.Controllers;
 
 [ApiController]
-[Authorize]
+[Authorize(Policy = "Account")]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/[controller]")]
 [Route("api/[controller]")]

@@ -15,14 +15,18 @@ namespace Qontract.Application.Services;
 public class AddressService : IAddressService
 {
     private readonly IApplicationDbContext _context;
+    private readonly Qontract.Application.Interfaces.IDocumentIdentity? _identity;
 
-    public AddressService(IApplicationDbContext context)
+    public AddressService(IApplicationDbContext context, Qontract.Application.Interfaces.IDocumentIdentity? identity = null)
     {
         _context = context;
+        _identity = identity;
     }
 
     public async Task<AddressDTO> CreateAddressAsync(AddressCreateDTO dto, int entityId, EntityType entityType, int tenantId, string? createdBy, CancellationToken cancellationToken = default)
     {
+        if (entityType == EntityType.Tenant && (tenantId <= 0 || entityId != tenantId))
+            throw new KeyNotFoundException("Tenant address owner not found.");
         var address = new Address
         {
             EntityType = entityType,
@@ -60,12 +64,12 @@ public class AddressService : IAddressService
             // (Tenant addresses are the caller's own tenant by construction).
             var owner = entityType switch
             {
-                EntityType.Contractor => (BaseEntity?)await _context.Contractors
+                EntityType.Contractor => (BaseEntity?)await _context.Contractors.VisibleIn(tenantId, _identity?.UserId)
                     .AsNoTracking()
-                    .FirstOrDefaultAsync(c => c.Id == entityId && c.TenantId == tenantId, cancellationToken),
-                EntityType.Contract => (BaseEntity?)await _context.Contracts
+                    .FirstOrDefaultAsync(c => c.Id == entityId, cancellationToken),
+                EntityType.Contract => (BaseEntity?)await _context.Contracts.VisibleIn(tenantId, _identity?.UserId)
                     .AsNoTracking()
-                    .FirstOrDefaultAsync(c => c.Id == entityId && c.TenantId == tenantId, cancellationToken),
+                    .FirstOrDefaultAsync(c => c.Id == entityId, cancellationToken),
                 _ => null
             };
             if (owner == null)
@@ -136,9 +140,9 @@ public class AddressService : IAddressService
     {
         // Uniform 404: cross-tenant contractors are not distinguishable
         // from unknown ids (same convention as the rest of this service).
-        var contractorExists = await _context.Contractors
+        var contractorExists = await _context.Contractors.VisibleIn(tenantId, _identity?.UserId)
             .AsNoTracking()
-            .AnyAsync(c => c.Id == contractorId && c.TenantId == tenantId, cancellationToken);
+            .AnyAsync(c => c.Id == contractorId, cancellationToken);
 
         if (!contractorExists)
         {
@@ -167,11 +171,13 @@ public class AddressService : IAddressService
 
     private async Task<Address> FindInTenantAsync(int id, int tenantId, CancellationToken cancellationToken)
     {
+        var contractors = _context.Contractors.VisibleIn(tenantId, _identity?.UserId);
+        var contracts = _context.Contracts.VisibleIn(tenantId, _identity?.UserId);
         var address = await _context.Addresses
             .FirstOrDefaultAsync(a => a.Id == id && a.IsActive
-                && (a.EntityType == EntityType.Tenant && a.TenantId == tenantId
-                    || (a.EntityType == EntityType.Contractor && _context.Contractors.Any(c => c.Id == a.ContractorId && c.TenantId == tenantId))
-                    || (a.EntityType == EntityType.Contract && _context.Contracts.Any(c => c.Id == a.ContractId && c.TenantId == tenantId))),
+                && (tenantId > 0 && a.EntityType == EntityType.Tenant && a.TenantId == tenantId
+                    || (a.EntityType == EntityType.Contractor && contractors.Any(c => c.Id == a.ContractorId))
+                    || (a.EntityType == EntityType.Contract && contracts.Any(c => c.Id == a.ContractId))),
                 cancellationToken);
 
         if (address == null)

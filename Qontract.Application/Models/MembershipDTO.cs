@@ -13,7 +13,8 @@ public class MembershipDTO
 
 public class SwitchTenantDTO
 {
-    [Range(1, int.MaxValue)] public int TenantId { get; set; }
+    // Zero selects the account's personal workspace; positive IDs require membership.
+    [Range(0, int.MaxValue)] public int TenantId { get; set; }
 }
 
 public class RegisterDTO

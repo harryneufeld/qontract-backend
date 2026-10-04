@@ -53,6 +53,9 @@ public class Contract : BaseEntity
     [Required]
     public bool IsActive { get; set; }
 
+    public int? OwnerUserId { get; set; }
+    public User? Owner { get; set; }
+
     // Navigation properties
     public Tenant? Tenant { get; set; }
     public Contractor? Contractor { get; set; }
