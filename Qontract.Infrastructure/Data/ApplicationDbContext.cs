@@ -67,11 +67,12 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
                      .Where(e => e.State == EntityState.Added).ToList())
         {
             var user = entry.Entity;
+            if (!user.TenantId.HasValue) continue;
             if (!TenantMemberships.Local.Any(m => m.User == user && m.TenantId == user.TenantId))
                 TenantMemberships.Add(new TenantMembership
                 {
                     User = user,
-                    TenantId = user.TenantId,
+                    TenantId = user.TenantId.Value,
                     Role = user.Role,
                     IsActive = user.IsActive,
                     CreatedBy = user.CreatedBy,
@@ -139,7 +140,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
             entity.HasIndex(e => e.NormalizedEmail).IsUnique();
             entity.Property(e => e.PasswordHash).IsRequired().HasMaxLength(255);
             entity.Property(e => e.Role).IsRequired();
-            entity.Property(e => e.TenantId).IsRequired();
+            entity.Property(e => e.TenantId).IsRequired(false);
             entity.Property(e => e.CreatedBy).HasMaxLength(500);
             entity.Property(e => e.ModifiedBy).HasMaxLength(500);
             entity.HasOne(e => e.Tenant)
@@ -198,6 +199,8 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
         // Contractor
         modelBuilder.Entity<Contractor>(entity =>
         {
+            entity.HasOne(e => e.Owner).WithMany().HasForeignKey(e => e.OwnerUserId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(e => new { e.OwnerUserId, e.TenantId });
             entity.ToTable("Contractors");
             entity.HasKey(e => e.Id);
             // Client-side key generation (issue #26): portable across SQLite,
@@ -224,6 +227,8 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
         // Contract
         modelBuilder.Entity<Contract>(entity =>
         {
+            entity.HasOne(e => e.Owner).WithMany().HasForeignKey(e => e.OwnerUserId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(e => new { e.OwnerUserId, e.TenantId });
             entity.ToTable("Contracts");
             entity.HasKey(e => e.Id);
             // Client-side key generation (issue #26): portable across SQLite,

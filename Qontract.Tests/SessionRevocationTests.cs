@@ -214,7 +214,7 @@ public class SessionRevocationTests : IClassFixture<QontractWebApplicationFactor
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-            var tenantId = (await db.Users.SingleAsync(u => u.Id == _userId)).TenantId;
+            var tenantId = (await db.Users.SingleAsync(u => u.Id == _userId)).TenantId!.Value;
             var users = scope.ServiceProvider.GetRequiredService<IUserService>();
             await users.UpdateUserAsync(_userId, tenantId, new UserUpdateDTO { Password = "replacement123" }, "admin");
         }

@@ -120,7 +120,7 @@ public class DocumentLibraryTests(QontractWebApplicationFactory factory) : IClas
         var tenant = await db.Users.Where(u => u.Email == "admin2@qontract.com").Select(u => u.TenantId).SingleAsync();
         if (!await db.TenantMemberships.AnyAsync(m => m.UserId == auth.UserId && m.TenantId == tenant))
         {
-            db.TenantMemberships.Add(new TenantMembership { UserId = auth.UserId, TenantId = tenant, IsActive = true, Role = UserRole.User }); await db.SaveChangesAsync();
+            db.TenantMemberships.Add(new TenantMembership { UserId = auth.UserId, TenantId = tenant!.Value, IsActive = true, Role = UserRole.User }); await db.SaveChangesAsync();
         }
         var switchResponse = await client.PostAsJsonAsync("/api/auth/switch-tenant", new { tenantId = tenant });
         switchResponse.StatusCode.Should().Be(HttpStatusCode.OK);

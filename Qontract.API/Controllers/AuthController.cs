@@ -50,7 +50,7 @@ public class AuthController : ControllerBase
     /// Returns the currently authenticated user (identity from the JWT Subject claim).
     /// </summary>
     [HttpGet("me")]
-    [Authorize]
+    [Authorize(Policy = "Account")]
     public async Task<ActionResult<Qontract.Application.Models.AuthUserDTO>> Me()
     {
         var subject = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
@@ -70,7 +70,7 @@ public class AuthController : ControllerBase
     /// Revoke this session, including tokens issued during tenant switches.
     /// </summary>
     [HttpPost("logout")]
-    [Authorize]
+    [Authorize(Policy = "Account")]
     public async Task<IActionResult> Logout(CancellationToken cancellationToken)
     {
         await _authService.LogoutAsync(CurrentUserId, CurrentSessionId, cancellationToken);
@@ -92,17 +92,17 @@ public class AuthController : ControllerBase
     }
 
     [HttpGet("memberships")]
-    [Authorize]
+    [Authorize(Policy = "Account")]
     public async Task<ActionResult<List<MembershipDTO>>> Memberships() =>
         Ok(await _memberships.ListAsync(CurrentUserId));
 
     [HttpPost("switch-tenant")]
-    [Authorize]
+    [Authorize(Policy = "Account")]
     public async Task<ActionResult<AuthDTO>> SwitchTenant(SwitchTenantDTO dto) =>
         Ok(await _authService.SwitchTenantAsync(CurrentUserId, dto.TenantId, sessionId: CurrentSessionId));
 
     [HttpPost("invitations/redeem")]
-    [Authorize]
+    [Authorize(Policy = "Account")]
     [EnableRateLimiting("auth")]
     public async Task<ActionResult<AuthDTO>> Redeem(InvitationRedeemDTO dto)
     {
@@ -117,7 +117,7 @@ public class AuthController : ControllerBase
     /// anything about the stored hash.
     /// </summary>
     [HttpPost("change-password")]
-    [Authorize]
+    [Authorize(Policy = "Account")]
     [EnableRateLimiting("auth")]
     public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDTO dto)
     {

@@ -184,6 +184,9 @@ namespace Qontract.Infrastructure.Migrations
                     b.Property<string>("Notes")
                         .HasColumnType("TEXT");
 
+                    b.Property<int?>("OwnerUserId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("StartDate")
                         .HasMaxLength(50)
                         .HasColumnType("TEXT");
@@ -216,6 +219,8 @@ namespace Qontract.Infrastructure.Migrations
                     b.HasIndex("ModifierId");
 
                     b.HasIndex("TenantId");
+
+                    b.HasIndex("OwnerUserId", "TenantId");
 
                     b.ToTable("Contracts", (string)null);
                 });
@@ -311,11 +316,14 @@ namespace Qontract.Infrastructure.Migrations
                     b.Property<string>("Notes")
                         .HasColumnType("TEXT");
 
+                    b.Property<int?>("OwnerUserId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("Phone")
                         .HasMaxLength(50)
                         .HasColumnType("TEXT");
 
-                    b.Property<int>("TenantId")
+                    b.Property<int?>("TenantId")
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("Type")
@@ -334,6 +342,8 @@ namespace Qontract.Infrastructure.Migrations
                     b.HasIndex("TenantId");
 
                     b.HasIndex("UserId");
+
+                    b.HasIndex("OwnerUserId", "TenantId");
 
                     b.ToTable("Contractors", (string)null);
                 });
@@ -761,7 +771,7 @@ namespace Qontract.Infrastructure.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("INTEGER");
 
-                    b.Property<int>("TenantId")
+                    b.Property<int?>("TenantId")
                         .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
@@ -835,6 +845,11 @@ namespace Qontract.Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("ModifierId");
 
+                    b.HasOne("Qontract.Domain.Models.User", "Owner")
+                        .WithMany()
+                        .HasForeignKey("OwnerUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Qontract.Domain.Models.Tenant", "Tenant")
                         .WithMany()
                         .HasForeignKey("TenantId");
@@ -844,6 +859,8 @@ namespace Qontract.Infrastructure.Migrations
                     b.Navigation("Creator");
 
                     b.Navigation("Modifier");
+
+                    b.Navigation("Owner");
 
                     b.Navigation("Tenant");
                 });
@@ -861,15 +878,20 @@ namespace Qontract.Infrastructure.Migrations
 
             modelBuilder.Entity("Qontract.Domain.Models.Contractor", b =>
                 {
+                    b.HasOne("Qontract.Domain.Models.User", "Owner")
+                        .WithMany()
+                        .HasForeignKey("OwnerUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Qontract.Domain.Models.Tenant", "Tenant")
                         .WithMany()
-                        .HasForeignKey("TenantId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .HasForeignKey("TenantId");
 
                     b.HasOne("Qontract.Domain.Models.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId");
+
+                    b.Navigation("Owner");
 
                     b.Navigation("Tenant");
 
@@ -1002,9 +1024,7 @@ namespace Qontract.Infrastructure.Migrations
                 {
                     b.HasOne("Qontract.Domain.Models.Tenant", "Tenant")
                         .WithMany()
-                        .HasForeignKey("TenantId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .HasForeignKey("TenantId");
 
                     b.Navigation("Tenant");
                 });

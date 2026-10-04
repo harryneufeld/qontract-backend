@@ -4,6 +4,8 @@ namespace Qontract.Application.Models;
 
 public class ContractDTO
 {
+    public int? TenantId { get; set; }
+    public int? OwnerUserId { get; set; }
     public List<ContractPriceDTO> PriceHistory { get; set; } = new();
     public int Id { get; set; }
     public string Title { get; set; } = string.Empty;

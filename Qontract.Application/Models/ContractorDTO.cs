@@ -4,6 +4,7 @@ namespace Qontract.Application.Models;
 
 public class ContractorDTO
 {
+    public int? OwnerUserId { get; set; }
     public int Id { get; set; }
     public string Name { get; set; } = string.Empty;
     public ContractorType Type { get; set; }
@@ -12,7 +13,7 @@ public class ContractorDTO
     public string? Website { get; set; }
     public string? Description { get; set; }
     public string? Notes { get; set; }
-    public int TenantId { get; set; }
+    public int? TenantId { get; set; }
     public int? UserId { get; set; }
     public bool IsActive { get; set; }
     /// <summary>

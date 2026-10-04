@@ -6,21 +6,23 @@ namespace Qontract.Application.Services;
 public class ContractorService : IContractorService
 {
     private readonly IApplicationDbContext _context;
+    private readonly Qontract.Application.Interfaces.IDocumentIdentity? _identity;
 
-    public ContractorService(IApplicationDbContext context)
+    public ContractorService(IApplicationDbContext context, Qontract.Application.Interfaces.IDocumentIdentity? identity = null)
     {
         _context = context;
+        _identity = identity;
     }
 
     public async Task<List<ContractorDTO>> GetContractorsAsync(int tenantId, CancellationToken cancellationToken = default)
     {
         var counts = await GetContractCountsAsync(tenantId, cancellationToken);
 
-        var contractors = await _context.Contractors
-            .Where(c => c.TenantId == tenantId)
+        var contractors = await _context.Contractors.VisibleIn(tenantId, _identity?.UserId)
             .Select(c => new ContractorDTO
             {
                 Id = c.Id,
+                OwnerUserId = c.OwnerUserId,
                 Name = c.Name,
                 Type = c.Type,
                 Email = c.Email,
@@ -52,8 +54,8 @@ public class ContractorService : IContractorService
     /// (contractor id -> count).
     private async Task<Dictionary<int, int>> GetContractCountsAsync(int tenantId, CancellationToken cancellationToken)
     {
-        var counts = await _context.Contracts
-            .Where(c => c.IsActive && c.TenantId == tenantId && c.ContractorId != null)
+        var counts = await _context.Contracts.VisibleIn(tenantId, _identity?.UserId)
+            .Where(c => c.IsActive && c.ContractorId != null)
             .GroupBy(c => c.ContractorId!.Value)
             .Select(g => new { ContractorId = g.Key, Count = g.Count() })
             .ToListAsync(cancellationToken);
@@ -63,8 +65,8 @@ public class ContractorService : IContractorService
 
     public async Task<ContractorDTO> GetContractorByIdAsync(int id, int tenantId, CancellationToken cancellationToken = default)
     {
-        var contractor = await _context.Contractors
-            .FirstOrDefaultAsync(c => c.Id == id && c.TenantId == tenantId, cancellationToken);
+        var contractor = await _context.Contractors.VisibleIn(tenantId, _identity?.UserId)
+            .FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
 
         if (contractor == null)
             throw new KeyNotFoundException($"Contractor with ID {id} not found in tenant {tenantId}.");
@@ -74,6 +76,7 @@ public class ContractorService : IContractorService
         return new ContractorDTO
         {
             Id = contractor.Id,
+            OwnerUserId = contractor.OwnerUserId,
             Name = contractor.Name,
             Type = contractor.Type,
             Email = contractor.Email,
@@ -94,6 +97,7 @@ public class ContractorService : IContractorService
 
     public async Task<ContractorDTO> CreateContractorAsync(ContractorCreateDTO dto, string? createdBy, CancellationToken cancellationToken = default)
     {
+        var tenantId = dto.TenantId;
         var contractor = new Contractor
         {
             Name = dto.Name,
@@ -103,7 +107,8 @@ public class ContractorService : IContractorService
             Website = dto.Website,
             Description = dto.Description,
             Notes = dto.Notes,
-            TenantId = dto.TenantId,
+            TenantId = tenantId == 0 ? null : tenantId,
+            OwnerUserId = RecordAccess.Owner(tenantId, _identity?.UserId),
             UserId = dto.UserId,
             IsActive = true,
             CreatedBy = createdBy,
@@ -120,8 +125,8 @@ public class ContractorService : IContractorService
 
     public async Task<ContractorDTO> UpdateContractorAsync(int id, int tenantId, ContractorUpdateDTO dto, string? modifiedBy, CancellationToken cancellationToken = default)
     {
-        var contractor = await _context.Contractors
-            .FirstOrDefaultAsync(c => c.Id == id && c.TenantId == tenantId, cancellationToken);
+        var contractor = await _context.Contractors.VisibleIn(tenantId, _identity?.UserId)
+            .FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
 
         if (contractor == null)
             throw new KeyNotFoundException($"Contractor with ID {id} not found in tenant {tenantId}.");
@@ -155,8 +160,8 @@ public class ContractorService : IContractorService
 
     public async Task<ContractorDTO> DeactivateContractorAsync(int id, int tenantId, string? modifiedBy, CancellationToken cancellationToken = default)
     {
-        var contractor = await _context.Contractors
-            .FirstOrDefaultAsync(c => c.Id == id && c.TenantId == tenantId, cancellationToken);
+        var contractor = await _context.Contractors.VisibleIn(tenantId, _identity?.UserId)
+            .FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
 
         if (contractor == null)
             throw new KeyNotFoundException($"Contractor with ID {id} not found in tenant {tenantId}.");
@@ -172,8 +177,8 @@ public class ContractorService : IContractorService
 
     public async Task<ContractorDTO> ActivateContractorAsync(int id, int tenantId, string? modifiedBy, CancellationToken cancellationToken = default)
     {
-        var contractor = await _context.Contractors
-            .FirstOrDefaultAsync(c => c.Id == id && c.TenantId == tenantId, cancellationToken);
+        var contractor = await _context.Contractors.VisibleIn(tenantId, _identity?.UserId)
+            .FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
 
         if (contractor == null)
             throw new KeyNotFoundException($"Contractor with ID {id} not found in tenant {tenantId}.");

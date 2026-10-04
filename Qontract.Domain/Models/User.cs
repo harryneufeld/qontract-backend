@@ -35,8 +35,7 @@ public class User : BaseEntity
     [Required]
     public bool IsActive { get; set; }
 
-    [Required]
-    public int TenantId { get; set; }
+    public int? TenantId { get; set; }
 
     // Navigation properties
     public Tenant? Tenant { get; set; }
