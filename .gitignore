@@ -491,3 +491,6 @@ core.*
 
 # Uploaded document storage
 Storage/
+# Deployment configuration and secrets are local to the operator.
+deploy/*.env
+secrets/

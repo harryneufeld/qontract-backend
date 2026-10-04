@@ -7,3 +7,11 @@ Storage/
 Dockerfile
 docker-compose.yml
 *.md
+**/debugSettings.json
+**/*.env
+**/.env
+**/*.log
+**/*.sqlite*
+**/Storage/
+**/backups/
+**/secrets/
