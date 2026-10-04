@@ -13,6 +13,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<Tenant> Tenants { get; set; }
     public DbSet<User> Users { get; set; }
     public DbSet<AuthSession> AuthSessions { get; set; }
+    public DbSet<PasswordReset> PasswordResets { get; set; }
     public DbSet<TenantMembership> TenantMemberships { get; set; }
     public DbSet<TenantInvitation> TenantInvitations { get; set; }
 
@@ -144,6 +145,18 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
             entity.HasOne(e => e.Tenant)
                 .WithMany()
                 .HasForeignKey(e => e.TenantId);
+        });
+
+        modelBuilder.Entity<PasswordReset>(entity =>
+        {
+            entity.ToTable("PasswordResets");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Id).ValueGeneratedNever();
+            entity.Property(e => e.TokenHash).IsRequired().HasMaxLength(64);
+            entity.Property(e => e.NormalizedEmail).IsRequired().HasMaxLength(100);
+            entity.HasIndex(e => e.TokenHash).IsUnique();
+            entity.HasIndex(e => new { e.UserId, e.CreatedAt });
+            entity.HasOne(e => e.User).WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<AuthSession>(entity =>

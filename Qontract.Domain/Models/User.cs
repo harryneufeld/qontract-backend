@@ -26,6 +26,7 @@ public class User : BaseEntity
     // Incremented atomically with credential changes; invalidates every session.
     [ConcurrencyCheck]
     public int AuthVersion { get; set; }
+    public bool RequiresPasswordSetup { get; set; }
 
     [Required]
     [MaxLength(50)]
