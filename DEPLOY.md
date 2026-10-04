@@ -55,6 +55,56 @@ pin image digests in the approved release environment for reproducible deploymen
 
 ## HTTPS proxy, client identity and readiness
 
+### Optional existing Traefik integration
+
+For a separately managed Traefik Docker provider, use Docker Compose 2.24.4 or
+later and add `deploy/compose.traefik.yml` after the root file. No Traefik container
+or Docker socket mount is added. The override removes the API's published host
+port, keeps its private default network, and joins the existing external proxy
+network. An explicit network label ensures Traefik selects the correct network.
+
+Configure `TRAEFIK_NETWORK` (existing Docker network name), `TRAEFIK_ROUTER`
+(unique router/service name), `TRAEFIK_HOST` (public API hostname without a scheme
+or path) and `TRAEFIK_HTTPS_ENTRYPOINT` (existing TLS entrypoint). Match
+`API_ALLOWED_HOSTS` to that API hostname, `WEB_ORIGIN` to the public web origin,
+and the Flutter build's API URL to `https://API_HOST/api`. Examples contain only
+generic domains/placeholders; actual settings belong in the local env files.
+
+```bash
+docker compose --project-name qontract-staging-api --env-file deploy/staging.env --env-file /opt/qontract/staging/secrets/api.env -f docker-compose.yml -f deploy/compose.traefik.yml config --quiet
+docker compose --project-name qontract-staging-api --env-file deploy/staging.env --env-file /opt/qontract/staging/secrets/api.env -f docker-compose.yml -f deploy/compose.traefik.yml build --pull
+docker compose --project-name qontract-staging-api --env-file deploy/staging.env --env-file /opt/qontract/staging/secrets/api.env -f docker-compose.yml -f deploy/compose.traefik.yml up -d --wait
+```
+
+Use the same file list for all lifecycle commands. Production needs its own env
+file, secret path, project and router name. `API_PORT` is ignored in Traefik mode.
+Both app and API use internal port 8080; the backend's Docker readiness check
+continues to use its own loopback rather than a public Traefik route.
+
+TLS is enabled. Use existing entrypoint/certificate-store configuration, or set
+`TRAEFIK_CERT_RESOLVER` and append `-f deploy/compose.traefik-acme.yml` for a named
+resolver already installed in Traefik. These files do not configure ACME or
+HTTP-to-HTTPS redirects; those belong to the existing proxy deployment.
+
+Set `TRUSTED_PROXY_IP` to Traefik's address on `TRAEFIK_NETWORK`, not the bridge
+gateway or the API's address. Use a stable address managed in the proxy's own
+network configuration. If Traefik is recreated with a different address, update
+this setting and recreate the API. Do not broaden trust to every network peer.
+Keep Traefik's forwarding trust restricted; a proxy chain before Traefik requires
+its own reviewed forwarding configuration. In staging verify HTTPS scheme and
+per-client-IP throttling, including spoofed forwarded headers. The existing
+one-hop backend trust policy is unchanged by this optional Compose override.
+
+The host-only rule assumes a dedicated API hostname and preserves `/api` paths.
+For a shared hostname, adapt the route rule in your local override; do not strip
+the API prefix. Actual Docker network reachability, certificate issuance and
+forwarded-header behavior remain deployment checks on the target Linux host.
+
+References: [Traefik Docker labels](https://doc.traefik.io/traefik/reference/routing-configuration/other-providers/docker/)
+and [Compose merge/reset behavior](https://docs.docker.com/reference/compose-file/merge/).
+
+### Host-installed proxy alternative
+
 The existing host HTTPS proxy terminates TLS and forwards to `127.0.0.1:5000`
 (production: 5001). For nginx, inside the existing HTTPS virtual host:
 
