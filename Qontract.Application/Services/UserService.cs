@@ -64,6 +64,9 @@ public class UserService(IApplicationDbContext context, IAuthService authService
             var normalized = dto.Email.Trim().ToUpperInvariant();
             if (await context.Users.AnyAsync(u => u.Id != id && u.NormalizedEmail == normalized, cancellationToken))
                 throw new InvalidOperationException("This email is already in use.");
+            // An old-address reset link must stay invalid even if the email is
+            // changed back later. Revoke outstanding sessions/links by version.
+            if (user.NormalizedEmail != normalized) user.AuthVersion++;
             user.Email = dto.Email.Trim();
         }
         if (!string.IsNullOrEmpty(dto.Password))

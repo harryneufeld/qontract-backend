@@ -337,10 +337,11 @@ FamilyPlanner BCrypt hashes are not supported. Harry confirmed two legacy users
 and selected email password setup instead of importing their hashes on 2026-10-04.
 Preserve the migrated accounts and their relationships, require password setup
 before login, and deliver expiring one-use links through the existing SMTP service.
-This flow is not implemented yet; see [#54](https://github.com/harryneufeld/qontract-backend/issues/54).
-Session revocation in [#44](https://github.com/harryneufeld/qontract-backend/issues/44)
-must invalidate old tokens when passwords are reset. SMTP settings/secrets and
-trusted frontend reset URLs require deployment configuration.
+Email reset/setup is implemented and disabled by default; see [PASSWORD-RESET.md](PASSWORD-RESET.md)
+for SMTP configuration, trusted links, limits and the staging verification gate.
+It atomically revokes old sessions through the authentication version from
+[#44](https://github.com/harryneufeld/qontract-backend/issues/44). Existing SMTP
+delivery and production onboarding remain unverified in [#54](https://github.com/harryneufeld/qontract-backend/issues/54).
 
 `AddRevocableAuthSessions` adds the session table and account authentication
 version without changing existing password hashes, memberships or audit fields.
@@ -361,9 +362,9 @@ Client logout clears local credentials even if the network request fails; server
 revocation is only confirmed when the backend successfully processes logout.
 
 Refresh tokens, short access-token lifetimes, session listing/revoke-all controls
-and expired-session cleanup are not implemented in this change. Password reset
-must atomically update credentials and the same authentication version; TOTP
-challenges must also be bound to it when those features are implemented.
+and expired-session cleanup remain follow-ups. Password reset atomically updates
+credentials and the same authentication version; TOTP challenges must also be
+bound to it when that feature is implemented.
 
 Invitation codes contain 32 random bytes, are stored only as SHA256 hashes, and
 are redeemed atomically once. Optional email binding is case-insensitive. The

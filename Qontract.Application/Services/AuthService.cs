@@ -33,7 +33,7 @@ public class AuthService : IAuthService
                 .AsNoTracking()
                 .FirstOrDefaultAsync(u => u.NormalizedEmail == dto.Email.Trim().ToUpperInvariant() && u.IsActive, cancellationToken);
 
-            if (user == null)
+            if (user == null || user.RequiresPasswordSetup)
             {
                 _logger.LogWarning("Invalid login attempt for email: {Email}", dto.Email);
                 throw new InvalidOperationException("Invalid email or password");
@@ -67,7 +67,7 @@ public class AuthService : IAuthService
 
     private IQueryable<TenantMembership> ActiveMembership(int userId, int tenantId) =>
         _context.TenantMemberships.Include(m => m.User).Where(m => m.UserId == userId && m.TenantId == tenantId
-            && m.IsActive && m.User.IsActive && m.Tenant.IsActive);
+            && m.IsActive && m.User.IsActive && !m.User.RequiresPasswordSetup && m.Tenant.IsActive);
 
     public async Task<AuthDTO> SwitchTenantAsync(int userId, int tenantId, CancellationToken cancellationToken = default, Guid? sessionId = null)
     {

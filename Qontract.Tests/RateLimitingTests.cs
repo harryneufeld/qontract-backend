@@ -46,6 +46,18 @@ public class RateLimitingTests : IAsyncLifetime
     private Task<HttpResponseMessage> BadLoginAsync() =>
         _client.PostAsJsonAsync(LoginUrl, new { email = "brute@qontract.com", password = "wrongpass123" });
 
+    [Theory]
+    [InlineData("forgot-password")]
+    [InlineData("reset-password")]
+    public async Task PasswordResetEndpointsAreThrottled(string endpoint)
+    {
+        object payload = endpoint == "forgot-password" ? new { email = "user@example.test" }
+            : new { token = new string('A', 64), newPassword = "replacement123" };
+        for (var i = 0; i < 3; i++)
+            (await _client.PostAsJsonAsync("/api/auth/" + endpoint, payload)).StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+        (await _client.PostAsJsonAsync("/api/auth/" + endpoint, payload)).StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
+    }
+
     [Fact]
     public async Task Login_WithinBudget_ShouldNotBeThrottled()
     {

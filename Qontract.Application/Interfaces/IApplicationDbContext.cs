@@ -8,6 +8,7 @@ public interface IApplicationDbContext
     DbSet<Tenant> Tenants { get; }
     DbSet<User> Users { get; }
     DbSet<AuthSession> AuthSessions { get; }
+    DbSet<PasswordReset> PasswordResets { get; }
     DbSet<TenantMembership> TenantMemberships { get; }
     DbSet<TenantInvitation> TenantInvitations { get; }
     DbSet<Contractor> Contractors { get; }

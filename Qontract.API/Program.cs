@@ -115,6 +115,15 @@ builder.Services.AddScoped<IApplicationDbContext, ApplicationDbContext>();
 
 // Register services
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<PasswordResetService>();
+builder.Services.AddScoped<IResetEmailSender, Qontract.Infrastructure.Email.SmtpResetEmailSender>();
+builder.Services.AddSingleton<Qontract.API.Services.PasswordResetQueue>();
+builder.Services.AddHostedService<Qontract.API.Services.PasswordResetWorker>();
+if (PasswordResetService.Enabled(builder.Configuration))
+{
+    PasswordResetService.PublicBase(builder.Configuration);
+    Qontract.Infrastructure.Email.SmtpResetEmailSender.ValidateConfiguration(builder.Configuration);
+}
 builder.Services.AddScoped<ITenantService, TenantService>();
 builder.Services.AddScoped<MembershipService>();
 builder.Services.AddScoped<IUserService, UserService>();
@@ -231,7 +240,7 @@ builder.Services.AddAuthentication(options =>
             var db = validation.HttpContext.RequestServices.GetRequiredService<ApplicationDbContext>();
             var session = await db.AuthSessions.AsNoTracking().SingleOrDefaultAsync(s => s.Id == sessionId
                 && s.UserId == userId && s.RevokedAt == null && s.AuthVersion == authVersion
-                && s.User.AuthVersion == authVersion && s.User.IsActive,
+                && s.User.AuthVersion == authVersion && s.User.IsActive && !s.User.RequiresPasswordSetup,
                 validation.HttpContext.RequestAborted);
             if (session is null || session.ExpiresAt <= DateTime.UtcNow)
             {
