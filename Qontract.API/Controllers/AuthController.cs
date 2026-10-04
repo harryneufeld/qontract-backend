@@ -67,16 +67,18 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
-    /// Stateless logout — the client discards its token.
+    /// Revoke this session, including tokens issued during tenant switches.
     /// </summary>
     [HttpPost("logout")]
     [Authorize]
-    public IActionResult Logout()
+    public async Task<IActionResult> Logout(CancellationToken cancellationToken)
     {
+        await _authService.LogoutAsync(CurrentUserId, CurrentSessionId, cancellationToken);
         return Ok(new { message = "Logged out" });
     }
 
     private int CurrentUserId => int.Parse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value);
+    private Guid CurrentSessionId => Guid.Parse(User.FindFirst("sid")!.Value);
 
     [HttpGet("registration")]
     public IActionResult RegistrationPolicy() => Ok(new { allowPublic = _memberships.AllowPublicRegistration });
@@ -97,7 +99,7 @@ public class AuthController : ControllerBase
     [HttpPost("switch-tenant")]
     [Authorize]
     public async Task<ActionResult<AuthDTO>> SwitchTenant(SwitchTenantDTO dto) =>
-        Ok(await _authService.SwitchTenantAsync(CurrentUserId, dto.TenantId));
+        Ok(await _authService.SwitchTenantAsync(CurrentUserId, dto.TenantId, sessionId: CurrentSessionId));
 
     [HttpPost("invitations/redeem")]
     [Authorize]
@@ -105,7 +107,7 @@ public class AuthController : ControllerBase
     public async Task<ActionResult<AuthDTO>> Redeem(InvitationRedeemDTO dto)
     {
         var tenantId = await _memberships.RedeemAsync(CurrentUserId, dto.Code);
-        return Ok(await _authService.SwitchTenantAsync(CurrentUserId, tenantId));
+        return Ok(await _authService.SwitchTenantAsync(CurrentUserId, tenantId, sessionId: CurrentSessionId));
     }
 
     /// <summary>

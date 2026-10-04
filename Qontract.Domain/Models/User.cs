@@ -23,6 +23,10 @@ public class User : BaseEntity
     [MaxLength(255)]
     public string PasswordHash { get; set; } = string.Empty;
 
+    // Incremented atomically with credential changes; invalidates every session.
+    [ConcurrencyCheck]
+    public int AuthVersion { get; set; }
+
     [Required]
     [MaxLength(50)]
     public UserRole Role { get; set; }

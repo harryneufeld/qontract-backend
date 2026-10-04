@@ -66,7 +66,11 @@ public class UserService(IApplicationDbContext context, IAuthService authService
                 throw new InvalidOperationException("This email is already in use.");
             user.Email = dto.Email.Trim();
         }
-        if (!string.IsNullOrEmpty(dto.Password)) user.PasswordHash = await authService.HashPasswordAsync(dto.Password);
+        if (!string.IsNullOrEmpty(dto.Password))
+        {
+            user.PasswordHash = await authService.HashPasswordAsync(dto.Password);
+            user.AuthVersion++;
+        }
         membership.Role = nextRole;
         membership.IsActive = nextActive;
         membership.ModifiedBy = modifiedBy;

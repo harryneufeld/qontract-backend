@@ -30,6 +30,7 @@ public class AuthService : IAuthService
         try
         {
             var user = await _context.Users
+                .AsNoTracking()
                 .FirstOrDefaultAsync(u => u.NormalizedEmail == dto.Email.Trim().ToUpperInvariant() && u.IsActive, cancellationToken);
 
             if (user == null)
@@ -49,7 +50,7 @@ public class AuthService : IAuthService
                 .OrderByDescending(m => m.TenantId == user.TenantId).ThenBy(m => m.TenantId)
                 .FirstOrDefaultAsync(cancellationToken)
                 ?? throw new InvalidOperationException("No active tenant membership.");
-            return Session(user, membership);
+            return await SessionAsync(user, membership, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -68,18 +69,48 @@ public class AuthService : IAuthService
         _context.TenantMemberships.Include(m => m.User).Where(m => m.UserId == userId && m.TenantId == tenantId
             && m.IsActive && m.User.IsActive && m.Tenant.IsActive);
 
-    public async Task<AuthDTO> SwitchTenantAsync(int userId, int tenantId, CancellationToken cancellationToken = default)
+    public async Task<AuthDTO> SwitchTenantAsync(int userId, int tenantId, CancellationToken cancellationToken = default, Guid? sessionId = null)
     {
         var membership = await ActiveMembership(userId, tenantId).FirstOrDefaultAsync(cancellationToken)
             ?? throw new KeyNotFoundException("Tenant not found.");
-        return Session(membership.User, membership);
+        return await SessionAsync(membership.User, membership, cancellationToken, sessionId);
     }
 
-    private AuthDTO Session(User user, TenantMembership membership) => new()
+    private async Task<AuthDTO> SessionAsync(User user, TenantMembership membership,
+        CancellationToken cancellationToken, Guid? sessionId = null)
     {
-        AccessToken = GenerateJwtToken(user, membership), UserId = user.Id, Email = user.Email,
-        ExpiresAt = DateTime.UtcNow.AddHours(24), User = ToAuthUser(user, membership)
-    };
+        var now = DateTime.UtcNow;
+        AuthSession session;
+        if (sessionId.HasValue)
+        {
+            session = await _context.AuthSessions.AsNoTracking().SingleOrDefaultAsync(s => s.Id == sessionId
+                && s.UserId == user.Id && s.AuthVersion == user.AuthVersion && s.RevokedAt == null, cancellationToken)
+                ?? throw new InvalidOperationException("Session is no longer active.");
+            // SQLite restores DateTime without Kind; expiry remains UTC in both
+            // JWT and DTO, including after a tenant switch.
+            session.ExpiresAt = DateTime.SpecifyKind(session.ExpiresAt, DateTimeKind.Utc);
+            if (session.ExpiresAt <= now) throw new InvalidOperationException("Session expired.");
+        }
+        else
+        {
+            session = new AuthSession { UserId = user.Id, AuthVersion = user.AuthVersion,
+                CreatedAt = now, ExpiresAt = now.AddHours(24) };
+            _context.AuthSessions.Add(session);
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+        return new AuthDTO
+        {
+            AccessToken = GenerateJwtToken(user, membership, session), UserId = user.Id, Email = user.Email,
+            ExpiresAt = session.ExpiresAt, User = ToAuthUser(user, membership)
+        };
+    }
+
+    public async Task LogoutAsync(int userId, Guid sessionId, CancellationToken cancellationToken = default)
+    {
+        var now = DateTime.UtcNow;
+        await _context.AuthSessions.Where(s => s.Id == sessionId && s.UserId == userId && s.RevokedAt == null)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(s => s.RevokedAt, now), cancellationToken);
+    }
 
     /// <summary>
     /// Self-service password change (app#11). Verifies the current password
@@ -90,6 +121,7 @@ public class AuthService : IAuthService
     public async Task<bool> ChangePasswordAsync(int userId, string currentPassword, string newPassword, CancellationToken cancellationToken = default)
     {
         var user = await _context.Users
+            .AsNoTracking()
             .FirstOrDefaultAsync(u => u.Id == userId && u.IsActive, cancellationToken);
 
         if (user == null)
@@ -104,9 +136,16 @@ public class AuthService : IAuthService
             return false;
         }
 
-        user.PasswordHash = await HashPasswordAsync(newPassword);
-        user.ModifiedAt = DateTime.UtcNow;
-        await _context.SaveChangesAsync(cancellationToken);
+        var replacement = await HashPasswordAsync(newPassword);
+        var now = DateTime.UtcNow;
+        // Credential replacement and global revocation are one atomic write.
+        // A concurrent change/deactivation must not be overwritten.
+        var updated = await _context.Users.Where(u => u.Id == userId && u.IsActive
+                && u.PasswordHash == user.PasswordHash && u.AuthVersion == user.AuthVersion)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(u => u.PasswordHash, replacement)
+                .SetProperty(u => u.AuthVersion, u => u.AuthVersion + 1)
+                .SetProperty(u => u.ModifiedAt, now), cancellationToken);
+        if (updated != 1) return false;
 
         _logger.LogInformation("Password changed for user {UserId}", userId);
         return true;
@@ -164,7 +203,7 @@ public class AuthService : IAuthService
         }
     }
 
-    private string GenerateJwtToken(User user, TenantMembership membership)
+    private string GenerateJwtToken(User user, TenantMembership membership, AuthSession session)
     {
         // (issue #36) The development fallback key is the single shared
         // constant Qontract.Core.Security.JwtKeys.DevelopmentFallback, also
@@ -186,6 +225,8 @@ public class AuthService : IAuthService
             new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
             new Claim(JwtRegisteredClaimNames.Email, user.Email!),
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+            new Claim("sid", session.Id.ToString()),
+            new Claim("auth_version", session.AuthVersion.ToString(System.Globalization.CultureInfo.InvariantCulture)),
             new Claim(ClaimTypes.Role, membership.Role.ToString()),
             new Claim("TenantId", membership.TenantId.ToString())
         };
@@ -194,7 +235,7 @@ public class AuthService : IAuthService
             issuer: _configuration["Jwt:Issuer"] ?? "Qontract",
             audience: _configuration["Jwt:Audience"] ?? "QontractClients",
             claims: claims,
-            expires: DateTime.UtcNow.AddHours(24),
+            expires: session.ExpiresAt,
             signingCredentials: credentials
         );
 
