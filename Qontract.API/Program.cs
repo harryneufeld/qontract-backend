@@ -221,12 +221,23 @@ builder.Services.AddAuthentication(options =>
         {
             var identity = validation.Principal?.Identity as System.Security.Claims.ClaimsIdentity;
             if (!int.TryParse(validation.Principal?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value, out var userId)
-                || !int.TryParse(validation.Principal?.FindFirst("TenantId")?.Value, out var tenantId))
+                || !int.TryParse(validation.Principal?.FindFirst("TenantId")?.Value, out var tenantId)
+                || !Guid.TryParse(validation.Principal?.FindFirst("sid")?.Value, out var sessionId)
+                || !int.TryParse(validation.Principal?.FindFirst("auth_version")?.Value, out var authVersion))
             {
                 validation.Fail("Invalid tenant identity.");
                 return;
             }
             var db = validation.HttpContext.RequestServices.GetRequiredService<ApplicationDbContext>();
+            var session = await db.AuthSessions.AsNoTracking().SingleOrDefaultAsync(s => s.Id == sessionId
+                && s.UserId == userId && s.RevokedAt == null && s.AuthVersion == authVersion
+                && s.User.AuthVersion == authVersion && s.User.IsActive,
+                validation.HttpContext.RequestAborted);
+            if (session is null || session.ExpiresAt <= DateTime.UtcNow)
+            {
+                validation.Fail("Session is no longer active.");
+                return;
+            }
             var membership = await db.TenantMemberships.AsNoTracking().SingleOrDefaultAsync(m => m.UserId == userId
                 && m.TenantId == tenantId && m.IsActive && m.User.IsActive && m.Tenant.IsActive,
                 validation.HttpContext.RequestAborted);

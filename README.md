@@ -33,8 +33,12 @@ This backend is not yet a complete replacement for it.
 - Tenant administrators can list/read/update/deactivate only tenants where they
   have an active admin membership, with an active account. Foreign and unknown
   IDs return the same 404; the JWT role alone does not grant tenant access.
-- Authentication currently issues 24-hour JWTs. Logout is stateless; revocable
-  sessions and refresh tokens are tracked in [#44](https://github.com/harryneufeld/qontract-backend/issues/44).
+- Authentication issues 24-hour JWTs linked to persisted, revocable sessions.
+  Logout revokes the current session, including tokens issued during tenant
+  switches; independent logins stay active. A successful password change atomically
+  increments the account authentication version, invalidating all earlier sessions.
+  The app then requires a fresh login. Refresh tokens and session-management UI
+  remain follow-ups in [#44](https://github.com/harryneufeld/qontract-backend/issues/44).
   Every authenticated request checks current account, tenant, membership activity,
   and role. Removing a membership immediately rejects its tokens; demotion updates
   their effective role. Membership removal preserves the account and other memberships,
@@ -163,7 +167,7 @@ dotnet run --project Qontract.API
 ### Authentication
 - `POST /api/Auth/login` - Login and get JWT token
 - `GET /api/Auth/me` - Validate current user/session
-- `POST /api/Auth/logout` - Stateless logout acknowledgement
+- `POST /api/Auth/logout` - Revoke the authenticated session
 - `POST /api/Auth/change-password` - Change current user's password
 - `GET /api/Auth/registration` - Public signup policy
 - `POST /api/Auth/register` - Public or invitation-based signup
@@ -337,6 +341,29 @@ This flow is not implemented yet; see [#54](https://github.com/harryneufeld/qont
 Session revocation in [#44](https://github.com/harryneufeld/qontract-backend/issues/44)
 must invalidate old tokens when passwords are reset. SMTP settings/secrets and
 trusted frontend reset URLs require deployment configuration.
+
+`AddRevocableAuthSessions` adds the session table and account authentication
+version without changing existing password hashes, memberships or audit fields.
+Every authenticated request verifies the persisted session ID, owner, account
+version, expiry and revocation, in addition to account/tenant/membership activity.
+Tokens without the new session/version claims are rejected: existing users must
+sign in again after deployment. Tenant switching and invitation redemption reuse
+the current session and its original expiry rather than extend it or create an
+unrevocable replacement. Independent logins create independent sessions.
+
+Apply the migration before starting the new backend and deploy all API instances
+together; an older stateless instance would bypass revocation. Deploy the app
+password-change signout update alongside it. If rolling back to the stateless
+backend, rotate the JWT signing key across all instances so revoked tokens cannot
+become usable again. Test rollout/restore against a copy first. Revocation rejects
+subsequent authentication checks; it does not cancel requests already authorised.
+Client logout clears local credentials even if the network request fails; server
+revocation is only confirmed when the backend successfully processes logout.
+
+Refresh tokens, short access-token lifetimes, session listing/revoke-all controls
+and expired-session cleanup are not implemented in this change. Password reset
+must atomically update credentials and the same authentication version; TOTP
+challenges must also be bound to it when those features are implemented.
 
 Invitation codes contain 32 random bytes, are stored only as SHA256 hashes, and
 are redeemed atomically once. Optional email binding is case-insensitive. The
