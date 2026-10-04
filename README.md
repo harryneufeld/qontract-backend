@@ -335,6 +335,8 @@ MIT
 For Linux Docker staging, provider/secret configuration, trusted HTTPS proxies,
 persistent documents, account bootstrap and coordinated restore, see
 [DEPLOY.md](DEPLOY.md). Demo accounts are now seeded only in Development.
+Optional Compose overrides support an existing Traefik network with generic
+HTTPS/router settings, keeping host ports unpublished and proxy trust explicit.
 
 New and changed passwords use versioned PBKDF2-SHA512 hashes with random salts
 and 210,000 iterations. Existing refactor SHA256 hashes remain accepted for login;

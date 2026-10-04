@@ -1,0 +1,5 @@
+# Optional: only when using a named certificate resolver already defined in Traefik.
+services:
+  qontract-api:
+    labels:
+      - "traefik.http.routers.${TRAEFIK_ROUTER:?Set a unique API router name}.tls.certresolver=${TRAEFIK_CERT_RESOLVER:?Set an existing certificate resolver}"
