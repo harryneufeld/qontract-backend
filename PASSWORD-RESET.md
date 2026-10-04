@@ -95,3 +95,9 @@ behaviour, and no secrets in proxy/application/crash logs. SQLite runtime tests 
 PostgreSQL/SQL Server migration-script checks are available; runtime rehearsal on
 the selected target provider is still required. Define retention/cleanup for expired
 reset records with the operator. No production deployment or real email has occurred.
+
+Restoring an older database can otherwise revive consumed links or revoked
+sessions. Before accepting traffic after restore, invalidate all restored reset
+records and sessions and advance account authentication versions under the
+reviewed recovery runbook; coordinate JWT signing-key rotation where required.
+Rehearse this on a copy, including the protection of any future enrolled factors.
