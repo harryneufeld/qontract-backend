@@ -133,7 +133,8 @@ dotnet restore
    > startup unless the key is provided via the `Jwt__Key` environment
    > variable (or user secrets), e.g.
    > `Jwt__Key="$(openssl rand -base64 48)" dotnet run --project Qontract.API`.
-   > `docker compose` expects the host variable `JWT_KEY` for the same reason.
+   > Docker Compose reads `Jwt__Key` from the protected deployment env file;
+   > see [DEPLOY.md](DEPLOY.md).
 
    > **File storage (issue #25):** document files are stored behind
    > `IFileStorage`, selected by `Storage:Provider` in `appsettings.json`:
@@ -155,7 +156,7 @@ dotnet run --project Qontract.API
    - HTTPS: `https://localhost:65532`
    - Swagger UI: `https://localhost:65532/swagger` (or `http://localhost:65533/swagger`)
 
-5. A seed tenant (`Test Family`) and admin user are created on first run:
+5. In Development only, demo tenants and admin users are created on first run:
    - Email: `admin@qontract.com`
    - Password: `password123`
 
@@ -279,9 +280,9 @@ Lists return arrays; request subsequent pages until a short page is returned.
 
 ### Running with Docker
 
-```bash
-docker-compose up --build
-```
+Follow [DEPLOY.md](DEPLOY.md) to choose a provider, supply protected secrets,
+configure persistent storage and start the API behind the HTTPS proxy. The Compose
+file uses Production and does not create demo accounts.
 
 ### Testing
 
@@ -330,6 +331,10 @@ Notes:
 MIT
 
 ## Security Considerations
+
+For Linux Docker staging, provider/secret configuration, trusted HTTPS proxies,
+persistent documents, account bootstrap and coordinated restore, see
+[DEPLOY.md](DEPLOY.md). Demo accounts are now seeded only in Development.
 
 New and changed passwords use versioned PBKDF2-SHA512 hashes with random salts
 and 210,000 iterations. Existing refactor SHA256 hashes remain accepted for login;

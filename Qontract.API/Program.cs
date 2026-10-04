@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.HttpOverrides;
+using System.Net;
 using System.Threading.RateLimiting;
 using FluentValidation;
 using Qontract.Infrastructure.Data;
@@ -103,6 +105,22 @@ builder.Services.AddValidatorsFromAssembly(typeof(Qontract.Application.Services.
 // (issue #26) The provider is selected by "Database:Provider" (default
 // "sqlite"); the shared migration chain runs on all three providers.
 var isDevelopment = builder.Environment.EnvironmentName == "Development";
+// Trust only the explicitly configured immediate reverse proxy.
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    var proxies = builder.Configuration.GetSection("ReverseProxy:KnownProxies").Get<string[]>() ?? [];
+    if (proxies.Length == 0) return;
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.ForwardLimit = 1;
+    options.KnownProxies.Clear();
+    options.KnownIPNetworks.Clear();
+    foreach (var proxy in proxies)
+    {
+        if (!IPAddress.TryParse(proxy, out var address))
+            throw new InvalidOperationException("ReverseProxy:KnownProxies must contain IP addresses.");
+        options.KnownProxies.Add(address);
+    }
+});
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {
     options.Configure(databaseProvider, connectionString);
@@ -387,6 +405,7 @@ if (usedJwtFallbackKey)
 // consistent JSON error envelope so no stack trace ever reaches clients
 // (issue #11). Registered first so it wraps the whole pipeline.
 app.UseMiddleware<Qontract.API.Middleware.ExceptionHandlingMiddleware>();
+app.UseForwardedHeaders();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.EnvironmentName == "Development")
@@ -405,6 +424,17 @@ app.UseAuthorization();
 // circuit here with a 429 + Retry-After, before the controller runs.
 app.UseRateLimiter();
 app.MapControllers();
+app.MapGet("/health/ready", async (ApplicationDbContext database, CancellationToken cancellationToken) =>
+{
+    try
+    {
+        return Results.StatusCode(await database.Database.CanConnectAsync(cancellationToken) ? 200 : 503);
+    }
+    catch
+    {
+        return Results.StatusCode(503);
+    }
+}).AllowAnonymous().DisableRateLimiting();
 
 // Apply migrations and seed data
 using (var scope = app.Services.CreateScope())
@@ -415,8 +445,11 @@ using (var scope = app.Services.CreateScope())
     // Apply migrations if needed
     context.Database.Migrate();
     
-    var userManager = services.GetRequiredService<IUserService>();
-    await SeedDataAsync(context, userManager);
+    if (isDevelopment)
+    {
+        var userManager = services.GetRequiredService<IUserService>();
+        await SeedDataAsync(context, userManager);
+    }
 }
 
 app.Run();

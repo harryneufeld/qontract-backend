@@ -84,6 +84,26 @@ public class SecurityConfigTests : IClassFixture<QontractWebApplicationFactory>
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
+    [Theory]
+    [InlineData("Production")]
+    [InlineData("Staging")]
+    public async Task NonDevelopmentStartup_DoesNotCreateDemoAccounts(string environment)
+    {
+        using var factory = new PlainHostFactory(environment,
+            "production-test-key-0123456789-0123456789");
+        using var restricted = factory.WithWebHostBuilder(builder =>
+            builder.UseSetting("AllowedHosts", "api.example.test;127.0.0.1"));
+        using var client = restricted.CreateClient(new() { BaseAddress = new Uri("http://127.0.0.1") });
+        using var scope = restricted.Services.CreateScope();
+        var database = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        (await database.Users.CountAsync()).Should().Be(0);
+        (await database.Tenants.CountAsync()).Should().Be(0);
+        (await client.GetAsync("/health/ready")).StatusCode.Should().Be(HttpStatusCode.OK);
+        var login = await client.PostAsJsonAsync("/api/auth/login",
+            new { email = "admin@qontract.com", password = "password123" });
+        login.IsSuccessStatusCode.Should().BeFalse();
+    }
+
     [Fact]
     public void SensitiveDataLogging_EnabledOnlyInDevelopment()
     {

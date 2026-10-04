@@ -1,23 +1,38 @@
-version: '3.8'
-
 services:
   qontract-api:
+    image: qontract-api:${QONTRACT_RELEASE:?Set a release tag}
     build: .
+    restart: unless-stopped
     ports:
-      - "5000:8080"
+      - "127.0.0.1:${API_PORT:-5000}:8080"
+    env_file:
+      - ${QONTRACT_SECRETS_FILE:?Set the absolute path to the protected API secrets file}
     environment:
-      - ConnectionStrings__DefaultConnection=Server=mssql;Database=QontractDb;User Id=sa;Password=YourStrong@Passw0rd
-      # JWT signing key (issue #36): no key is committed in appsettings.json,
-      # so the container (non-Development environment) fails fast at startup
-      # unless JWT_KEY is provided in the host environment / .env file.
-      - Jwt__Key=${JWT_KEY:?Set JWT_KEY (min. 32 characters) in the environment or a .env file}
-    depends_on:
-      - mssql
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      Database__Provider: ${DATABASE_PROVIDER:?Choose sqlite, postgresql or sqlserver}
+      ConnectionStrings__DefaultConnection: ${ConnectionStrings__DefaultConnection:?Set the provider-matching connection string in the protected env file}
+      Jwt__Key: ${Jwt__Key:?Set the signing key in the protected env file}
+      Storage__Provider: local
+      Storage__Path: /app/Storage
+      Cors__Origins__0: ${WEB_ORIGIN:?Set the public web origin without a path}
+      Cors__Origins__1: ${WEB_ORIGIN:?Set the public web origin without a path}
+      AllowedHosts: "${API_ALLOWED_HOSTS:?Set the public API hostname};127.0.0.1"
+      Registration__AllowPublic: ${ALLOW_PUBLIC_REGISTRATION:-false}
+      PasswordReset__Enabled: ${PASSWORD_RESET_ENABLED:-false}
+      PasswordReset__PublicAppUrl: ${PUBLIC_APP_URL:-}
+      ReverseProxy__KnownProxies__0: ${TRUSTED_PROXY_IP:?Set the immediate proxy IP seen by the API}
+    volumes:
+      - database:/app/data
+      - documents:/app/Storage
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
-  mssql:
-    image: mcr.microsoft.com/mssql/server:2022-latest
-    environment:
-      - SA_PASSWORD=YourStrong@Passw0rd
-      - ACCEPT_EULA=Y
-    ports:
-      - "1433:1433"
+volumes:
+  database:
+  documents:
