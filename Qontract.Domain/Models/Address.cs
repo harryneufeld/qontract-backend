@@ -13,17 +13,10 @@ public class Address : BaseEntity
     [StringLength(50)]
     public EntityType EntityType { get; set; }
 
-    [Required]
-    [MaxLength(500)]
     public string? Street { get; set; }
-
-    [MaxLength(100)]
+    public string? HouseNumber { get; set; }
     public string? City { get; set; }
-
-    [MaxLength(20)]
     public string? Zip { get; set; }
-
-    [MaxLength(100)]
     public string? Country { get; set; }
 
     /// <summary>
@@ -37,10 +30,12 @@ public class Address : BaseEntity
     public int? TenantId { get; set; }
     public int? ContractorId { get; set; }
     public int? ContractId { get; set; }
+    public int? UserId { get; set; }
 
     public Tenant? Tenant { get; set; }
     public Contractor? Contractor { get; set; }
     public Contract? Contract { get; set; }
+    public User? User { get; set; }
 }
 
 public enum EntityType

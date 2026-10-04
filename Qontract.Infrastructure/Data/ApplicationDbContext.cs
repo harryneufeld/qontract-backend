@@ -352,10 +352,11 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
                 .ValueGeneratedOnAdd()
                 .HasValueGenerator((p, t) => new ClientSideIdValueGenerator());
             entity.Property(e => e.EntityType).IsRequired();
-            entity.Property(e => e.Street).HasMaxLength(500);
-            entity.Property(e => e.City).HasMaxLength(100);
-            entity.Property(e => e.Zip).HasMaxLength(20);
-            entity.Property(e => e.Country).HasMaxLength(100);
+            // Source addresses are optional, unbounded text. Keep partial and
+            // long historical values intact; API input limits apply to new edits.
+            entity.Property(e => e.Street).IsRequired(false);
+            entity.HasOne(e => e.User).WithMany().HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
             entity.Property(e => e.CreatedBy).HasMaxLength(500);
             entity.Property(e => e.ModifiedBy).HasMaxLength(500);
             entity.HasOne(e => e.Tenant)

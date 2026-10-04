@@ -39,7 +39,6 @@ namespace Qontract.Infrastructure.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("City")
-                        .HasMaxLength(100)
                         .HasColumnType("TEXT");
 
                     b.Property<int?>("ContractId")
@@ -49,7 +48,6 @@ namespace Qontract.Infrastructure.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("Country")
-                        .HasMaxLength(100)
                         .HasColumnType("TEXT");
 
                     b.Property<DateTime>("CreatedAt")
@@ -63,6 +61,9 @@ namespace Qontract.Infrastructure.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("HouseNumber")
+                        .HasColumnType("TEXT");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("INTEGER");
 
@@ -74,15 +75,15 @@ namespace Qontract.Infrastructure.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Street")
-                        .IsRequired()
-                        .HasMaxLength(500)
                         .HasColumnType("TEXT");
 
                     b.Property<int?>("TenantId")
                         .HasColumnType("INTEGER");
 
+                    b.Property<int?>("UserId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("Zip")
-                        .HasMaxLength(20)
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
@@ -92,6 +93,8 @@ namespace Qontract.Infrastructure.Migrations
                     b.HasIndex("ContractorId");
 
                     b.HasIndex("TenantId");
+
+                    b.HasIndex("UserId");
 
                     b.ToTable("Addresses", (string)null);
                 });
@@ -813,11 +816,18 @@ namespace Qontract.Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("TenantId");
 
+                    b.HasOne("Qontract.Domain.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("Contract");
 
                     b.Navigation("Contractor");
 
                     b.Navigation("Tenant");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("Qontract.Domain.Models.AuthSession", b =>

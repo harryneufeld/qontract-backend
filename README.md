@@ -8,6 +8,7 @@ This backend is not yet a complete replacement for it.
 
 - ✅ Multi-tenant data model (Family & Company tenants)
 - ✅ Personal workspaces with owner-only contracts, contractors and documents
+- ✅ Private account addresses and member-readable tenant addresses, with separate house numbers
 - ✅ Clean Architecture with Domain/Application/Infrastructure separation
 - ✅ Entity Framework Core with migration support
 - ✅ File upload/download for contract documents
@@ -78,6 +79,11 @@ This backend is not yet a complete replacement for it.
   documents and addresses enforce the same boundary. Tenant admins cannot bypass
   it. Migration adds explicit ownership without inferring or changing historical
   rows. See [LEGACY-MAPPING.md](LEGACY-MAPPING.md) for the API and rollback requirements.
+- Account addresses stay private across workspace switches, including from tenant
+  admins. Members can view their tenant's addresses; only admins can change them.
+  Partial addresses, separate house numbers and unbounded legacy text are stored
+  without guessing missing fields. Source address mappings and shared references
+  still require reconciliation before import. Deploy the API before its companion app.
 - Current migration scope preserves memberships, current prices and periods,
   personal/tenant documents, shared-file relationships, addresses and audit data.
   Credentials use email password setup. Unused production `Invoices`, `PriceHistories`

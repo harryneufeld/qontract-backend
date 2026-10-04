@@ -263,14 +263,12 @@ public class DocumentReuploadValidator : AbstractValidator<DocumentReuploadDTO>
     }
 }
 
-public class AddressCreateValidator : AbstractValidator<AddressCreateDTO>
+public abstract class AddressFieldsValidator<T> : AbstractValidator<T> where T : AddressCreateDTO
 {
-    public AddressCreateValidator()
+    public AddressFieldsValidator()
     {
         RuleFor(x => x.EntityType)
-            .IsInEnum().WithMessage("Invalid entity type.")
-            .Must(x => x != EntityType.Person)
-            .WithMessage("Address entity type 'Person' is not supported.");
+            .IsInEnum().WithMessage("Invalid entity type.");
 
         RuleFor(x => x.ContractorId)
             .GreaterThanOrEqualTo(1)
@@ -283,8 +281,10 @@ public class AddressCreateValidator : AbstractValidator<AddressCreateDTO>
             .WithMessage("ContractId is required for contract addresses.");
 
         RuleFor(x => x.Street)
-            .NotEmpty().WithMessage("Street is required.")
             .MaximumLength(500).WithMessage("Street cannot exceed 500 characters.");
+
+        RuleFor(x => x.HouseNumber).MaximumLength(100)
+            .WithMessage("House number cannot exceed 100 characters.");
 
         RuleFor(x => x.City)
             .MaximumLength(100).When(x => x.City is not null).WithMessage("City cannot exceed 100 characters.");
@@ -296,3 +296,16 @@ public class AddressCreateValidator : AbstractValidator<AddressCreateDTO>
             .MaximumLength(100).When(x => x.Country is not null).WithMessage("Country cannot exceed 100 characters.");
     }
 }
+
+public class AddressCreateValidator : AddressFieldsValidator<AddressCreateDTO>
+{
+    public AddressCreateValidator()
+    {
+        RuleFor(x => x.Street).Must((dto, street) =>
+            new[] { street, dto.HouseNumber, dto.City, dto.Zip, dto.Country }
+                .Any(value => !string.IsNullOrWhiteSpace(value)))
+            .WithMessage("Enter at least one address field.");
+    }
+}
+
+public class AddressUpdateValidator : AddressFieldsValidator<AddressUpdateDTO> { }

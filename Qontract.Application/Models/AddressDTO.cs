@@ -7,6 +7,7 @@ public class AddressDTO
     public int Id { get; set; }
     public EntityType EntityType { get; set; }
     public string? Street { get; set; }
+    public string? HouseNumber { get; set; }
     public string? City { get; set; }
     public string? Zip { get; set; }
     public string? Country { get; set; }
@@ -34,8 +35,11 @@ public class AddressCreateDTO
     /// </summary>
     public int? ContractId { get; set; }
 
-    public string Street { get; set; } = string.Empty;
+    public string? Street { get; set; }
+    public string? HouseNumber { get; set; }
     public string? City { get; set; }
     public string? Zip { get; set; }
     public string? Country { get; set; }
 }
+
+public class AddressUpdateDTO : AddressCreateDTO { }

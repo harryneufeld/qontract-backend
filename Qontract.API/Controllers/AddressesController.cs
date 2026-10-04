@@ -15,13 +15,16 @@ public class AddressesController : ControllerBase
 {
     private readonly IAddressService _addressService;
     private readonly IValidator<AddressCreateDTO> _createValidator;
+    private readonly IValidator<AddressUpdateDTO> _updateValidator;
 
     public AddressesController(
         IAddressService addressService,
-        IValidator<AddressCreateDTO> createValidator)
+        IValidator<AddressCreateDTO> createValidator,
+        IValidator<AddressUpdateDTO> updateValidator)
     {
         _addressService = addressService;
         _createValidator = createValidator;
+        _updateValidator = updateValidator;
     }
 
     /// <summary>
@@ -31,6 +34,16 @@ public class AddressesController : ControllerBase
     private int CurrentTenantId =>
         int.Parse(User.FindFirst("TenantId")?.Value
             ?? throw new InvalidOperationException("Authenticated user has no TenantId claim."));
+
+    private int CurrentUserId => int.Parse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value);
+
+    [HttpGet("me")]
+    public async Task<ActionResult<List<AddressDTO>>> GetMyAddresses() =>
+        Ok(await _addressService.GetMyAddressesAsync());
+
+    [HttpGet("tenant")]
+    public async Task<ActionResult<List<AddressDTO>>> GetTenantAddresses() =>
+        Ok(await _addressService.GetTenantAddressesAsync(CurrentTenantId));
 
     /// <summary>
     /// Identity used for audit fields (CreatedBy/ModifiedBy). The JWT carries
@@ -48,13 +61,12 @@ public class AddressesController : ControllerBase
         if (reject is not null)
             return reject;
 
-        // Never trust the client for the owning entity (issue #32): the
-        // caller's own address is the tenant's; a contractor address is
-        // explicitly passed and must belong to the caller's tenant
-        // (enforced by the service, 404 otherwise).
+        // Account and tenant ownership come only from authenticated identity.
+        // Contract/contractor references must belong to the active workspace.
         var (entityId, entityType) = dto.EntityType switch
         {
             EntityType.Tenant => (CurrentTenantId, EntityType.Tenant),
+            EntityType.Person => (CurrentUserId, EntityType.Person),
             EntityType.Contractor => (dto.ContractorId ?? 0, EntityType.Contractor),
             EntityType.Contract => (dto.ContractId ?? 0, EntityType.Contract),
             _ => (0, dto.EntityType)
@@ -65,9 +77,17 @@ public class AddressesController : ControllerBase
     }
 
     [HttpPut("{id}")]
-    public async Task<ActionResult<AddressDTO>> UpdateAddress(int id, [FromBody] AddressCreateDTO dto)
+    public async Task<ActionResult<AddressDTO>> UpdateAddress(int id, [FromBody] AddressUpdateDTO dto)
     {
-        var reject = await DtoValidation.RejectIfInvalidAsync(_createValidator, dto);
+        var existing = await _addressService.GetAddressByIdAsync(id, CurrentTenantId);
+        // Unchanged historical values may exceed today's input limits. Preserve
+        // them verbatim while validating every newly entered value.
+        if (dto.Street == existing.Street) dto.Street = null;
+        if (dto.HouseNumber == existing.HouseNumber) dto.HouseNumber = null;
+        if (dto.City == existing.City) dto.City = null;
+        if (dto.Zip == existing.Zip) dto.Zip = null;
+        if (dto.Country == existing.Country) dto.Country = null;
+        var reject = await DtoValidation.RejectIfInvalidAsync(_updateValidator, dto);
         if (reject is not null)
             return reject;
 
