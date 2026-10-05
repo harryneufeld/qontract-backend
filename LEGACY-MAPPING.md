@@ -137,8 +137,54 @@ creator association). Neither a populated `UserId` nor audit text alone implies
 private scope. Export must retain both source IDs and a source mapping ledger.
 Missing owners, conflicting relationships, and private contractors referenced by
 shared contracts must be reported for review, without widening visibility or
-silently duplicating records. User/tenant addresses, long legacy values, full
+silently duplicating records. Source address mappings, other long legacy values, full
 ownership reconciliation and the exporter/importer are still prerequisites.
+
+## Account and tenant addresses (2026-10-04)
+
+Legacy `User.AddressId`, `UserFamily.AddressId`, and `Company.AddressId` are
+explicit source relationships to `Address`. `StreetName`, `HouseNumber`,
+`ZipCode`, `CityName`, and `CountryName` map separately to `Street`, `HouseNumber`,
+`Zip`, `City`, and `Country`. No street splitting, house-number guessing, trimming,
+or required-field fabrication is part of migration. Source fields are nullable,
+unbounded text; target storage supports the same, including partial/blank addresses.
+
+`AccountAndTenantAddresses` adds nullable `Addresses.UserId` and `HouseNumber`,
+makes street optional, and removes storage length limits. Existing address IDs,
+text, timestamps, active state, and tenant/contractor/contract associations stay
+unchanged. Existing `Person` rows with unknown owners remain unresolved and
+inaccessible; ownership is never inferred from audit text. Downgrade is refused;
+restore a matched pre-upgrade database backup for rollback. SQL generation is
+covered for SQLite, PostgreSQL and SQL Server; only SQLite has been exercised live.
+
+The address API preserves the existing `Person = 2` enum value for account-owned
+addresses. `GET /api/addresses/me` lists only the caller's active account addresses,
+independently of the selected workspace. `POST /api/addresses` with
+`entityType: Person` stamps the authenticated account ID. Tenant admins cannot read,
+edit or remove another account's address. User/tenant IDs in payloads are ignored.
+`GET /api/addresses/tenant` lists the active tenant's addresses for members;
+only its active administrators can create, edit or deactivate them. Personal
+workspaces have no tenant address. Contract/contractor addresses keep their
+existing scope and now support a separate house number too.
+
+Address scope is immutable through updates. Null/omitted fields preserve stored
+text; explicit empty strings clear fields. New input uses conservative length
+limits and requires at least one populated field. Unchanged long historical
+fields can round-trip through an edit of another field without being rejected,
+truncated or normalized. Deactivation keeps the full row and hides it from lists.
+
+The app exposes **My addresses** under Account and **Tenant addresses** under
+Account → Workspaces when a tenant is selected. Members have a read-only view;
+administrators get the shared add/edit/remove controls. The reusable editor
+supports partial addresses, separate house numbers, clearing, and phone-size
+scrolling; actions stay at the bottom using the existing design language.
+
+This is target parity, not source import. Export must retain each original
+`AddressId` and every referencing user/family/company GUID, even when a single
+source address is reused. Shared source address rows, unresolved references,
+and associations crossing personal/tenant visibility need an explicit mapping
+decision and reconciliation ledger before import. Do not merge addresses by
+their text or silently change visibility. Production FamilyPlanner is unchanged.
 
 ## Cost estimate convention
 
