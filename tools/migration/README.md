@@ -55,7 +55,7 @@ reject conflicting reruns/target edits and reconcile every entity/link/binary.
 Deterministic dry-run output is not proof that imports are idempotent.
 
 Also pending: a protected authenticated export API, operator configuration/trigger,
-production target import, imported API/app privacy checks, SMTP staging and
+production target import, SMTP staging and
 backup restore/cutover rehearsal. This tooling does not complete FamilyPlanner #2
 or backend #63 and does not authorize a production import.
 
@@ -113,6 +113,14 @@ directory (database, documents and plan marker) together when backing it up.
 The populated fixture imported 2 users, 1 tenant, 3 contractors, 3 contracts,
 4 addresses and 3 documents with 2 memberships and 2 contract-file links. Twenty
 raw entity/relationship rows are retained in the ledger. Replaying inserted zero.
-Source FamilyPlanner is unchanged and running. API/app browsing of the imported
-target, password-setup/SMTP and production provider/cutover remain follow-ups.
+Source FamilyPlanner is unchanged and running. A separate runtime copy passed
+70 live API checks with both imported accounts: tenant sharing, role restrictions,
+personal ownership, contract/document links and checksum-identical downloads.
+The API used Staging without demo seeding or sensitive SQL logging. Temporary
+test passwords and relocated file paths exist only in that runtime copy;
+the immutable importer target still requires password setup. No email was sent.
+Browser checks covered imported tenant/personal contracts, addresses, the file
+library and PDF rendering. They identified app amount formatting, missing Files
+navigation and missing PDF.js web setup, addressed by a companion app PR.
+Password-setup/SMTP and production provider/cutover remain follow-ups.
 The existing SQLite dependency warning remains tracked in backend #49.
