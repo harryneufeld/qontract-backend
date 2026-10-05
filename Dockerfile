@@ -17,6 +17,7 @@ COPY Qontract.Core/Qontract.Core.csproj ./Qontract.Core/
 COPY Qontract.Domain/Qontract.Domain.csproj ./Qontract.Domain/
 COPY Qontract.Infrastructure/Qontract.Infrastructure.csproj ./Qontract.Infrastructure/
 COPY Qontract.Tests/Qontract.Tests.csproj ./Qontract.Tests/
+COPY tools/migration/LocalImport/LocalImport.csproj ./tools/migration/LocalImport/
 
 # Restore the whole solution (project references make a single-project
 # restore of Qontract.API alone insufficient).
