@@ -325,6 +325,15 @@ unchanged. Retain unresolved records in staging until reviewed.
 
 ## Export/import gates
 
+Address target parity is merged in backend #62 and app #52. Source AddressId
+reconciliation remains backend #63. FamilyPlanner's
+[protected address inventory and mapping proposal](https://github.com/harryneufeld/FamilyPlanner/blob/master/tools/migration/ADDRESS-RECONCILIATION.md)
+preserves raw fields/audit and all user/family/company references, including null,
+missing and reused rows. The proposed one-target-address-per-parent expansion
+requires review before importer writes; source GUID alone cannot identify a target
+address when references cross ownership boundaries. No historical import or
+restored-copy verification is established by that preparation.
+
 1. Produce a complete inventory from a restored production copy: all entity/join
    counts, orphan references, duplicate identities, scope, billing anomalies, and
    actual file counts/sizes/checksums. This repository review cannot supply those counts.
