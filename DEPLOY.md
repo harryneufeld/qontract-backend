@@ -6,6 +6,12 @@ JWT keys, database credentials and SMTP configuration for staging and production
 
 ## Configuration and startup
 
+For the standalone existing-Traefik / host-mounted-CIFS setup, see
+[deploy/TRAEFIK-CIFS.md](deploy/TRAEFIK-CIFS.md) and
+[deploy/compose.traefik-cifs.yml](deploy/compose.traefik-cifs.yml).
+Its example keeps SQLite on a local Docker volume and documents on the CIFS bind
+mount, runs in Staging and includes a storage-marker startup check.
+
 The root Compose file runs the API in Production, binds port 5000 to host loopback
 and persists `/app/data` and `/app/Storage` as named volumes. It no longer silently
 pairs a SQL Server connection string with the default SQLite provider or creates
