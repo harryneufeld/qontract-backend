@@ -22,6 +22,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\tools\migration\LocalImport\LocalImport.csproj" />
     <ProjectReference Include="..\Qontract.Domain\Qontract.Domain.csproj" />
     <ProjectReference Include="..\Qontract.API\Qontract.API.csproj" />
     <ProjectReference Include="..\Qontract.Infrastructure\Qontract.Infrastructure.csproj" />
