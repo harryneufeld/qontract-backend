@@ -352,6 +352,11 @@ persistent documents, account bootstrap and coordinated restore, see
 [DEPLOY.md](DEPLOY.md). Demo accounts are now seeded only in Development.
 Optional Compose overrides support an existing Traefik network with generic
 HTTPS/router settings, keeping host ports unpublished and proxy trust explicit.
+The standalone [Traefik/CIFS deployment](deploy/TRAEFIK-CIFS.md) pulls the backend
+from GHCR. The `Backend container` workflow verifies tests and Linux container
+startup on pull requests; master/version-tag publications follow successful
+verification. New packages default to private; the workflow does not change
+existing package visibility. Private server pulls require GHCR authentication.
 
 New and changed passwords use versioned PBKDF2-SHA512 hashes with random salts
 and 210,000 iterations. Existing refactor SHA256 hashes remain accepted for login;
