@@ -181,6 +181,12 @@ Server, use the provider's consistent native backup plus matching document stora
 Secure backups, manifests, secrets/configuration and SHA-256 checksums outside
 public repos. A backup is not verified until restored into an isolated environment.
 
+For an immutable **local SQLite migration target**, the migration tooling now
+provides [offline backup/restore verification](tools/migration/README.md#offline-backup-and-restore-verification)
+with database/document checksums, foreign-key checks and preserved import evidence.
+This verifies a restored copy; it does not make that copy API-ready, relocate its
+absolute document paths or replace the provider-specific deployment procedure below.
+
 Restore the paired database/documents into new isolated volumes, use the matching
 image/configuration, verify counts, relationships, document bytes and access, and
 repeat after an interrupted import. Preserve source backups even for the approved

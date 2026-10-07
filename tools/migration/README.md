@@ -124,3 +124,56 @@ library and PDF rendering. They identified app amount formatting, missing Files
 navigation and missing PDF.js web setup, addressed by a companion app PR.
 Password-setup/SMTP and production provider/cutover remain follow-ups.
 The existing SQLite dependency warning remains tracked in backend #49.
+
+## Offline backup and restore verification
+
+After a successful local import/replay, `rehearse_restore.py` captures the entire
+immutable SQLite rehearsal target and restores it to a **new** directory:
+
+```powershell
+python tools/migration/rehearse_restore.py backup PRIVATE_LOCAL_TARGET NEW_PRIVATE_BACKUP --offline-confirmed
+python tools/migration/rehearse_restore.py verify PRIVATE_BACKUP
+python tools/migration/rehearse_restore.py restore PRIVATE_BACKUP NEW_PRIVATE_RESTORED_TARGET
+```
+
+Stop every API/importer/writer first. `--offline-confirmed` is an operator assertion,
+not automatic process detection or a database/filesystem lock. The tool refuses
+SQLite WAL/SHM/journal files, linked storage (including Windows junctions), existing
+destinations and nested backup paths. Close SQLite connections cleanly before
+capture; do not delete sidecars to bypass this check. Concurrent changes detected
+before/after copying fail the capture. An interrupted capture has no final manifest
+and must not be used. Preserve failed evidence privately; retry with a new directory.
+
+The manifest contains SHA-256/size for every file, every database table's count,
+the import plan marker and the original storage root. Database integrity and foreign
+keys are checked read-only. Each document's copied bytes must match the original
+source checksum/size in the retained reviewed plan. Verification rejects missing,
+changed or additional payload files. Restoring changes no database field: schema,
+accounts, scope, membership, addresses, source ledger and relationships are preserved
+byte for byte. It verifies the copies without opening original document paths; the
+original source directory can be unavailable. Reports print counts, without source
+emails or GUIDs. Keep the package, plan and backup privately outside Git.
+
+This is backup integrity evidence for an already reconciled local import, not a new
+review of the import policies or protection against an attacker replacing both the
+manifest and payload. Preserve trusted manifests separately where appropriate.
+It supports the LocalImport layout on the same operating system only; it does not
+back up Docker volumes, network shares, PostgreSQL or SQL Server.
+
+**The restored target is not ready to serve requests.** Imported `Document.FilePath`
+values remain absolute references to the original target. Verification resolves
+those references within the restored copy, without rewriting the database or import
+fingerprint. For an API rehearsal, first make a separate runtime copy and explicitly
+relocate document paths/configuration there; keep the verified restoration immutable.
+Do not point an API at the restored database while its paths reference the old target.
+Production rollback additionally needs session/reset invalidation, compatible images
+and provider-specific restore, as described in [DEPLOY.md](../../DEPLOY.md).
+
+Validation on 2026-10-07: a new synthetic fixture passed the real EF migration/import
+chain, backup and restore with identical database/document checksums, and unchanged
+source import replay inserted zero. It contains one account, tenant, membership,
+contractor, contract, account address and document with a contract link; eight original
+entity/relationship rows remain in the ledger. Automated tests additionally verify
+restore after the original storage is unavailable, foreign-key failures, changed or
+missing files, unfinished capture, concurrent changes and linked storage rejection.
+The user-created FamilyPlanner fixture and production were not changed by this work.
