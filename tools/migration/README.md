@@ -123,7 +123,10 @@ Browser checks covered imported tenant/personal contracts, addresses, the file
 library and PDF rendering. They identified app amount formatting, missing Files
 navigation and missing PDF.js web setup, addressed by a companion app PR.
 Password-setup/SMTP and production provider/cutover remain follow-ups.
-The existing SQLite dependency warning remains tracked in backend #49.
+That earlier rehearsal used the SQLite dependency tracked in backend #49. The
+backend now pins bundle 2.1.13 and tests the loaded native engine against the
+3.50.2 security-fix minimum. Rebuild LocalImport/API before future rehearsals;
+retained published runtimes do not automatically receive dependency updates.
 
 ## Offline backup and restore verification
 
