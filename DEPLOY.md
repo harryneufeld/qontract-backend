@@ -202,7 +202,12 @@ the README session-revocation rollout notes. Handle writes since the backup expl
 
 Remaining staging gates: Docker builds/startup on the actual Linux host, chosen
 provider runtime verification, HTTPS/CORS/client-IP throttling, persistent documents,
-SMTP delivery, coordinated restore and full app smoke checks. The existing SQLite
-dependency advisory [#49](https://github.com/harryneufeld/qontract-backend/issues/49)
-also remains a release blocker to resolve. No host deployment or production
+SMTP delivery, coordinated restore and full app smoke checks. SQLite dependency
+advisory [#49](https://github.com/harryneufeld/qontract-backend/issues/49) is addressed
+by explicitly selecting `SQLitePCLRaw.bundle_e_sqlite3` 2.1.13 instead of EF's
+older minimum. Local tests load SQLite 3.53.3 and restore audits report no vulnerable
+packages. Deploy a rebuilt image to pick up the native library; previously running
+instances still use their earlier binaries. Linux native loading/container startup
+are checked by the existing PR workflow and remain host rollout checks.
+No host deployment or production
 migration has occurred as part of preparing these files.

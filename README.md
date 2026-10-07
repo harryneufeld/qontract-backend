@@ -4,6 +4,11 @@ The .NET 10 API for the qontract refactor. FamilyPlanner is the production
 system and the reference for full feature parity and complete migration.
 This backend is not yet a complete replacement for it.
 
+SQLite uses an explicit `SQLitePCLRaw.bundle_e_sqlite3` 2.1.13 reference so EF's
+older minimum cannot select the vulnerable 2.1.11 native library (#49). The loaded
+engine is checked in integration tests; dependency audits are not suppressed.
+Rebuild and deploy the API/import tooling to update existing published instances.
+
 ## Features
 
 - ✅ Multi-tenant data model (Family & Company tenants)
