@@ -1,0 +1,74 @@
+# Standalone native ARM64/amd64 staging; preserve existing host web ports.
+services:
+  api:
+    image: ${QONTRACT_API_IMAGE:-qontract-api:staging}
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ${STAGING_SECRETS_FILE:?Set the private API env-file path}
+    environment:
+      ASPNETCORE_ENVIRONMENT: Staging
+      Database__Provider: sqlite
+      ConnectionStrings__DefaultConnection: Data Source=/app/data/qontract.sqlite
+      Storage__Provider: local
+      Storage__Path: /app/Storage
+      AllowedHosts: "${STAGING_HOST:?Set the LAN IP or hostname};127.0.0.1"
+      Cors__Origins__0: "https://${STAGING_HOST}:${STAGING_HTTPS_PORT:-8443}"
+      Cors__Origins__1: "https://${STAGING_HOST}:${STAGING_HTTPS_PORT:-8443}"
+      Registration__AllowPublic: "false"
+      PasswordReset__Enabled: ${PASSWORD_RESET_ENABLED:-false}
+      PasswordReset__PublicAppUrl: "https://${STAGING_HOST}:${STAGING_HTTPS_PORT:-8443}/"
+      ReverseProxy__KnownProxies__0: ${STAGING_PROXY_IP:?Set the reserved proxy address}
+    volumes:
+      - type: bind
+        source: ${STAGING_DATA_PATH:?Set the dedicated local database directory}
+        target: /app/data
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${STAGING_DOCUMENTS_PATH:?Set the dedicated document directory}
+        target: /app/Storage
+        bind:
+          create_host_path: false
+    networks:
+      - staging
+    security_opt:
+      - no-new-privileges:true
+  web:
+    image: ${QONTRACT_WEB_IMAGE:?Set an architecture-compatible web image}
+    restart: unless-stopped
+    volumes:
+      - type: bind
+        source: ${STAGING_WEB_CONFIG_PATH:?Set the copied app nginx configuration path}
+        target: /etc/nginx/conf.d/default.conf
+        read_only: true
+        bind:
+          create_host_path: false
+    networks:
+      - staging
+    security_opt:
+      - no-new-privileges:true
+  proxy:
+    image: ${TRAEFIK_IMAGE:-traefik:v3.7.14}
+    restart: unless-stopped
+    command:
+      - --entrypoints.websecure.address=:8443
+      - --providers.file.filename=/etc/traefik/dynamic.yml
+      - --api.dashboard=false
+      - --log.level=WARN
+    ports:
+      - "${STAGING_BIND_IP:?Set the Pi LAN address}:${STAGING_HTTPS_PORT:-8443}:8443"
+    volumes:
+      - ./staging-lan-traefik.yml:/etc/traefik/dynamic.yml:ro
+    networks:
+      staging:
+        ipv4_address: ${STAGING_PROXY_IP:?Set the reserved proxy address}
+    security_opt:
+      - no-new-privileges:true
+networks:
+  staging:
+    ipam:
+      config:
+        - subnet: ${STAGING_NETWORK_SUBNET:?Choose a non-conflicting private subnet}

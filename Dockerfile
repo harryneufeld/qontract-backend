@@ -10,7 +10,7 @@ WORKDIR /src
 
 # Copy the solution + every project file first so the restore layer is
 # cached until a .csproj actually changes.
-COPY Qontract.sln ./
+COPY Qontract.sln Directory.Build.props ./
 COPY Qontract.API/Qontract.API.csproj ./Qontract.API/
 COPY Qontract.Application/Qontract.Application.csproj ./Qontract.Application/
 COPY Qontract.Core/Qontract.Core.csproj ./Qontract.Core/
