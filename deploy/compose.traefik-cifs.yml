@@ -2,10 +2,8 @@
 # Traefik and the host CIFS mount are managed outside this stack.
 services:
   qontract-api:
-    image: qontract-api:${QONTRACT_RELEASE:?Set an image/release tag}
-    build:
-      context: ..
-      dockerfile: Dockerfile
+    image: ${QONTRACT_IMAGE:?Set the GHCR image tag or digest}
+    pull_policy: always
     restart: unless-stopped
     env_file:
       - ${QONTRACT_SECRETS_FILE:?Set the absolute path to api.env}

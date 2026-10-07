@@ -11,6 +11,9 @@ For the standalone existing-Traefik / host-mounted-CIFS setup, see
 [deploy/compose.traefik-cifs.yml](deploy/compose.traefik-cifs.yml).
 Its example keeps SQLite on a local Docker volume and documents on the CIFS bind
 mount, runs in Staging and includes a storage-marker startup check.
+This standalone file pulls from GHCR; see the guide for private-registry login,
+the publishing workflow and pinned image references. The root Compose file below
+continues to support local source builds.
 
 The root Compose file runs the API in Production, binds port 5000 to host loopback
 and persists `/app/data` and `/app/Storage` as named volumes. It no longer silently
