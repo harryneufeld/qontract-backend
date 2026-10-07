@@ -1,7 +1,8 @@
 # Email password reset and migration onboarding
 
 Implemented endpoints and UI are reviewed through backend #54 and app #46.
-Live SMTP delivery, host configuration and production onboarding are not yet verified.
+Dedicated test-mailbox delivery and password setup were verified on ARM64 LAN
+staging on 2026-10-08. Production onboarding remains pending.
 
 ## Deployment configuration
 
@@ -71,10 +72,36 @@ delivery allows active setup-required accounts and clears this flag after proof.
 Do not bulk-mark existing refactor users: the migration defaults the flag to false
 and preserves their hashes, authentication versions and audit fields.
 
-After staging delivery is verified, request links through the public flow for the
+After the production cutover gates are satisfied, request links through the public flow for the
 two accounts under the agreed cutover/onboarding plan. No source account/session
-is modified. This does not resolve remaining personal-scope/address/import gaps;
-accounts still require the existing login membership rules until those are addressed.
+is modified. Accounts without an active tenant membership sign in to their personal
+workspace; tenant memberships and access must still be reconciled during migration.
+
+## Verified staging email rehearsal (2026-10-08)
+
+The native ARM64 Docker deployment behind Traefik was tested with a dedicated
+SMTP sender and recipient mailbox. SMTP authentication used required STARTTLS on
+port 587; recipient verification used IMAP over TLS on port 993. Both connections
+validated their server certificates. Only the LAN HTTPS proxy used its staging
+self-signed certificate; mail certificate validation remained enabled.
+
+An isolated active test account started with `RequiresPasswordSetup = true`, the
+ordinary user role and no tenant memberships. The public flow verified:
+
+- Login was rejected before password setup.
+- A reset request returned the generic 202 response and the email arrived in INBOX.
+- The link targeted the configured HTTPS app using the hash-router reset route.
+- Redemption succeeded without returning a login token; reuse returned 400.
+- The new password allowed sign-in to the personal workspace, and its contract
+  list was empty.
+
+Credentials were supplied through the host's protected API environment file.
+The test retained only outcome metadata; mailbox passwords, the generated app
+password and reset link were excluded from that evidence. No production accounts
+or legacy data were used. This proves delivery for the tested provider and inbox,
+not spam placement across other providers, production DNS or production onboarding.
+Browser URL scrubbing, mobile layout, subpath hosting, expiry and failure/restart
+checks remain part of the deployment gate below.
 
 ## App links and verification gate
 
@@ -94,7 +121,8 @@ URL scrubbing/referrer policy, expiry/reuse, old-session rejection, restart/fail
 behaviour, and no secrets in proxy/application/crash logs. SQLite runtime tests and
 PostgreSQL/SQL Server migration-script checks are available; runtime rehearsal on
 the selected target provider is still required. Define retention/cleanup for expired
-reset records with the operator. No production deployment or real email has occurred.
+reset records with the operator. A real email was delivered only to the dedicated
+staging test mailbox; no production deployment or onboarding has occurred.
 
 Restoring an older database can otherwise revive consumed links or revoked
 sessions. Before accepting traffic after restore, invalidate all restored reset

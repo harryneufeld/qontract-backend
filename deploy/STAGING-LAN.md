@@ -62,6 +62,18 @@ HTTPS port/address, rebuild the Flutter assets and update both API CORS and the
 trusted reset URL. Real SMTP configuration/delivery checks remain a separate step
 in [PASSWORD-RESET.md](../PASSWORD-RESET.md).
 
+For an email rehearsal, add the `Smtp__*` settings from that guide to the existing
+protected API env file, and set `PASSWORD_RESET_ENABLED=true` in the private
+Compose env file. The template derives `PasswordReset__PublicAppUrl` from
+`STAGING_HOST` and `STAGING_HTTPS_PORT`; keep these aligned with the Flutter
+HTTPS URL. Recreate the API with the `up -d --wait` command
+above; restarting an existing container does not load changed environment values.
+Use a dedicated recipient account in the staging database and request a link
+through Forgot password. Confirm actual inbox delivery, set a password, verify
+one-time redemption and sign in. Keep passwords and reset links out of evidence.
+The ARM64 rehearsal recorded in the password-reset guide passed these checks;
+each deployment still needs validation with its own mail and hosting settings.
+
 Start with empty staging storage or an explicitly reviewed **copied** fixture.
 Never mount production/FamilyPlanner storage here. For a copied fixture, relocate
 document paths to `/app/Storage`, invalidate restored sessions/reset records and
