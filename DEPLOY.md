@@ -4,6 +4,10 @@ Prepare staging before any productive cutover. These files do not connect to or
 replace FamilyPlanner. Use separate Compose project names, volumes, public URLs,
 JWT keys, database credentials and SMTP configuration for staging and production.
 
+For a dedicated Raspberry Pi / ARM64 LAN test host, see
+[native LAN staging](deploy/STAGING-LAN.md). It builds the API natively and serves
+precompiled Flutter assets behind its own Traefik on a separate host port.
+
 ## Configuration and startup
 
 For the standalone existing-Traefik / host-mounted-CIFS setup, see
