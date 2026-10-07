@@ -177,3 +177,51 @@ entity/relationship rows remain in the ledger. Automated tests additionally veri
 restore after the original storage is unavailable, foreign-key failures, changed or
 missing files, unfinished capture, concurrent changes and linked storage rejection.
 The user-created FamilyPlanner fixture and production were not changed by this work.
+
+## Prepare a separate runnable copy
+
+`prepare_runtime.py` starts from verified backup evidence and creates a new local
+runtime directory. It copies and verifies the immutable target, relocates only
+document paths into that copy, revokes restored sessions, consumes restored reset
+links and advances all account authentication versions in one SQLite transaction.
+It preserves source ledger rows, entity IDs, ownership, memberships and document
+bytes. The original backup and imported target remain unchanged. The retained
+import fingerprint deliberately cannot pass replay after these runtime changes.
+
+```powershell
+python tools/migration/prepare_runtime.py PRIVATE_BACKUP NEW_PRIVATE_RUNTIME
+dotnet publish Qontract.API/Qontract.API.csproj -o NEW_PRIVATE_RUNTIME/api
+dotnet NEW_PRIVATE_RUNTIME/api/Qontract.API.dll --contentRoot ABSOLUTE_PRIVATE_RUNTIME --environment Staging
+```
+
+The generated `appsettings.Staging.json` selects the copied SQLite database and
+document directory, loopback port 5099 (override with `--port`), a fresh random JWT
+signing key, disabled public registration and disabled password-reset delivery.
+Use a clean process environment: existing application configuration variables can
+override this generated file. Staging prevents demo seeding and sensitive SQL
+logging. The configuration, database and all runtime evidence are private: keep
+the directory outside Git with access restricted to its operator. Publish into
+the generated directory only after preparation succeeds; check readiness before
+using it. Stop the API before replacing/copying its database or files.
+
+Accounts normally retain `RequiresPasswordSetup` and their original hashes.
+Real staging onboarding still requires verified TLS SMTP and the trusted HTTPS
+app URL in [PASSWORD-RESET.md](../../PASSWORD-RESET.md); this tool neither enables
+delivery nor sends email. Existing password-setup tests use an in-memory mail
+capture and do not prove real SMTP delivery.
+
+For **invented accounts only**, `--synthetic-login` generates temporary local
+passwords and clears setup state in the runtime copy. It refuses this mode unless
+the source instance is `fixture` and every account uses `@example.test`.
+Credentials go only into the private `local-test-credentials.json`; they are not
+printed or added to the original target/backup. This optional convenience is not
+the migration onboarding policy and must never be used for actual users.
+
+Rehearsal on 2026-10-07: the synthetic runtime passed 12 live API checks covering
+login/current account, tenant contract visibility, personal address ownership,
+document download with matching bytes, Personal workspace isolation and logout
+revocation across workspace tokens. A release web build points only to this
+loopback API, with a local static server bound to port 5098. No real mail was sent.
+An additional backend test verifies email password setup with captured mail for
+an account without tenant membership, preserving its private address/contract and
+entering Personal after setup; the link remains single-use.
