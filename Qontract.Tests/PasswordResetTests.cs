@@ -142,6 +142,44 @@ public class PasswordResetTests : IDisposable
     }
 
     [Fact]
+    public async Task SetupWithoutTenant_PreservesPrivateRecords_AndSignsIntoPersonal()
+    {
+        await Update(db =>
+        {
+            var user = db.Users.Single(u => u.Id == _userId);
+            user.TenantId = null;
+            user.RequiresPasswordSetup = true;
+            db.TenantMemberships.RemoveRange(db.TenantMemberships.Where(m => m.UserId == _userId));
+            db.Addresses.Add(new Address { EntityType = EntityType.Person, UserId = _userId,
+                Street = "  Original street  ", HouseNumber = "12a", IsActive = true });
+            db.Contracts.Add(new Contract { Title = "Imported private contract", OwnerUserId = _userId,
+                IsActive = true, Status = ContractStatus.Active, Value = "12.3400", BillingPeriod = BillingPeriod.Monthly });
+        });
+        (await _client.PostAsJsonAsync("/api/auth/login", new { email = _email, password = "password123" }))
+            .StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        await Deliver();
+        (await Reset()).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Reset()).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var response = await _client.PostAsJsonAsync("/api/auth/login", new { email = _email, password = "replacement123" });
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var auth = (await response.Content.ReadFromJsonAsync<AuthDTO>())!;
+        auth.User!.TenantId.Should().Be(0);
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth.AccessToken);
+        (await _client.GetAsync("/api/auth/me")).StatusCode.Should().Be(HttpStatusCode.OK);
+        var json = new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web);
+        json.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+        var addresses = (await _client.GetFromJsonAsync<List<AddressDTO>>("/api/addresses/me", json))!;
+        addresses.Should().ContainSingle();
+        addresses[0].Street.Should().Be("  Original street  ");
+        addresses[0].HouseNumber.Should().Be("12a");
+        using var scope = _host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var contract = await db.Contracts.SingleAsync(c => c.OwnerUserId == _userId);
+        contract.TenantId.Should().BeNull(); contract.Value.Should().Be("12.3400");
+        (await db.TenantMemberships.CountAsync(m => m.UserId == _userId)).Should().Be(0);
+    }
+
+    [Fact]
     public async Task CooldownAndHourlyLimitBoundEmails_AndNewLinkSupersedesOld()
     {
         await Deliver(); var first = _mail.Token;
