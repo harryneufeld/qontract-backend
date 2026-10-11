@@ -84,6 +84,19 @@ def validate(root):
             raise ValueError('Document byte checksum/size mismatch')
         if record['Size'] is not None and record['Size'] != binary['size']:
             raise ValueError('Declared document size mismatch')
+    if 'selection' in manifest:
+        selection = manifest['selection']
+        selection_path = member(root, selection['path'])
+        if selection.get('policy') != 'first_test_member_with_owned_contract_and_email_v1' or digest(selection_path) != selection['sha256']:
+            raise ValueError('Invalid scoped-source exclusion evidence')
+        exclusions = json.loads(selection_path.read_text(encoding='utf-8'))
+        if (exclusions.get('policy') != selection['policy'] or exclusions.get('productionApproved') is not False
+                or len(exclusions['excludedRecords']) != selection['count']
+                or set(exclusions['originalCounts']) != TABLES):
+            raise ValueError('Invalid scoped-source counts')
+        counts = Counter(r['entity'] for r in exclusions['excludedRecords'])
+        if set(counts) - TABLES or any(len(rows[t]) + counts[t] != exclusions['originalCounts'][t] for t in TABLES):
+            raise ValueError('Scoped-source exclusions do not reconcile')
     return manifest, rows, indexes
 
 

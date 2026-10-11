@@ -47,6 +47,24 @@ class DryRunTests(unittest.TestCase):
         self.assertEqual(a['summary']['blockers'], 0)
         self.assertFalse(a['summary']['readyForImport'])
 
+    def test_scoped_exclusion_evidence_is_hashed_and_counts_reconcile(self):
+        manifest = self.package()
+        evidence = {'policy': 'first_test_member_with_owned_contract_and_email_v1', 'productionApproved': False,
+                    'originalCounts': {t: 0 for t in dry_run.TABLES}, 'excludedRecords': []}
+        path = self.root / 'scope-exclusions.json'
+        path.write_text(json.dumps(evidence))
+        manifest['selection'] = {'policy': evidence['policy'], 'path': path.name, 'sha256': dry_run.digest(path), 'count': 0}
+        (self.root / 'manifest.json').write_text(json.dumps(manifest))
+        dry_run.validate(self.root)
+        evidence['originalCounts']['Users'] = 1
+        path.write_text(json.dumps(evidence))
+        with self.assertRaisesRegex(ValueError, 'exclusion evidence'):
+            dry_run.validate(self.root)
+        manifest['selection']['sha256'] = dry_run.digest(path)
+        (self.root / 'manifest.json').write_text(json.dumps(manifest))
+        with self.assertRaisesRegex(ValueError, 'do not reconcile'):
+            dry_run.validate(self.root)
+
     def test_staging_replay_is_idempotent_and_preserves_raw_fields(self):
         self.row('Users', Id=str(uuid.uuid4()), UserName=None, Email=' test@example.test ')
         self.package()

@@ -50,14 +50,65 @@ public static class LocalFixtureImporter
                 || raw.GetProperty(entity.Name).GetArrayLength() != entity.Value.GetProperty("count").GetInt32())
                 throw new InvalidDataException("Plan/raw mismatch");
         }
-        var adminSource = Text(plan, "tenantAdminSourceId")!;
+        if (manifest.TryGetProperty("selection", out var selection))
+        {
+            var evidencePath = Member(package, Text(selection, "path")!);
+            if (Text(selection, "policy") != "first_test_member_with_owned_contract_and_email_v1"
+                || Hash(evidencePath) != Text(selection, "sha256")) throw new InvalidDataException("Changed scope exclusion evidence");
+            using var exclusionDoc = JsonDocument.Parse(await File.ReadAllTextAsync(evidencePath));
+            var evidence = exclusionDoc.RootElement;
+            var excluded = evidence.GetProperty("excludedRecords").EnumerateArray().ToList();
+            var entities = manifest.GetProperty("entities").EnumerateObject().Select(e => e.Name).ToHashSet();
+            if (Text(evidence, "policy") != Text(selection, "policy") || evidence.GetProperty("productionApproved").GetBoolean()
+                || excluded.Count != selection.GetProperty("count").GetInt32()
+                || !evidence.GetProperty("originalCounts").EnumerateObject().Select(e => e.Name).ToHashSet().SetEquals(entities)
+                || excluded.Any(e => !entities.Contains(Text(e, "entity")!))) throw new InvalidDataException("Invalid scope exclusion evidence");
+            foreach (var entity in entities)
+                if (raw.GetProperty(entity).GetArrayLength() + excluded.Count(e => Text(e, "entity") == entity)
+                    != evidence.GetProperty("originalCounts").GetProperty(entity).GetInt32()) throw new InvalidDataException("Scope counts disagree");
+        }
         var sourceUsers = raw.GetProperty("Users").EnumerateArray().ToDictionary(Id);
         var sourceContracts = raw.GetProperty("Contracts").EnumerateArray().ToDictionary(Id);
+        var sourceCompanies = raw.GetProperty("Companies").EnumerateArray().ToDictionary(Id);
+        var sourceTenants = raw.GetProperty("UserFamilies").EnumerateArray().ToDictionary(Id);
         var memberships = raw.GetProperty("FamilyUserList").EnumerateArray().Select(r => (Text(r, "UsersId"), Text(r, "FamiliesId"))).ToHashSet();
-        if (!sourceUsers.ContainsKey(adminSource) || !string.Equals(Text(sourceUsers[adminSource], "Email")?.Trim(), Text(plan.GetProperty("reviewedPolicy"), "tenantAdminEmail")?.Trim(), StringComparison.OrdinalIgnoreCase))
-            throw new InvalidDataException("Admin policy mismatch");
-        foreach (var tenant in raw.GetProperty("UserFamilies").EnumerateArray())
-            if (!memberships.Contains((adminSource, Id(tenant)))) throw new InvalidDataException("Admin not a member");
+        var policy = plan.GetProperty("reviewedPolicy");
+        var admins = sourceTenants.Keys.ToDictionary(t => t, t => plan.TryGetProperty("tenantAdminSourceIds", out var choices)
+            ? Text(choices, t)! : Text(plan, "tenantAdminSourceId")!);
+        if (plan.TryGetProperty("tenantAdminSourceIds", out var declaredAdmins) && !declaredAdmins.EnumerateObject().Select(p => p.Name).ToHashSet().SetEquals(sourceTenants.Keys))
+            throw new InvalidDataException("Administrator tenant set mismatch");
+        foreach (var (tenant, admin) in admins)
+        {
+            var email = policy.TryGetProperty("tenantAdminEmails", out var emails) ? Text(emails, tenant) : Text(policy, "tenantAdminEmail");
+            if (admin is null || !sourceUsers.ContainsKey(admin) || !memberships.Contains((admin, tenant))
+                || !string.Equals(Text(sourceUsers[admin], "Email")?.Trim(), email?.Trim(), StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException("Admin policy mismatch");
+        }
+        var assignments = new Dictionary<string, string>();
+        if (policy.TryGetProperty("contractorScopePolicy", out var scopePolicy)
+            && scopePolicy.GetString() == "assign_unscoped_company_to_owner_single_tenant")
+        {
+            foreach (var company in sourceCompanies.Values.Where(c => Text(c, "FamilyId") is null))
+            {
+                var choices = memberships.Where(m => m.Item1 == Text(company, "UserId")).Select(m => m.Item2!).Distinct().ToList();
+                if (choices.Count != 1) throw new InvalidDataException("Ambiguous contractor default tenant requires review");
+                assignments.Add(Id(company), choices.Single());
+            }
+        }
+        var declaredAssignments = plan.TryGetProperty("contractorTenantAssignments", out var assignmentRows)
+            ? assignmentRows.EnumerateArray().Select(r => (Text(r, "sourceCompanyId")!, Text(r, "tenantSourceId")!)).ToList() : [];
+        if (declaredAssignments.Count != declaredAssignments.Distinct().Count()
+            || !assignments.Select(a => (a.Key, a.Value)).ToHashSet().SetEquals(declaredAssignments))
+            throw new InvalidDataException("Contractor default tenant policy mismatch");
+        foreach (var contract in sourceContracts.Values)
+        {
+            if (Text(contract, "CompanyId") is not string companyId) continue;
+            var company = sourceCompanies[companyId];
+            var companyTenant = assignments.GetValueOrDefault(companyId) ?? Text(company, "FamilyId");
+            var contractTenant = Text(contract, "FamilyId");
+            if (companyTenant != contractTenant || (contractTenant is null && Text(company, "UserId") != Text(contract, "UserId")))
+                throw new InvalidDataException("Contractor assignment conflicts with contract scope");
+        }
         foreach (var user in sourceUsers.Values)
         {
             var name = Text(user, "UserName");
@@ -78,7 +129,7 @@ public static class LocalFixtureImporter
             var declared = plan.GetProperty("documentScopes").GetProperty(Id(file));
             if (Text(declared, "kind") != scope.Item1 || Text(declared, "sourceOwner") != scope.Item2) throw new InvalidDataException("Scope policy mismatch");
             var users = linked.Select(c => Text(c, "UserId")!).Distinct().ToList();
-            var expectedUploader = Text(file, "UserId") ?? (users.Count == 1 ? users[0] : users.Count == 0 && scope.Item1 == "tenant" ? adminSource : throw new InvalidDataException("Unknown uploader"));
+            var expectedUploader = Text(file, "UserId") ?? (users.Count == 1 ? users[0] : users.Count == 0 && scope.Item1 == "tenant" ? admins[scope.Item2] : throw new InvalidDataException("Unknown uploader"));
             var uploader = Text(plan.GetProperty("documentUploaders"), Id(file))!;
             if (uploader != expectedUploader || !sourceUsers.ContainsKey(uploader) || (scope.Item1 == "private" ? uploader != scope.Item2 : !memberships.Contains((uploader, scope.Item2))))
                 throw new InvalidDataException("Uploader policy mismatch");
@@ -137,10 +188,10 @@ public static class LocalFixtureImporter
         }
         await db.SaveChangesAsync();
         foreach (var row in raw.GetProperty("FamilyUserList").EnumerateArray()) db.TenantMemberships.Add(new TenantMembership { UserId = usersTarget[Text(row, "UsersId")!].Id,
-            TenantId = tenants[Text(row, "FamiliesId")!].Id, Role = Text(row, "UsersId") == adminSource ? UserRole.TenantAdmin : UserRole.User, IsActive = true });
+            TenantId = tenants[Text(row, "FamiliesId")!].Id, Role = Text(row, "UsersId") == admins[Text(row, "FamiliesId")!] ? UserRole.TenantAdmin : UserRole.User, IsActive = true });
         foreach (var row in raw.GetProperty("Companies").EnumerateArray())
         {
-            var t = Text(row, "FamilyId"); var c = new Contractor { Name = Text(row, "CompanyName")!, Type = ContractorType.Company, IsActive = true,
+            var t = assignments.GetValueOrDefault(Id(row)) ?? Text(row, "FamilyId"); var c = new Contractor { Name = Text(row, "CompanyName")!, Type = ContractorType.Company, IsActive = true,
                 TenantId = t is null ? null : tenants[t].Id, OwnerUserId = t is null ? usersTarget[Text(row, "UserId")!].Id : null,
                 UserId = usersTarget[Text(row, "UserId")!].Id, Email = Text(row, "Email"), Phone = Text(row, "Phone"), Website = Text(row, "Website"), Description = Text(row, "Description"), Notes = Text(row, "Notes") };
             companies.Add(Id(row), c); db.Contractors.Add(c);
@@ -200,6 +251,9 @@ public static class LocalFixtureImporter
             throw new InvalidDataException("Reconciliation counts disagree");
         await db.Database.ExecuteSqlRawAsync("CREATE TABLE LocalImportRun (PlanHash TEXT PRIMARY KEY, Fingerprint TEXT NOT NULL, PlanJson TEXT NOT NULL)");
         await db.Database.ExecuteSqlRawAsync("CREATE TABLE LocalSourceLedger (Entity TEXT NOT NULL, SourceId TEXT NOT NULL, TargetReference TEXT, RawJson TEXT NOT NULL, PRIMARY KEY(Entity, SourceId))");
+        await db.Database.ExecuteSqlRawAsync("CREATE TABLE LocalContractorScopeLedger (SourceCompanyId TEXT PRIMARY KEY, TenantSourceId TEXT NOT NULL, TargetContractorId INTEGER NOT NULL)");
+        foreach (var (company, tenant) in assignments)
+            await db.Database.ExecuteSqlRawAsync("INSERT INTO LocalContractorScopeLedger VALUES ({0}, {1}, {2})", company, tenant, companies[company].Id);
         foreach (var table in raw.EnumerateObject()) foreach (var row in table.Value.EnumerateArray())
         {
             string key = row.TryGetProperty("Id", out var id) ? id.GetString()! : row.GetRawText();

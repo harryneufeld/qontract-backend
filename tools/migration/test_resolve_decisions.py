@@ -43,6 +43,38 @@ class DecisionTests(unittest.TestCase):
         return f.row('DatabaseFiles', Id=self.file, FileName='proof.pdf', Size=5, UserFamilyId=self.tenant,
                      Binary={'path': path.name, 'sha256': dry_run.digest(path), 'size': 5})
 
+    def add_unscoped_company(self):
+        company = str(uuid.uuid4())
+        self.fixture.row('Companies', Id=company, UserId=self.user, CompanyName='Provider')
+        self.fixture.row('Contracts', Id=str(uuid.uuid4()), CompanyId=company, UserId=self.user,
+                         FamilyId=self.tenant, ContractName='Shared', Recurring=3, Type=0, IsActive=1)
+        self.policy['contractorScopePolicy'] = 'assign_unscoped_company_to_owner_single_tenant'
+        return company
+
+    def test_single_default_tenant_assignment_preserves_original_company(self):
+        company = self.add_unscoped_company()
+        self.fixture.package()
+        plan = resolve_decisions.resolve(self.fixture.root, self.policy)
+        self.assertEqual(plan['contractorTenantAssignments'], [{'sourceCompanyId': company, 'tenantSourceId': self.tenant}])
+        self.assertIsNone(plan['rawRecords']['Companies'][0]['FamilyId'])
+        self.assertEqual(len(plan['rawRecords']['Companies']), 1)
+
+    def test_multiple_memberships_require_review_even_if_only_one_is_referenced(self):
+        self.add_unscoped_company()
+        other = str(uuid.uuid4())
+        self.fixture.row('UserFamilies', Id=other, FamilyName='Other')
+        self.fixture.row('FamilyUserList', UsersId=self.user, FamiliesId=other)
+        self.fixture.package()
+        with self.assertRaisesRegex(ValueError, 'ambiguous defaults'):
+            resolve_decisions.resolve(self.fixture.root, self.policy)
+
+    def test_assignment_cannot_break_private_contract_scope(self):
+        self.add_unscoped_company()
+        self.fixture.rows['Contracts'][0]['FamilyId'] = None
+        self.fixture.package()
+        with self.assertRaisesRegex(ValueError, 'conflicts'):
+            resolve_decisions.resolve(self.fixture.root, self.policy)
+
     def test_standalone_tenant_document_uses_admin_but_stays_shared(self):
         self.add_document()
         self.fixture.package()
