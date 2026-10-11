@@ -2,10 +2,17 @@ using Qontract.Domain.Models;
 
 namespace Qontract.Application.Models;
 
+public record ResponsibleMemberDTO(int Id, string Name);
+
 public class ContractDTO
 {
     public int? TenantId { get; set; }
     public int? OwnerUserId { get; set; }
+    public int? ResponsibleUserId { get; set; }
+    public string? ResponsibleUserName { get; set; }
+    public bool IsActive { get; set; } = true;
+    public DateTime? DeletedAt { get; set; }
+    public DateTime? RetentionExpiresAt { get; set; }
     public List<ContractPriceDTO> PriceHistory { get; set; } = new();
     public int Id { get; set; }
     public string Title { get; set; } = string.Empty;
@@ -33,6 +40,8 @@ public class ContractDTO
 // Qontract.Application.FluentValidation (issue #39), not DataAnnotations.
 public class ContractCreateDTO
 {
+    public bool ClearResponsibleUser { get; set; }
+    public int? ResponsibleUserId { get; set; }
     public string Title { get; set; } = string.Empty;
     public string? Description { get; set; }
     public string? Iban { get; set; }
@@ -67,6 +76,9 @@ public class ContractStatsDTO
 
 public class ContractUpdateDTO
 {
+    public int? ResponsibleUserId { get; set; }
+    public bool ClearResponsibleUser { get; set; }
+    public bool? IsActive { get; set; }
     // Omitted/null Type preserves classification; ClearType explicitly resets it.
     public bool ClearType { get; set; }
     public string? PriceEffectiveFrom { get; set; }

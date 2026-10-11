@@ -55,6 +55,7 @@ public class DocumentRetentionWorker : BackgroundService
             try
             {
                 using var scope = _scopeFactory.CreateScope();
+                await scope.ServiceProvider.GetRequiredService<Qontract.Infrastructure.ContractPurgeService>().PurgeExpiredAsync(stoppingToken);
                 var purger = scope.ServiceProvider.GetRequiredService<DocumentPurgeService>();
                 await purger.PurgeExpiredAsync(stoppingToken);
                 _hasRun = true;

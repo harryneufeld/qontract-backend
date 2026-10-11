@@ -156,6 +156,13 @@ namespace Qontract.Infrastructure.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("TEXT");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DeletedBy")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Description")
                         .HasMaxLength(2000)
                         .HasColumnType("TEXT");
@@ -190,6 +197,12 @@ namespace Qontract.Infrastructure.Migrations
                     b.Property<int?>("OwnerUserId")
                         .HasColumnType("INTEGER");
 
+                    b.Property<int?>("ResponsibleUserId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("RetentionExpiresAt")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("StartDate")
                         .HasMaxLength(50)
                         .HasColumnType("TEXT");
@@ -221,9 +234,11 @@ namespace Qontract.Infrastructure.Migrations
 
                     b.HasIndex("ModifierId");
 
-                    b.HasIndex("TenantId");
+                    b.HasIndex("ResponsibleUserId");
 
                     b.HasIndex("OwnerUserId", "TenantId");
+
+                    b.HasIndex("TenantId", "ResponsibleUserId", "DeletedAt");
 
                     b.ToTable("Contracts", (string)null);
                 });
@@ -860,6 +875,11 @@ namespace Qontract.Infrastructure.Migrations
                         .HasForeignKey("OwnerUserId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("Qontract.Domain.Models.User", "ResponsibleUser")
+                        .WithMany()
+                        .HasForeignKey("ResponsibleUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Qontract.Domain.Models.Tenant", "Tenant")
                         .WithMany()
                         .HasForeignKey("TenantId");
@@ -871,6 +891,8 @@ namespace Qontract.Infrastructure.Migrations
                     b.Navigation("Modifier");
 
                     b.Navigation("Owner");
+
+                    b.Navigation("ResponsibleUser");
 
                     b.Navigation("Tenant");
                 });

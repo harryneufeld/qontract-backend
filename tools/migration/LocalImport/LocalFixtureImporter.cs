@@ -223,6 +223,7 @@ public static class LocalFixtureImporter
                 Iban = Text(row, "Iban"), Notes = Text(row, "Notes"), Type = (ContractType)row.GetProperty("Type").GetInt32(), Status = ContractStatus.Active,
                 IsActive = row.GetProperty("IsActive").GetInt32() != 0, StartDate = Text(row, "StartDate"), EndDate = Text(row, "EndDate"), MinimumContractDate = Text(row, "MinContractDate"),
                 Value = Text(row, "Price"), Currency = null, BillingPeriod = (BillingPeriod)row.GetProperty("Recurring").GetInt32(),
+                ResponsibleUserId = usersTarget[Text(row, "UserId")!].Id,
                 TenantId = t is null ? null : tenants[t].Id, OwnerUserId = t is null ? usersTarget[Text(row, "UserId")!].Id : null,
                 ContractorId = Text(row, "CompanyId") is string p ? companies[p].Id : null };
             contracts.Add(Id(row), c); db.Contracts.Add(c);
@@ -270,7 +271,7 @@ public static class LocalFixtureImporter
             || await db.Documents.CountAsync(d => d.ContractId != null) + await db.DocumentLinks.CountAsync() != raw.GetProperty("ContractFileList").GetArrayLength())
             throw new InvalidDataException("Reconciliation counts disagree");
         await db.Database.ExecuteSqlRawAsync("CREATE TABLE LocalImportRun (PlanHash TEXT PRIMARY KEY, Fingerprint TEXT NOT NULL, PlanJson TEXT NOT NULL)");
-        await db.Database.ExecuteSqlRawAsync("CREATE TABLE LocalSourceLedger (Entity TEXT NOT NULL, SourceId TEXT NOT NULL, TargetReference TEXT, RawJson TEXT NOT NULL, PRIMARY KEY(Entity, SourceId))");
+        await db.Database.ExecuteSqlRawAsync("CREATE TABLE IF NOT EXISTS LocalSourceLedger (Entity TEXT NOT NULL, SourceId TEXT NOT NULL, TargetReference TEXT, RawJson TEXT NOT NULL, PRIMARY KEY(Entity, SourceId))");
         await db.Database.ExecuteSqlRawAsync("CREATE TABLE LocalContractorScopeLedger (SourceCompanyId TEXT PRIMARY KEY, TenantSourceId TEXT NOT NULL, TargetContractorId INTEGER NOT NULL)");
         foreach (var (company, tenant) in assignments)
             await db.Database.ExecuteSqlRawAsync("INSERT INTO LocalContractorScopeLedger VALUES ({0}, {1}, {2})", company, tenant, companies[company].Id);

@@ -227,6 +227,8 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
         // Contract
         modelBuilder.Entity<Contract>(entity =>
         {
+            entity.HasOne(e => e.ResponsibleUser).WithMany().HasForeignKey(e => e.ResponsibleUserId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(e => new { e.TenantId, e.ResponsibleUserId, e.DeletedAt });
             entity.HasOne(e => e.Owner).WithMany().HasForeignKey(e => e.OwnerUserId).OnDelete(DeleteBehavior.Restrict);
             entity.HasIndex(e => new { e.OwnerUserId, e.TenantId });
             entity.ToTable("Contracts");

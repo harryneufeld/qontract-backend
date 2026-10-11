@@ -336,19 +336,17 @@ public class ContractApiIntegrationTests : IClassFixture<QontractWebApplicationF
             .ToHashSet();
         allProbes.Should().BeEquivalentTo(ids);
 
-        // Page 1 of 2: exactly 2 probe rows, newest-first, disjoint from
-        // page 2. (Newest-first because the list sorts by CreatedAt desc,
-        // with Id desc as a stable tiebreak.)
+        // Alphabetical ordering is applied globally before pagination.
         var page1 = await _client.GetFromJsonAsync<List<ContractJson>>(
             "/api/contracts?page=1&pageSize=2");
         page1.Should().NotBeNull();
-        page1!.Should().OnlyContain(c => c.Title.StartsWith(prefix));
+        page1!.Select(c => c.Id).Should().Equal(all.Take(2).Select(c => c.Id));
         page1.Should().HaveCount(2);
-        page1[0].Id.Should().BeGreaterThan(page1[1].Id);
+        all.Select(c => c.Title.ToLowerInvariant()).Should().BeInAscendingOrder();
 
         var page2 = await _client.GetFromJsonAsync<List<ContractJson>>(
             "/api/contracts?page=2&pageSize=2");
-        page2!.Should().OnlyContain(c => c.Title.StartsWith(prefix));
+        page2!.Select(c => c.Id).Should().Equal(all.Skip(2).Take(2).Select(c => c.Id));
         page2.Should().HaveCount(2);
 
         // The two pages are disjoint and together hold 4 distinct probe ids

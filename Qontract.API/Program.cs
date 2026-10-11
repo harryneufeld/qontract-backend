@@ -181,6 +181,7 @@ switch (StorageProvider.Normalize(builder.Configuration[$"{FileStorageOptions.Se
 // worker that permanently removes expired soft-deleted documents.
 builder.Services.Configure<Qontract.Application.Services.DocumentRetentionOptions>(
     builder.Configuration.GetSection(Qontract.Application.Services.DocumentRetentionOptions.SectionName));
+builder.Services.AddScoped<Qontract.Infrastructure.ContractPurgeService>();
 builder.Services.AddScoped<Qontract.Application.Services.DocumentPurgeService>();
 builder.Services.AddHostedService<Qontract.API.Services.DocumentRetentionWorker>();
 

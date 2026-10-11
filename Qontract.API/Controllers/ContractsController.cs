@@ -48,7 +48,7 @@ public class ContractsController : ControllerBase
     public async Task<ActionResult<List<ContractDTO>>> GetContracts(
         [FromQuery] int page = 0,
         [FromQuery] int pageSize = 0,
-        [FromQuery] string? status = null)
+        [FromQuery] string? status = null, [FromQuery] string scope = "tenant", [FromQuery] bool trash = false)
     {
         // Offset paging for the dashboard (issue #43). Absent/zero params
         // preserve the historic full-list behaviour.
@@ -59,7 +59,7 @@ public class ContractsController : ControllerBase
         // of the stat-chip buckets so a filtered view covers ALL of the
         // tenant's matching contracts, not only the loaded page.
         if (status is not null &&
-            status is not ("active" or "expiring" or "expired" or "minDate"))
+            status is not ("active" or "inactive" or "expiring" or "expired" or "minDate"))
         {
             return BadRequest(new
             {
@@ -68,7 +68,7 @@ public class ContractsController : ControllerBase
         }
 
         var contracts = await _contractService.GetContractsAsync(
-            CurrentTenantId, p, s, status);
+            CurrentTenantId, p, s, status, scope: scope, trash: trash);
         return Ok(contracts);
     }
 
@@ -79,11 +79,19 @@ public class ContractsController : ControllerBase
     /// wins.
     /// </summary>
     [HttpGet("stats")]
-    public async Task<ActionResult<ContractStatsDTO>> GetStats()
+    public async Task<ActionResult<ContractStatsDTO>> GetStats([FromQuery] string scope = "mine")
     {
-        var stats = await _contractService.GetStatsAsync(CurrentTenantId);
+        var stats = await _contractService.GetStatsAsync(CurrentTenantId, scope: scope);
         return Ok(stats);
     }
+
+    [HttpGet("members")]
+    public async Task<ActionResult<List<ResponsibleMemberDTO>>> Members() =>
+        Ok(await _contractService.GetResponsibleMembersAsync(CurrentTenantId));
+
+    [HttpPost("{id}/restore")]
+    public async Task<ActionResult<ContractDTO>> Restore(int id) =>
+        Ok(await _contractService.RestoreContractAsync(id, CurrentTenantId, CurrentUser));
 
     [HttpGet("{id}")]
     public async Task<ActionResult<ContractDTO>> GetContract(int id)
