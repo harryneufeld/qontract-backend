@@ -128,6 +128,41 @@ public sealed class LocalFixtureImportTests : IDisposable
     }
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ReviewedFileResolutionMustPreserveRawMetadata(bool alteredName)
+    {
+        Fixture();
+        var plan = JsonNode.Parse(File.ReadAllText(Plan))!;
+        var source = plan["rawRecords"]!["DatabaseFiles"]![0]!;
+        string package = plan["packagePath"]!.GetValue<string>();
+        string evidencePath = Path.Combine(package, "file-resolutions.json");
+        File.WriteAllText(evidencePath, JsonSerializer.Serialize(new
+        {
+            format = "familyplanner-reviewed-file-resolutions", version = 1, sourceInstance = "fixture",
+            resolutions = new[] { new { sourceId = source["Id"]!.GetValue<string>(), sourcePath = (string?)null,
+                sourceFileName = alteredName ? "changed.pdf" : source["FileName"]!.GetValue<string>(),
+                storagePath = "files/original.pdf", sha256 = source["Binary"]!["sha256"]!.GetValue<string>(),
+                size = 3, approved = true, reason = "reviewed_legacy_filename_encoding" } }
+        }));
+        string manifestPath = Path.Combine(package, "manifest.json");
+        var manifest = JsonNode.Parse(File.ReadAllText(manifestPath))!;
+        manifest["fileResolutions"] = JsonSerializer.SerializeToNode(new { path = "file-resolutions.json", sha256 = Hash(evidencePath), count = 1 });
+        File.WriteAllText(manifestPath, manifest.ToJsonString());
+        plan["manifestSha256"] = Hash(manifestPath);File.WriteAllText(Plan, plan.ToJsonString());
+        if (alteredName)
+        {
+            var act = () => LocalFixtureImporter.ImportAsync(Plan, Target);
+            await act.Should().ThrowAsync<InvalidDataException>();Directory.Exists(Target).Should().BeFalse();
+        }
+        else
+        {
+            await LocalFixtureImporter.ImportAsync(Plan, Target);
+            JsonSerializer.Serialize(await LocalFixtureImporter.ImportAsync(Plan, Target)).Should().Contain("\"inserted\":0");
+        }
+    }
+
+    [Theory]
     [InlineData(true, false)]
     [InlineData(false, true)]
     public async Task AmbiguousOrTamperedDefaultTenantIsRejectedBeforeCreatingTarget(bool ambiguous, bool tampered)

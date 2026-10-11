@@ -97,6 +97,23 @@ def validate(root):
         counts = Counter(r['entity'] for r in exclusions['excludedRecords'])
         if set(counts) - TABLES or any(len(rows[t]) + counts[t] != exclusions['originalCounts'][t] for t in TABLES):
             raise ValueError('Scoped-source exclusions do not reconcile')
+    if 'fileResolutions' in manifest:
+        entry = manifest['fileResolutions']
+        path = member(root, entry['path'])
+        if digest(path) != entry['sha256']:
+            raise ValueError('Changed file resolution evidence')
+        evidence = json.loads(path.read_text(encoding='utf-8'))
+        resolved = evidence['resolutions']
+        if (evidence.get('format') != 'familyplanner-reviewed-file-resolutions' or evidence.get('version') != 1
+                or evidence.get('sourceInstance') != manifest['sourceInstance'] or len(resolved) != entry['count']
+                or len({r['sourceId'] for r in resolved}) != len(resolved)):
+            raise ValueError('Invalid file resolution evidence')
+        for resolution in resolved:
+            record = indexes['DatabaseFiles'][resolution['sourceId']]
+            if (resolution.get('approved') is not True or resolution.get('reason') != 'reviewed_legacy_filename_encoding'
+                    or resolution['sourcePath'] != record['Path'] or resolution['sourceFileName'] != record['FileName']
+                    or resolution['sha256'] != record['Binary']['sha256'] or resolution['size'] != record['Binary']['size']):
+                raise ValueError('File resolution disagrees with source or binary')
     return manifest, rows, indexes
 
 

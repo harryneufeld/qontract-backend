@@ -67,6 +67,26 @@ public static class LocalFixtureImporter
                 if (raw.GetProperty(entity).GetArrayLength() + excluded.Count(e => Text(e, "entity") == entity)
                     != evidence.GetProperty("originalCounts").GetProperty(entity).GetInt32()) throw new InvalidDataException("Scope counts disagree");
         }
+        if (manifest.TryGetProperty("fileResolutions", out var resolutionEntry))
+        {
+            var path = Member(package, Text(resolutionEntry, "path")!);
+            if (Hash(path) != Text(resolutionEntry, "sha256")) throw new InvalidDataException("Changed file resolution evidence");
+            using var resolutionDoc = JsonDocument.Parse(await File.ReadAllTextAsync(path));
+            var evidence = resolutionDoc.RootElement;
+            var resolutions = evidence.GetProperty("resolutions").EnumerateArray().ToList();
+            if (Text(evidence, "format") != "familyplanner-reviewed-file-resolutions" || evidence.GetProperty("version").GetInt32() != 1
+                || Text(evidence, "sourceInstance") != Text(manifest, "sourceInstance") || resolutions.Count != resolutionEntry.GetProperty("count").GetInt32()
+                || resolutions.Select(r => Text(r, "sourceId")).Distinct().Count() != resolutions.Count) throw new InvalidDataException("Invalid file resolution evidence");
+            foreach (var resolution in resolutions)
+            {
+                var source = raw.GetProperty("DatabaseFiles").EnumerateArray().Single(r => Id(r) == Text(resolution, "sourceId"));
+                var binary = source.GetProperty("Binary");
+                if (!resolution.GetProperty("approved").GetBoolean() || Text(resolution, "reason") != "reviewed_legacy_filename_encoding"
+                    || Text(resolution, "sourcePath") != Text(source, "Path") || Text(resolution, "sourceFileName") != Text(source, "FileName")
+                    || Text(resolution, "sha256") != Text(binary, "sha256") || resolution.GetProperty("size").GetInt64() != binary.GetProperty("size").GetInt64())
+                    throw new InvalidDataException("File resolution disagrees with source or bytes");
+            }
+        }
         var sourceUsers = raw.GetProperty("Users").EnumerateArray().ToDictionary(Id);
         var sourceContracts = raw.GetProperty("Contracts").EnumerateArray().ToDictionary(Id);
         var sourceCompanies = raw.GetProperty("Companies").EnumerateArray().ToDictionary(Id);
