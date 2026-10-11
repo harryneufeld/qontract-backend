@@ -10,6 +10,26 @@ import dry_run
 
 
 class DryRunTests(unittest.TestCase):
+    def test_resolution_evidence_must_match_raw_source_and_exported_bytes(self):
+        blob = self.root/'proof.bin';blob.write_bytes(b'proof')
+        record = self.row('DatabaseFiles', Id=str(uuid.uuid4()), FileName='raw-name.pdf', Path='files', Size=5,
+                          Binary={'path':blob.name, 'sha256':dry_run.digest(blob), 'size':5})
+        manifest = self.package()
+        resolution = {'sourceId':record['Id'], 'sourcePath':'files', 'sourceFileName':record['FileName'],
+                      'storagePath':'files/actual.pdf', 'sha256':record['Binary']['sha256'], 'size':5,
+                      'approved':True, 'reason':'reviewed_legacy_filename_encoding'}
+        evidence = {'format':'familyplanner-reviewed-file-resolutions', 'version':1, 'sourceInstance':'fixture', 'resolutions':[resolution]}
+        path=self.root/'file-resolutions.json'
+        def save():
+            path.write_text(json.dumps(evidence))
+            manifest['fileResolutions']={'path':path.name,'sha256':dry_run.digest(path),'count':1}
+            (self.root/'manifest.json').write_text(json.dumps(manifest))
+        save();dry_run.validate(self.root)
+        resolution['sourceFileName']='renamed.pdf';save()
+        with self.assertRaisesRegex(ValueError,'disagrees'):dry_run.validate(self.root)
+        path.write_text('{}')
+        with self.assertRaisesRegex(ValueError,'Changed'):dry_run.validate(self.root)
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)

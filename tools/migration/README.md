@@ -194,6 +194,15 @@ The hashed `scope-exclusions.json` retains every excluded allowlisted record and
 original table counts; the dry run reconciles retained plus excluded counts.
 Keep this evidence private alongside the untouched source backup.
 
+For the restored archive, the apparent missing bytes were subsequently resolved
+through reviewed legacy filename mappings. The current test uses
+`--first-test-scope --file-resolutions PRIVATE_MAP.json`, without
+`--drop-missing-files`, and retains all 197 selected documents. The optional
+manifest `fileResolutions` descriptor hashes the applied mapping evidence.
+Both dry run and importer check its source identity, original metadata, unique
+document IDs and binary hashes/sizes. Source names/paths and archive bytes remain
+unchanged; there is no implicit filename guessing or normalization.
+
 Reviewed decisions may provide `tenantAdminEmails`, keyed by source tenant ID;
 every choice must identify an existing member. The legacy single
 `tenantAdminEmail` remains supported.
