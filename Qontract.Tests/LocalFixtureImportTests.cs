@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Qontract.Domain.Models;
@@ -66,6 +67,76 @@ public sealed class LocalFixtureImportTests : IDisposable
         }));
     }
     private ApplicationDbContext Db() => new(new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite($"Data Source={Path.Combine(Target, "qontract.sqlite")};Pooling=False").Options);
+
+    private void DefaultTenantFixture(bool ambiguous = false, bool tampered = false)
+    {
+        Fixture();
+        var plan = JsonNode.Parse(File.ReadAllText(Plan))!;
+        var raw = plan["rawRecords"]!;
+        string user = raw["Users"]![0]!["Id"]!.GetValue<string>();
+        string tenant = raw["UserFamilies"]![0]!["Id"]!.GetValue<string>();
+        string company = Guid.NewGuid().ToString();
+        raw["Companies"]!.AsArray().Add(JsonSerializer.SerializeToNode(Row("Id CompanyName FamilyId UserId AddressId Email Phone Website Description Notes Created Modified",
+            ("Id", company), ("CompanyName", "Provider"), ("UserId", user))));
+        raw["Contracts"]![0]!["FamilyId"] = tenant;
+        raw["Contracts"]![0]!["CompanyId"] = company;
+        raw["DatabaseFiles"]![0]!["UserFamilyId"] = tenant;
+        var document = raw["DatabaseFiles"]![0]!["Id"]!.GetValue<string>();
+        plan["documentScopes"]![document]!["kind"] = "tenant";
+        plan["documentScopes"]![document]!["sourceOwner"] = tenant;
+        plan["reviewedPolicy"]!["contractorScopePolicy"] = "assign_unscoped_company_to_owner_single_tenant";
+        plan["contractorTenantAssignments"] = JsonSerializer.SerializeToNode(new[] { new { sourceCompanyId = company, tenantSourceId = tampered ? Guid.NewGuid().ToString() : tenant } });
+        if (ambiguous)
+        {
+            string other = Guid.NewGuid().ToString();
+            raw["UserFamilies"]!.AsArray().Add(JsonSerializer.SerializeToNode(Row("Id FamilyName AddressId Created Modified", ("Id", other), ("FamilyName", "Other"))));
+            raw["FamilyUserList"]!.AsArray().Add(JsonSerializer.SerializeToNode(Row("UsersId FamiliesId", ("UsersId", user), ("FamiliesId", other))));
+        }
+        string package = plan["packagePath"]!.GetValue<string>();
+        var manifestPath = Path.Combine(package, "manifest.json");
+        var manifest = JsonNode.Parse(File.ReadAllText(manifestPath))!;
+        foreach (var entity in raw.AsObject())
+        {
+            var path = Path.Combine(package, entity.Key + ".json"); File.WriteAllText(path, entity.Value!.ToJsonString());
+            manifest["entities"]![entity.Key]!["sha256"] = Hash(path);
+            manifest["entities"]![entity.Key]!["count"] = entity.Value.AsArray().Count;
+        }
+        File.WriteAllText(manifestPath, manifest.ToJsonString());
+        plan["manifestSha256"] = Hash(manifestPath);
+        File.WriteAllText(Plan, plan.ToJsonString());
+    }
+
+    [Fact]
+    public async Task DefaultTenantAssignmentPreservesOneContractorAndSourceOwnership()
+    {
+        DefaultTenantFixture();
+        await LocalFixtureImporter.ImportAsync(Plan, Target);
+        await using (var db = Db())
+        {
+            var contractor = await db.Contractors.SingleAsync();
+            contractor.TenantId.Should().Be((await db.Tenants.SingleAsync()).Id);
+            contractor.OwnerUserId.Should().BeNull();
+            (await db.Contracts.SingleAsync()).ContractorId.Should().Be(contractor.Id);
+            (await db.Addresses.CountAsync()).Should().Be(1);
+            await db.Database.OpenConnectionAsync();
+            using var command = db.Database.GetDbConnection().CreateCommand();
+            command.CommandText = "SELECT RawJson FROM LocalSourceLedger WHERE Entity='Companies'";
+            using var source = JsonDocument.Parse((string)(await command.ExecuteScalarAsync())!);
+            source.RootElement.GetProperty("FamilyId").ValueKind.Should().Be(JsonValueKind.Null);
+        }
+        JsonSerializer.Serialize(await LocalFixtureImporter.ImportAsync(Plan, Target)).Should().Contain("\"inserted\":0");
+    }
+
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public async Task AmbiguousOrTamperedDefaultTenantIsRejectedBeforeCreatingTarget(bool ambiguous, bool tampered)
+    {
+        DefaultTenantFixture(ambiguous, tampered);
+        var act = () => LocalFixtureImporter.ImportAsync(Plan, Target);
+        await act.Should().ThrowAsync<InvalidDataException>();
+        Directory.Exists(Target).Should().BeFalse();
+    }
 
     [Fact]
     public async Task ImportAndReplay_PreserveValuesRolesScopeAndCredentialSetup()

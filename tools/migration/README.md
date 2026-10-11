@@ -183,6 +183,36 @@ The user-created FamilyPlanner fixture and production were not changed by this w
 
 ## Prepare a separate runnable copy
 
+### Scoped first test and default contractor tenants
+
+The exporter can create an explicitly scoped **first-test** package using
+`--first-test-scope --drop-missing-files`. This includes users with a tenant
+membership, at least one owned contract and an email-shaped address, and their
+selected tenant records. Missing document bytes and their links are excluded
+only under that explicit policy. This is not a full-source migration approval.
+The hashed `scope-exclusions.json` retains every excluded allowlisted record and
+original table counts; the dry run reconciles retained plus excluded counts.
+Keep this evidence private alongside the untouched source backup.
+
+Reviewed decisions may provide `tenantAdminEmails`, keyed by source tenant ID;
+every choice must identify an existing member. The legacy single
+`tenantAdminEmail` remains supported.
+
+`contractorScopePolicy: assign_unscoped_company_to_owner_single_tenant` assigns
+each contractor without a legacy family to its owner's sole tenant. It creates
+no contractor or address copies, preserves existing tenant assignments, and
+records the transformation in `LocalContractorScopeLedger`. The original
+company row, including its null `FamilyId`, remains in `LocalSourceLedger`.
+Both resolver and importer recompute memberships and reject ambiguous defaults,
+altered assignments, or a resulting contract/contractor scope mismatch before
+creating the target. Legacy tenant rows contain no creator field; dates and names
+are not evidence of who created a tenant. Multiple memberships need a separately
+reviewed default-tenant decision; this policy deliberately cannot infer one.
+
+Assignment makes contractor details visible to members of the selected tenant.
+It is an explicit reviewed migration transformation, not an automatic change to
+the application's personal contractor behavior.
+
 `prepare_runtime.py` starts from verified backup evidence and creates a new local
 runtime directory. It copies and verifies the immutable target, relocates only
 document paths into that copy, revokes restored sessions, consumes restored reset

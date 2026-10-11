@@ -15,14 +15,28 @@ def resolve(package, policy):
         raise ValueError('Unsupported display-name decision')
     if policy.get('documentUploaderPolicy') != 'unique_contract_user_else_tenant_admin':
         raise ValueError('Uploader decision has not been reviewed')
-    admins = [u for u in rows['Users'] if (u['Email'] or '').strip().casefold()
-              == policy.get('tenantAdminEmail', '').strip().casefold()]
-    if len(admins) != 1:
-        raise ValueError('Selected administrator must match exactly one source account')
-    admin_id = admins[0]['Id']
     memberships = {(r['UsersId'], r['FamiliesId']) for r in rows['FamilyUserList']}
-    if any((admin_id, t['Id']) not in memberships for t in rows['UserFamilies']):
-        raise ValueError('Selected administrator is not a member of every exported tenant')
+    tenant_ids = {t['Id'] for t in rows['UserFamilies']}
+    choices = policy.get('tenantAdminEmails')
+    if choices is None:
+        choices = {t: policy.get('tenantAdminEmail', '') for t in tenant_ids}
+    if set(choices) != tenant_ids:
+        raise ValueError('Administrator choices must cover exactly the exported tenants')
+    admins = {}
+    for tenant, email in choices.items():
+        users = [u for u in rows['Users'] if (u['Email'] or '').strip().casefold() == email.strip().casefold()]
+        if len(users) != 1 or (users[0]['Id'], tenant) not in memberships:
+            raise ValueError('Each administrator must match one existing tenant member')
+        admins[tenant] = users[0]['Id']
+    assignments = {}
+    if policy.get('contractorScopePolicy') == 'assign_unscoped_company_to_owner_single_tenant':
+        for company in rows['Companies']:
+            if company['FamilyId'] is not None:
+                continue
+            tenants = {tenant for user, tenant in memberships if user == company['UserId']}
+            if len(tenants) != 1:
+                raise ValueError('Contractor owner needs exactly one tenant; ambiguous defaults require review')
+            assignments[company['Id']] = next(iter(tenants))
     names = {}
     for user in rows['Users']:
         value = user['UserName']
@@ -45,7 +59,7 @@ def resolve(package, policy):
         elif owners:
             raise ValueError('Linked contracts have different users; no uploader can be inferred')
         elif scope[0]['kind'] == 'tenant':
-            uploader, reason = admin_id, 'reviewed_tenant_admin_fallback'
+            uploader, reason = admins[scope[0]['sourceOwner']], 'reviewed_tenant_admin_fallback'
         else:
             raise ValueError('Private standalone document has no reviewed uploader')
         if uploader not in idx['Users']:
@@ -57,13 +71,25 @@ def resolve(package, policy):
         uploaders[file_id], provenance[file_id] = uploader, reason
     resolved = {'target_required_UserName', 'tenant_admin_assignment_required',
                 'document_uploader_provenance_requires_review', 'mapping_policy_confirmation_required'}
-    remaining = [f for f in report['findings'] if f['code'] not in resolved]
+    def assignment_resolves(finding):
+        if finding['code'] != 'contract_contractor_scope_mismatch':
+            return False
+        contract = idx['Contracts'][finding['sourceId']]
+        return contract['FamilyId'] is not None and assignments.get(contract['CompanyId']) == contract['FamilyId']
+    # Assignment must not break a previously valid private or differently scoped contract.
+    for contract in rows['Contracts']:
+        if contract['CompanyId'] in assignments and contract['FamilyId'] != assignments[contract['CompanyId']]:
+            raise ValueError('Default tenant assignment conflicts with a contract scope')
+    remaining = [f for f in report['findings'] if f['code'] not in resolved and not assignment_resolves(f)]
     if any(f['severity'] in ('blocker', 'review') for f in remaining):
         raise ValueError('Unresolved findings still block local import')
     return {'format': 'qontract-local-import-plan', 'version': 1,
             'sourceInstance': manifest['sourceInstance'], 'exportId': manifest['exportId'],
             'packagePath': str(package.resolve()), 'manifestSha256': dry_run.digest(package / 'manifest.json'),
-            'rawRecords': rows, 'displayNames': names, 'tenantAdminSourceId': admin_id,
+            'rawRecords': rows, 'displayNames': names, 'tenantAdminSourceIds': admins,
+            'tenantAdminSourceId': next(iter(admins.values())) if len(set(admins.values())) == 1 else None,
+            'contractorTenantAssignments': [{'sourceCompanyId': company, 'tenantSourceId': tenant}
+                                           for company, tenant in sorted(assignments.items())],
             'documentUploaders': uploaders, 'uploaderProvenance': provenance,
             'documentScopes': {m['sourceId']: m['candidateScopes'][0] for m in report['mappingCandidates']
                                if m['entity'] == 'DatabaseFiles'},
