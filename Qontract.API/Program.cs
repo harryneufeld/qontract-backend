@@ -21,9 +21,9 @@ using Asp.Versioning.ApiExplorer;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Configuration.AddJsonFile("debugSettings.json", optional: true, reloadOnChange: true);
 if (builder.Environment.EnvironmentName == "Development")
 {
+    builder.Configuration.AddJsonFile("debugSettings.json", optional: true, reloadOnChange: true);
     var debugUrls = builder.Configuration["Urls"];
     if (!string.IsNullOrWhiteSpace(debugUrls))
     {
@@ -181,6 +181,7 @@ switch (StorageProvider.Normalize(builder.Configuration[$"{FileStorageOptions.Se
 // worker that permanently removes expired soft-deleted documents.
 builder.Services.Configure<Qontract.Application.Services.DocumentRetentionOptions>(
     builder.Configuration.GetSection(Qontract.Application.Services.DocumentRetentionOptions.SectionName));
+builder.Services.AddScoped<Qontract.Infrastructure.ContractPurgeService>();
 builder.Services.AddScoped<Qontract.Application.Services.DocumentPurgeService>();
 builder.Services.AddHostedService<Qontract.API.Services.DocumentRetentionWorker>();
 

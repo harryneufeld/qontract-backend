@@ -16,7 +16,7 @@ public class ContractService : IContractService
     }
 
     /// <summary>
-    /// Lists a tenant's active contracts, most recently created first.
+    /// Lists accessible, non-deleted contracts alphabetically, including inactive records.
     ///
     /// When [page] &gt; 0 and [pageSize] &gt; 0 the result is a single page
     /// of at most [pageSize] rows (issue #43); otherwise the full list is
@@ -34,10 +34,10 @@ public class ContractService : IContractService
         int page = 0,
         int pageSize = 0,
         string? status = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default, string scope = "tenant", bool trash = false)
     {
         if (status is not null &&
-            status is not ("active" or "expiring" or "expired" or "minDate"))
+            status is not ("active" or "inactive" or "expiring" or "expired" or "minDate"))
         {
             throw new ArgumentException(
                 $"Unknown contract status filter '{status}'.", nameof(status));
@@ -48,25 +48,28 @@ public class ContractService : IContractService
             .Include(c => c.Contractor)
             .Include(c => c.Creator)
             .Include(c => c.Modifier)
-            .Where(c => c.IsActive);
+            .Include(c => c.ResponsibleUser)
+            .Where(c => trash ? c.DeletedAt != null : c.DeletedAt == null);
+        query = InScope(query, scope);
 
         if (status is not null)
         {
             var now = DateTime.Now;
             var today = now.Date;
             var rows = await query
-                .Select(c => new { c.Id, c.Status, c.EndDate, c.MinimumContractDate })
+                .Select(c => new { c.Id, c.Status, c.IsActive, c.EndDate, c.MinimumContractDate })
                 .ToListAsync(cancellationToken);
 
             var matching = rows
                 .Where(r => status switch
                 {
-                    "active" => r.Status == ContractStatus.Active,
-                    "expiring" => IsExpiringSoon(r.EndDate, now) &&
+                    "active" => r.IsActive && r.Status == ContractStatus.Active,
+                    "inactive" => !r.IsActive,
+                    "expiring" => r.IsActive && IsExpiringSoon(r.EndDate, now) &&
                                   !IsDateExpired(r.EndDate, now),
                     "expired" => IsDateExpired(r.EndDate, now) ||
                                  r.Status == ContractStatus.Expired,
-                    "minDate" => r.Status == ContractStatus.Active &&
+                    "minDate" => r.IsActive && r.Status == ContractStatus.Active &&
                                  ReachesMinimumContractDate(r.MinimumContractDate, today),
                     _ => false
                 })
@@ -86,11 +89,10 @@ public class ContractService : IContractService
 
         if (status is not "minDate")
         {
-            // Secondary sort keeps paging stable when CreatedAt collides
-            // (multiple rows created within the same millisecond).
+            // ID keeps alphabetical pagination stable for equal titles.
             query = query
-                .OrderByDescending(c => c.CreatedAt)
-                .ThenByDescending(c => c.Id);
+                .OrderBy(c => c.Title.ToLower())
+                .ThenBy(c => c.Id);
         }
 
         if (page > 0 && pageSize > 0)
@@ -103,6 +105,8 @@ public class ContractService : IContractService
             {
                 Id = c.Id,
                 TenantId = c.TenantId, OwnerUserId = c.OwnerUserId,
+                ResponsibleUserId = c.ResponsibleUserId, ResponsibleUserName = c.ResponsibleUser == null ? null : c.ResponsibleUser.Name,
+                IsActive = c.IsActive, DeletedAt = c.DeletedAt, RetentionExpiresAt = c.RetentionExpiresAt,
                 Title = c.Title,
                 Description = c.Description,
                 Iban = c.Iban,
@@ -145,16 +149,17 @@ public class ContractService : IContractService
     ///  - minDateApproaching: status Active and the minimum contract date
     ///    falls within the next 90 days (already passed counts)
     /// </summary>
-    public async Task<ContractStatsDTO> GetStatsAsync(int tenantId, CancellationToken cancellationToken = default)
+    public async Task<ContractStatsDTO> GetStatsAsync(int tenantId, CancellationToken cancellationToken = default, string scope = "mine")
     {
         var now = DateTime.Now;
         var today = now.Date;
 
-        var rows = await _context.Contracts.VisibleIn(tenantId, _identity?.UserId)
-            .Where(c => c.IsActive)
+        var rows = await InScope(_context.Contracts.VisibleIn(tenantId, _identity?.UserId), scope)
+            .Where(c => c.DeletedAt == null)
             .Select(c => new
             {
                 c.Status,
+                c.IsActive,
                 c.EndDate,
                 c.MinimumContractDate
             })
@@ -168,10 +173,10 @@ public class ContractService : IContractService
         foreach (var c in rows)
         {
             var dateExpired = IsDateExpired(c.EndDate, now);
-            if (c.Status == ContractStatus.Active) active++;
+            if (c.IsActive && c.Status == ContractStatus.Active) active++;
             if (dateExpired || c.Status == ContractStatus.Expired) expired++;
-            if (IsExpiringSoon(c.EndDate, now) && !dateExpired) expiring++;
-            if (c.Status == ContractStatus.Active &&
+            if (c.IsActive && IsExpiringSoon(c.EndDate, now) && !dateExpired) expiring++;
+            if (c.IsActive && c.Status == ContractStatus.Active &&
                 ReachesMinimumContractDate(c.MinimumContractDate, today))
             {
                 minDateApproaching++;
@@ -228,7 +233,8 @@ public class ContractService : IContractService
             .Include(c => c.Contractor)
             .Include(c => c.Creator)
             .Include(c => c.Modifier)
-            .FirstOrDefaultAsync(c => c.Id == id && c.IsActive, cancellationToken);
+            .Include(c => c.ResponsibleUser)
+            .FirstOrDefaultAsync(c => c.Id == id && c.DeletedAt == null, cancellationToken);
 
         if (contract == null)
             throw new KeyNotFoundException($"Contract with ID {id} not found in tenant {tenantId}.");
@@ -237,6 +243,8 @@ public class ContractService : IContractService
         {
             Id = contract.Id,
             TenantId = contract.TenantId, OwnerUserId = contract.OwnerUserId,
+            ResponsibleUserId = contract.ResponsibleUserId, ResponsibleUserName = contract.ResponsibleUser?.Name,
+            IsActive = contract.IsActive, DeletedAt = contract.DeletedAt, RetentionExpiresAt = contract.RetentionExpiresAt,
             Title = contract.Title,
             Description = contract.Description,
             Iban = contract.Iban,
@@ -263,6 +271,10 @@ public class ContractService : IContractService
     public async Task<ContractDTO> CreateContractAsync(int tenantId, ContractCreateDTO dto, string? createdBy, CancellationToken cancellationToken = default)
     {
         await ValidateContractorAsync(dto.ContractorId, tenantId, cancellationToken);
+        if (dto.ClearResponsibleUser && dto.ResponsibleUserId != null)
+            throw new InvalidOperationException("Choose a responsible member or clear the assignment, not both.");
+        var responsible = dto.ClearResponsibleUser ? null : dto.ResponsibleUserId ?? _identity?.UserId;
+        await ValidateResponsibleAsync(responsible, tenantId, cancellationToken);
         var contract = new Contract
         {
             Title = dto.Title,
@@ -281,6 +293,7 @@ public class ContractService : IContractService
             ContractorId = dto.ContractorId,
             TenantId = tenantId == 0 ? null : tenantId,
             OwnerUserId = RecordAccess.Owner(tenantId, _identity?.UserId),
+            ResponsibleUserId = responsible,
             IsActive = true,
             CreatedBy = createdBy,
             ModifiedBy = createdBy,
@@ -299,12 +312,20 @@ public class ContractService : IContractService
     {
         await using var transaction = await _context.BeginSerializableTransactionAsync(cancellationToken);
         var contract = await _context.Contracts.VisibleIn(tenantId, _identity?.UserId).Include(c => c.PriceHistory)
-            .FirstOrDefaultAsync(c => c.Id == id && c.IsActive, cancellationToken);
+            .FirstOrDefaultAsync(c => c.Id == id && c.DeletedAt == null, cancellationToken);
 
         if (contract == null)
             throw new KeyNotFoundException($"Contract with ID {id} not found in tenant {tenantId}.");
 
         await ValidateContractorAsync(dto.ContractorId ?? contract.ContractorId, tenantId, cancellationToken);
+        if (dto.ClearResponsibleUser && dto.ResponsibleUserId != null)
+            throw new InvalidOperationException("Choose a responsible member or clear the assignment, not both.");
+        if (dto.ResponsibleUserId.HasValue || dto.ClearResponsibleUser)
+        {
+            await ValidateResponsibleAsync(dto.ClearResponsibleUser ? null : dto.ResponsibleUserId, tenantId, cancellationToken);
+            contract.ResponsibleUserId = dto.ClearResponsibleUser ? null : dto.ResponsibleUserId;
+        }
+        if (dto.IsActive.HasValue) contract.IsActive = dto.IsActive.Value;
         var oldValue = contract.Value;
         var oldCurrency = contract.Currency;
         var oldPeriod = contract.BillingPeriod;
@@ -371,7 +392,7 @@ public class ContractService : IContractService
     public async Task<ContractDTO> DeactivateContractAsync(int id, int tenantId, string? modifiedBy, CancellationToken cancellationToken = default)
     {
         var contract = await _context.Contracts.VisibleIn(tenantId, _identity?.UserId).Include(c => c.PriceHistory)
-            .FirstOrDefaultAsync(c => c.Id == id && c.IsActive, cancellationToken);
+            .FirstOrDefaultAsync(c => c.Id == id && c.DeletedAt == null, cancellationToken);
 
         if (contract == null)
             throw new KeyNotFoundException($"Contract with ID {id} not found in tenant {tenantId}.");
@@ -389,6 +410,8 @@ public class ContractService : IContractService
         {
             Id = contract.Id,
             TenantId = contract.TenantId, OwnerUserId = contract.OwnerUserId,
+            ResponsibleUserId = contract.ResponsibleUserId, ResponsibleUserName = contract.ResponsibleUser?.Name,
+            IsActive = contract.IsActive, DeletedAt = contract.DeletedAt, RetentionExpiresAt = contract.RetentionExpiresAt,
             Title = contract.Title,
             Description = contract.Description,
             Iban = contract.Iban,
@@ -410,6 +433,46 @@ public class ContractService : IContractService
             ModifiedBy = contract.ModifiedBy,
             CreatedAtUTC = contract.CreatedAt
         };
+    }
+
+    private IQueryable<Contract> InScope(IQueryable<Contract> query, string scope)
+    {
+        if (scope is not ("mine" or "tenant")) throw new ArgumentException("Unknown contract scope.");
+        return scope == "mine" && _identity?.UserId is int userId
+            ? query.Where(c => c.ResponsibleUserId == userId || c.TenantId == null && c.OwnerUserId == userId) : query;
+    }
+
+    public async Task<List<ResponsibleMemberDTO>> GetResponsibleMembersAsync(int tenantId, CancellationToken cancellationToken = default)
+    {
+        if (tenantId == 0)
+            return await _context.Users.Where(u => u.Id == _identity!.UserId && u.IsActive)
+                .Select(u => new ResponsibleMemberDTO(u.Id, u.Name)).ToListAsync(cancellationToken);
+        return await _context.TenantMemberships.Where(m => m.TenantId == tenantId && m.IsActive && m.User.IsActive)
+            .OrderBy(m => m.User.Name).Select(m => new ResponsibleMemberDTO(m.UserId, m.User.Name)).ToListAsync(cancellationToken);
+    }
+
+    private async Task ValidateResponsibleAsync(int? userId, int tenantId, CancellationToken ct)
+    {
+        if (userId == null) return;
+        var valid = tenantId == 0 ? userId == _identity?.UserId
+            : await _context.TenantMemberships.AnyAsync(m => m.TenantId == tenantId && m.UserId == userId && m.IsActive && m.User.IsActive, ct);
+        if (!valid) throw new InvalidOperationException("Responsible user must be an active member of this workspace.");
+    }
+
+    public async Task<ContractDTO> RestoreContractAsync(int id, int tenantId, string? actor, CancellationToken cancellationToken = default)
+    {
+        await using var transaction = await _context.BeginSerializableTransactionAsync(cancellationToken);
+        var contract = await _context.Contracts.VisibleIn(tenantId, _identity?.UserId)
+            .SingleOrDefaultAsync(c => c.Id == id && c.DeletedAt != null, cancellationToken)
+            ?? throw new KeyNotFoundException("Deleted contract not found.");
+        if (contract.RetentionExpiresAt <= DateTime.UtcNow) throw new InvalidOperationException("The restoration period has expired.");
+        contract.DeletedAt = null;
+        contract.DeletedBy = null;
+        contract.RetentionExpiresAt = null;
+        contract.ModifiedBy = actor;
+        await _context.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return await GetContractByIdAsync(id, tenantId, cancellationToken);
     }
 
     private async Task ValidateContractorAsync(int? id, int tenantId, CancellationToken ct)
@@ -447,12 +510,16 @@ public class ContractService : IContractService
     public async Task<bool> DeleteContractSoftAsync(int id, int tenantId, string? modifiedBy, CancellationToken cancellationToken = default)
     {
         var contract = await _context.Contracts.VisibleIn(tenantId, _identity?.UserId).Include(c => c.PriceHistory)
-            .FirstOrDefaultAsync(c => c.Id == id && c.IsActive, cancellationToken);
+            .FirstOrDefaultAsync(c => c.Id == id && c.DeletedAt == null, cancellationToken);
 
         if (contract == null)
             throw new KeyNotFoundException($"Contract with ID {id} not found in tenant {tenantId}.");
 
-        contract.IsActive = false;
+        var settings = tenantId == 0 ? null : await _context.Tenants.Where(t => t.Id == tenantId).Select(t => t.Settings).SingleAsync(cancellationToken);
+        var days = TenantSettingsParser.GetContractRetentionDays(settings) ?? 90;
+        contract.DeletedAt = DateTime.UtcNow;
+        contract.DeletedBy = modifiedBy;
+        contract.RetentionExpiresAt = contract.DeletedAt.Value.AddDays(days);
         contract.ModifiedAt = DateTime.UtcNow;
         contract.ModifiedBy = modifiedBy;
 

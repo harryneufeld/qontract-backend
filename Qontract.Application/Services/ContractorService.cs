@@ -55,7 +55,7 @@ public class ContractorService : IContractorService
     private async Task<Dictionary<int, int>> GetContractCountsAsync(int tenantId, CancellationToken cancellationToken)
     {
         var counts = await _context.Contracts.VisibleIn(tenantId, _identity?.UserId)
-            .Where(c => c.IsActive && c.ContractorId != null)
+            .Where(c => c.IsActive && c.DeletedAt == null && c.ContractorId != null)
             .GroupBy(c => c.ContractorId!.Value)
             .Select(g => new { ContractorId = g.Key, Count = g.Count() })
             .ToListAsync(cancellationToken);

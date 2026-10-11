@@ -33,6 +33,20 @@ public static class TenantSettingsParser
     /// The tenant's document retention period in days, or null when the
     /// tenant has no (valid) setting — the global default then applies.
     /// </summary>
+    public static int? GetContractRetentionDays(string? settingsJson)
+    {
+        if (string.IsNullOrWhiteSpace(settingsJson)) return null;
+        try
+        {
+            using var json = JsonDocument.Parse(settingsJson);
+            return json.RootElement.ValueKind == JsonValueKind.Object
+                && json.RootElement.TryGetProperty("contractRetentionDays", out var value)
+                && value.ValueKind == JsonValueKind.Number
+                && value.TryGetInt32(out var days) && days is >= 1 and <= 3650 ? days : null;
+        }
+        catch (JsonException) { return null; }
+    }
+
     public static int? GetDocumentRetentionDays(string? settingsJson)
     {
         if (string.IsNullOrWhiteSpace(settingsJson))

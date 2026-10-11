@@ -54,6 +54,11 @@ public class Contract : BaseEntity
     public bool IsActive { get; set; }
 
     public int? OwnerUserId { get; set; }
+    public int? ResponsibleUserId { get; set; }
+    public User? ResponsibleUser { get; set; }
+    public DateTime? DeletedAt { get; set; }
+    [MaxLength(500)] public string? DeletedBy { get; set; }
+    public DateTime? RetentionExpiresAt { get; set; }
     public User? Owner { get; set; }
 
     // Navigation properties
