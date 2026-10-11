@@ -21,9 +21,9 @@ using Asp.Versioning.ApiExplorer;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Configuration.AddJsonFile("debugSettings.json", optional: true, reloadOnChange: true);
 if (builder.Environment.EnvironmentName == "Development")
 {
+    builder.Configuration.AddJsonFile("debugSettings.json", optional: true, reloadOnChange: true);
     var debugUrls = builder.Configuration["Urls"];
     if (!string.IsNullOrWhiteSpace(debugUrls))
     {

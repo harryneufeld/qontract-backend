@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Configuration;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -38,6 +39,17 @@ public class SecurityConfigTests : IClassFixture<QontractWebApplicationFactory>
     {
         _factory = factory;
         _client = factory.CreateClient();
+    }
+
+    [Theory]
+    [InlineData("Staging")]
+    [InlineData("Production")]
+    public void NonDevelopmentStartupPreservesConfiguredContainerUrls(string environment)
+    {
+        using var factory = new PlainHostFactory(environment, "regression-test-key-at-least-thirty-two-bytes", "http://+:8080");
+        using var client = factory.CreateClient();
+        factory.Services.GetRequiredService<IConfiguration>()["Urls"].Should().Be("http://+:8080",
+            "local debugSettings must not override container binding in deployed environments");
     }
 
     [Fact]
@@ -163,11 +175,13 @@ public class SecurityConfigTests : IClassFixture<QontractWebApplicationFactory>
         private readonly string _environment;
         private readonly string? _jwtKey;
         private readonly string _dbPath;
+        private readonly string? _urls;
 
-        public PlainHostFactory(string environment, string? jwtKey)
+        public PlainHostFactory(string environment, string? jwtKey, string? urls = null)
         {
             _environment = environment;
             _jwtKey = jwtKey;
+            _urls = urls;
             _dbPath = Path.Combine(AppContext.BaseDirectory,
                 $"security-config-test-{Guid.NewGuid():N}.sqlite");
         }
@@ -183,6 +197,7 @@ public class SecurityConfigTests : IClassFixture<QontractWebApplicationFactory>
                 logging.AddConsole();
             });
             builder.UseEnvironment(_environment);
+            if (_urls is not null) builder.UseSetting("Urls", _urls);
             builder.UseSetting("ConnectionStrings:DefaultConnection", $"Data Source={_dbPath}");
             if (_jwtKey is not null)
             {
