@@ -7,6 +7,7 @@ namespace Qontract.Application.Services;
 
 public interface IContractService
 {
+    Task<string> GetDefaultCurrencyAsync(int tenantId, CancellationToken cancellationToken = default);
     Task<List<ContractDTO>> GetContractsAsync(int tenantId, int page = 0, int pageSize = 0, string? status = null, CancellationToken cancellationToken = default, string scope = "tenant", bool trash = false);
     Task<ContractStatsDTO> GetStatsAsync(int tenantId, CancellationToken cancellationToken = default, string scope = "mine");
     Task<ContractDTO> RestoreContractAsync(int id, int tenantId, string? actor, CancellationToken cancellationToken = default);

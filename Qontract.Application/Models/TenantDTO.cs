@@ -4,6 +4,7 @@ namespace Qontract.Application.Models;
 
 public class TenantDTO
 {
+    public string DefaultCurrency => Qontract.Application.Services.TenantCurrency.FromSettings(Settings);
     public int Id { get; set; }
     public string Name { get; set; } = string.Empty;
     public TenantType Type { get; set; }
@@ -31,4 +32,9 @@ public class TenantUpdateDTO
     public TenantType? Type { get; set; }
     public string? Settings { get; set; }
     public bool? IsActive { get; set; }
+}
+
+public class ApplyTenantCurrencyDTO
+{
+    public bool ReplaceExisting { get; set; }
 }

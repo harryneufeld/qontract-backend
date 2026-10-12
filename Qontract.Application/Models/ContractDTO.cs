@@ -15,6 +15,7 @@ public class ContractDTO
     public DateTime? RetentionExpiresAt { get; set; }
     public List<ContractPriceDTO> PriceHistory { get; set; } = new();
     public int Id { get; set; }
+    public int DocumentCount { get; set; }
     public string Title { get; set; } = string.Empty;
     public string? Description { get; set; }
     public string? Iban { get; set; }

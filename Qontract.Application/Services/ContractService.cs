@@ -104,6 +104,12 @@ public class ContractService : IContractService
             .Select(c => new ContractDTO
             {
                 Id = c.Id,
+                DocumentCount = _context.Documents.Count(d =>
+                    (tenantId == 0
+                        ? d.Scope == DocumentScope.Personal && d.UserId == _identity!.UserId
+                        : d.Scope == DocumentScope.Tenant && (d.TenantId == tenantId || d.TenantId == null && d.Contract != null && d.Contract.TenantId == tenantId))
+                    && (d.ContractId == c.Id || d.Links.Any(l => l.ContractId == c.Id))
+                    && !d.IsDeleted && d.SupersededById == null),
                 TenantId = c.TenantId, OwnerUserId = c.OwnerUserId,
                 ResponsibleUserId = c.ResponsibleUserId, ResponsibleUserName = c.ResponsibleUser == null ? null : c.ResponsibleUser.Name,
                 IsActive = c.IsActive, DeletedAt = c.DeletedAt, RetentionExpiresAt = c.RetentionExpiresAt,
@@ -242,6 +248,12 @@ public class ContractService : IContractService
         return new ContractDTO
         {
             Id = contract.Id,
+            DocumentCount = await _context.Documents.CountAsync(d =>
+                (tenantId == 0
+                    ? d.Scope == DocumentScope.Personal && d.UserId == _identity!.UserId
+                    : d.Scope == DocumentScope.Tenant && (d.TenantId == tenantId || d.TenantId == null && d.Contract != null && d.Contract.TenantId == tenantId))
+                && (d.ContractId == contract.Id || d.Links.Any(l => l.ContractId == contract.Id))
+                && !d.IsDeleted && d.SupersededById == null, cancellationToken),
             TenantId = contract.TenantId, OwnerUserId = contract.OwnerUserId,
             ResponsibleUserId = contract.ResponsibleUserId, ResponsibleUserName = contract.ResponsibleUser?.Name,
             IsActive = contract.IsActive, DeletedAt = contract.DeletedAt, RetentionExpiresAt = contract.RetentionExpiresAt,
@@ -268,6 +280,14 @@ public class ContractService : IContractService
         };
     }
 
+    public async Task<string> GetDefaultCurrencyAsync(int tenantId, CancellationToken cancellationToken = default)
+    {
+        if (tenantId == 0) return "EUR";
+        var settings = await _context.Tenants.Where(t => t.Id == tenantId && t.IsActive)
+            .Select(t => t.Settings).SingleOrDefaultAsync(cancellationToken);
+        return TenantCurrency.FromSettings(settings);
+    }
+
     public async Task<ContractDTO> CreateContractAsync(int tenantId, ContractCreateDTO dto, string? createdBy, CancellationToken cancellationToken = default)
     {
         await ValidateContractorAsync(dto.ContractorId, tenantId, cancellationToken);
@@ -285,7 +305,9 @@ public class ContractService : IContractService
             Status = dto.Status,
             StartDate = dto.StartDate,
             EndDate = dto.EndDate,
-            Currency = dto.Currency,
+            Currency = string.IsNullOrWhiteSpace(dto.Currency)
+                ? await GetDefaultCurrencyAsync(tenantId, cancellationToken)
+                : TenantCurrency.Normalize(dto.Currency),
             Value = CanonicalValue(dto.Value, dto.BillingPeriod),
             BillingPeriod = dto.BillingPeriod,
             ContractNumber = dto.ContractNumber,
@@ -409,6 +431,12 @@ public class ContractService : IContractService
         return new ContractDTO
         {
             Id = contract.Id,
+            DocumentCount = await _context.Documents.CountAsync(d =>
+                (tenantId == 0
+                    ? d.Scope == DocumentScope.Personal && d.UserId == _identity!.UserId
+                    : d.Scope == DocumentScope.Tenant && (d.TenantId == tenantId || d.TenantId == null && d.Contract != null && d.Contract.TenantId == tenantId))
+                && (d.ContractId == contract.Id || d.Links.Any(l => l.ContractId == contract.Id))
+                && !d.IsDeleted && d.SupersededById == null, cancellationToken),
             TenantId = contract.TenantId, OwnerUserId = contract.OwnerUserId,
             ResponsibleUserId = contract.ResponsibleUserId, ResponsibleUserName = contract.ResponsibleUser?.Name,
             IsActive = contract.IsActive, DeletedAt = contract.DeletedAt, RetentionExpiresAt = contract.RetentionExpiresAt,

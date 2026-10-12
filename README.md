@@ -11,6 +11,20 @@ Rebuild and deploy the API/import tooling to update existing published instances
 
 ## Features
 
+Tenant admins can configure `defaultCurrency` in the existing tenant settings
+JSON (three-letter currency code; EUR when absent). `GET
+/api/contracts/default-currency` exposes the current workspace default to members,
+and contract creation applies it when currency is omitted. `POST
+/api/tenants/{id}/apply-default-currency` updates non-deleted tenant contracts and
+their price history, filling missing currencies by default; `{ "replaceExisting":
+true }` also replaces existing currencies. It changes currency labels, never
+amounts, checks active admin membership, and returns `changedContracts`. The
+operation excludes personal workspaces, other tenants and the deletion queue.
+Settings storage needs no schema migration.
+
+Contract responses include `documentCount` for visible current documents, including
+shared links and excluding deleted documents and superseded versions.
+
 - ✅ Multi-tenant data model (Family & Company tenants)
 - ✅ Personal workspaces with owner-only contracts, contractors and documents
 - ✅ Private account addresses and member-readable tenant addresses, with separate house numbers
