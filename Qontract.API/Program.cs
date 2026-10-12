@@ -41,7 +41,7 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 var databaseProvider = DatabaseProvider.Normalize(builder.Configuration["Database:Provider"]);
 
 // Add services to the container.
-builder.Services.AddControllers()
+builder.Services.AddControllers(options => options.Filters.Add<Qontract.API.Localization.LocalizedResultFilter>())
     .AddJsonOptions(options =>
     {
         // Enums as strings so API consumers (Flutter app) work with readable values
@@ -409,6 +409,27 @@ builder.Services.AddRateLimiter(options =>
 });
 
 var app = builder.Build();
+
+// Negotiate only UI culture. Numeric/date parsing remains invariant and the
+// same API values round-trip regardless of the display language.
+var languages = new[] { new System.Globalization.CultureInfo("en"), new System.Globalization.CultureInfo("de") };
+app.UseRequestLocalization(new Microsoft.AspNetCore.Builder.RequestLocalizationOptions
+{
+    DefaultRequestCulture = new Microsoft.AspNetCore.Localization.RequestCulture(System.Globalization.CultureInfo.InvariantCulture, languages[0]),
+    SupportedCultures = new[] { System.Globalization.CultureInfo.InvariantCulture },
+    SupportedUICultures = languages,
+    RequestCultureProviders = new[] { new Microsoft.AspNetCore.Localization.AcceptLanguageHeaderRequestCultureProvider() }
+});
+app.Use(async (context, next) =>
+{
+    context.Response.OnStarting(() =>
+    {
+        context.Response.Headers.ContentLanguage = Qontract.API.Localization.UserMessages.Language;
+        context.Response.Headers.Append("Vary", "Accept-Language");
+        return Task.CompletedTask;
+    });
+    await next();
+});
 
 if (usedJwtFallbackKey)
 {

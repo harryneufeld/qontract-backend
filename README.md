@@ -11,6 +11,16 @@ Rebuild and deploy the API/import tooling to update existing published instances
 
 ## Features
 
+- English/German user messages negotiated with `Accept-Language`; responses
+  include `Content-Language` and `Vary: Accept-Language`. Numeric/date parsing,
+  JSON fields, enum values and user content remain invariant. Unsupported or
+  missing language headers use English. The app's explicit choice overrides its
+  device default. Request-local UI culture does not change the process default.
+- Password reset requests carry their resolved language through the bounded
+  worker queue. SMTP subjects and plain-text bodies use that language, and reset
+  links carry `lang=en`/`lang=de`; existing callers default to English. Tokens,
+  expiration, one-use semantics, account-disclosure protection and mandatory TLS
+  are unchanged. No schema migration is needed for language support.
 Tenant admins can configure `defaultCurrency` in the existing tenant settings
 JSON (three-letter currency code; EUR when absent). `GET
 /api/contracts/default-currency` exposes the current workspace default to members,

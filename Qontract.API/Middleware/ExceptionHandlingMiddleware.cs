@@ -86,10 +86,10 @@ public class ExceptionHandlingMiddleware
         var problem = new ErrorResponse
         {
             Type = $"https://httpstatuses.org/{status}",
-            Title = GetTitle(status),
+            Title = Qontract.API.Localization.UserMessages.Translate(GetTitle(status)),
             Status = status,
             Code = code,
-            Message = message,
+            Message = Qontract.API.Localization.UserMessages.Translate(message),
             Details = details
         };
 

@@ -87,5 +87,5 @@ public class PasswordResetStorageTests
         if (provider == "sqlserver") script.Should().Contain("uniqueidentifier").And.Contain("nvarchar(64)").And.Contain("bit");
     }
     private sealed class NeverSend : IResetEmailSender
-    { public Task SendAsync(string email, Uri resetLink, CancellationToken ct) => throw new InvalidOperationException("Unexpected email"); }
+    { public Task SendAsync(string email, Uri resetLink, CancellationToken ct, string language = "en") => throw new InvalidOperationException("Unexpected email"); }
 }
