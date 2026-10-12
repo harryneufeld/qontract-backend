@@ -105,6 +105,7 @@ public class TenantService : ITenantService
     public async Task<TenantDTO> CreateTenantAsync(TenantCreateDTO dto, int userId, int currentTenantId, string? createdBy, CancellationToken cancellationToken = default)
     {
         ValidateContractRetention(dto.Settings);
+        TenantCurrency.FromSettings(dto.Settings);
         try
         {
             if (!await AdministeredTenants(userId).AnyAsync(t => t.Id == currentTenantId && t.IsActive, cancellationToken))
@@ -148,6 +149,7 @@ public class TenantService : ITenantService
     public async Task<TenantDTO> UpdateTenantAsync(int id, int userId, TenantUpdateDTO dto, string? modifiedBy, CancellationToken cancellationToken = default)
     {
         ValidateContractRetention(dto.Settings);
+        TenantCurrency.FromSettings(dto.Settings);
         try
         {
             var tenant = await AdministeredTenants(userId)
@@ -242,6 +244,41 @@ public class TenantService : ITenantService
         }
     }
 
+    public async Task<int> ApplyDefaultCurrencyAsync(int id, int userId, bool replaceExisting,
+        string? actor, CancellationToken cancellationToken = default)
+    {
+        var tenant = await AdministeredTenants(userId)
+            .SingleOrDefaultAsync(t => t.Id == id && t.IsActive, cancellationToken)
+            ?? throw new KeyNotFoundException("Tenant not found.");
+        var currency = TenantCurrency.FromSettings(tenant.Settings);
+        var contracts = await _context.Contracts
+            .Where(c => c.TenantId == id && c.DeletedAt == null)
+            .Include(c => c.PriceHistory).ToListAsync(cancellationToken);
+        var changed = 0;
+        foreach (var contract in contracts)
+        {
+            var updated = false;
+            if ((replaceExisting || string.IsNullOrWhiteSpace(contract.Currency)) && contract.Currency != currency)
+            {
+                contract.Currency = currency;
+                updated = true;
+            }
+            foreach (var price in contract.PriceHistory)
+            {
+                if ((replaceExisting || string.IsNullOrWhiteSpace(price.Currency)) && price.Currency != currency)
+                {
+                    price.Currency = currency;
+                    updated = true;
+                }
+            }
+            if (!updated) continue;
+            contract.ModifiedAt = DateTime.UtcNow;
+            contract.ModifiedBy = actor;
+            changed++;
+        }
+        await _context.SaveChangesAsync(cancellationToken);
+        return changed;
+    }
     private static TenantDTO ToDto(Tenant tenant) => new()
     {
         Id = tenant.Id,

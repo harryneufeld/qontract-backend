@@ -82,6 +82,14 @@ public class TenantsController : ControllerBase
         return Ok(tenant);
     }
 
+    [HttpPost("{id}/apply-default-currency")]
+    public async Task<ActionResult> ApplyDefaultCurrency(int id, [FromBody] ApplyTenantCurrencyDTO dto)
+    {
+        var changed = await _tenantService.ApplyDefaultCurrencyAsync(id, CurrentUserId,
+            dto.ReplaceExisting, CurrentUser);
+        return Ok(new { changedContracts = changed });
+    }
+
     [HttpPatch("{id}/deactivate")]
     public async Task<ActionResult<TenantDTO>> DeactivateTenant(int id)
     {

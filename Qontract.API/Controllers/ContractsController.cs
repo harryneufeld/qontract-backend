@@ -78,6 +78,10 @@ public class ContractsController : ControllerBase
     /// from the loaded page. Declared before the {id} route so the literal
     /// wins.
     /// </summary>
+    [HttpGet("default-currency")]
+    public async Task<ActionResult> GetDefaultCurrency() =>
+        Ok(new { currency = await _contractService.GetDefaultCurrencyAsync(CurrentTenantId) });
+
     [HttpGet("stats")]
     public async Task<ActionResult<ContractStatsDTO>> GetStats([FromQuery] string scope = "mine")
     {
