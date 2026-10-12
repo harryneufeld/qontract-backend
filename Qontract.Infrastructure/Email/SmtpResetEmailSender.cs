@@ -22,21 +22,31 @@ public class SmtpResetEmailSender(IConfiguration config) : IResetEmailSender
         "SslOnConnect" => SecureSocketOptions.SslOnConnect,
         _ => throw new InvalidOperationException("Smtp:TlsMode must be StartTls or SslOnConnect.")
     };
-    public async Task SendAsync(string email, Uri resetLink, CancellationToken cancellationToken)
+    public MimeMessage CreateMessage(string email, Uri resetLink, string language = "en")
     {
         ValidateConfiguration(config);
         var message = new MimeMessage();
-        message.From.Add(MailboxAddress.Parse(config["Smtp:From"]));
+        message.From.Add(MailboxAddress.Parse(config["Smtp:From"]!));
         message.To.Add(MailboxAddress.Parse(email));
-        message.Subject = "Set your qontract password";
+        var german = Qontract.Application.Localization.SupportedLanguage.Normalize(language) == "de";
+        message.Subject = german ? "Dein qontract-Passwort festlegen" : "Set your qontract password";
         message.Body = new TextPart("plain") { Text =
-            "Use this link to set a new qontract password. It expires in 30 minutes and can be used once.\n\n"
-            + resetLink.AbsoluteUri + "\n\nIf you did not request this, ignore this message. Your password has not changed." };
+            (german
+                ? "Mit diesem Link kannst du ein neues qontract-Passwort festlegen. Er ist 30 Minuten gültig und kann einmal verwendet werden.\n\n"
+                : "Use this link to set a new qontract password. It expires in 30 minutes and can be used once.\n\n")
+            + resetLink.AbsoluteUri + (german
+                ? "\n\nFalls du dies nicht angefordert hast, ignoriere diese Nachricht. Dein Passwort wurde nicht geändert."
+                : "\n\nIf you did not request this, ignore this message. Your password has not changed.") };
+        return message;
+    }
+    public async Task SendAsync(string email, Uri resetLink, CancellationToken cancellationToken, string language = "en")
+    {
+        var message = CreateMessage(email, resetLink, language);
         using var client = new SmtpClient { Timeout = 20_000 };
         // Mandatory TLS and default certificate verification; no protocol logging.
-        await client.ConnectAsync(config["Smtp:Host"], int.Parse(config["Smtp:Port"]!), Mode(config), cancellationToken);
+        await client.ConnectAsync(config["Smtp:Host"]!, int.Parse(config["Smtp:Port"]!), Mode(config), cancellationToken);
         if (!string.IsNullOrEmpty(config["Smtp:Username"]))
-            await client.AuthenticateAsync(config["Smtp:Username"], config["Smtp:Password"], cancellationToken);
+            await client.AuthenticateAsync(config["Smtp:Username"]!, config["Smtp:Password"]!, cancellationToken);
         await client.SendAsync(message, cancellationToken);
         await client.DisconnectAsync(true, cancellationToken);
     }

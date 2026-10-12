@@ -22,7 +22,7 @@ public class PasswordResetService(IApplicationDbContext db, IConfiguration confi
     }
 
     // Worker-only: no account lookup or SMTP latency in the public request path.
-    public async Task DeliverAsync(string email, CancellationToken cancellationToken = default)
+    public async Task DeliverAsync(string email, CancellationToken cancellationToken = default, string language = "en")
     {
         if (!Enabled(config)) return;
         var normalized = email.Trim().ToUpperInvariant();
@@ -48,8 +48,9 @@ public class PasswordResetService(IApplicationDbContext db, IConfiguration confi
             await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
         }
-        var link = new UriBuilder(PublicBase(config)) { Fragment = "/reset-password?token=" + token }.Uri;
-        try { await sender.SendAsync(destination, link, cancellationToken); }
+        language = Qontract.Application.Localization.SupportedLanguage.Normalize(language);
+        var link = new UriBuilder(PublicBase(config)) { Fragment = "/reset-password?token=" + token + "&lang=" + language }.Uri;
+        try { await sender.SendAsync(destination, link, cancellationToken, language); }
         catch
         {
             await db.PasswordResets.Where(r => r.Id == reset.Id && r.ConsumedAt == null)

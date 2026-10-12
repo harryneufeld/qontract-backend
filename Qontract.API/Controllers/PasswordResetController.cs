@@ -19,7 +19,7 @@ public class PasswordResetController(PasswordResetQueue queue, PasswordResetServ
         if (!PasswordResetService.Enabled(config))
             return StatusCode(503, new { message = "Password reset is not available. Please contact the administrator." });
         // Same response path for every address: no account query or SMTP here.
-        if (!queue.TryEnqueue(dto.Email.Trim()))
+        if (!queue.TryEnqueue(dto.Email.Trim(), Qontract.API.Localization.UserMessages.Language))
             return StatusCode(503, new { message = "Please try again later." });
         return Accepted(new { message = "If this account is eligible, a password reset link will be sent." });
     }

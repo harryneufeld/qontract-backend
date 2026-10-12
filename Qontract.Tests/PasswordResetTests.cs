@@ -76,7 +76,29 @@ public class PasswordResetTests : IDisposable
         _mail.Sent.Should().Be(0);
         var queue = _host.Services.GetRequiredService<PasswordResetQueue>();
         await using var entries = queue.ReadAllAsync(CancellationToken.None).GetAsyncEnumerator();
-        (await entries.MoveNextAsync()).Should().BeTrue(); entries.Current.Should().Be(_email);
+        (await entries.MoveNextAsync()).Should().BeTrue(); entries.Current.Email.Should().Be(_email);
+        entries.Current.Language.Should().Be("en");
+    }
+
+    [Fact]
+    public async Task GermanRequestCarriesLanguageThroughQueueAndDelivery_WithoutAccountDisclosure()
+    {
+        _client.DefaultRequestHeaders.AcceptLanguage.ParseAdd("de-DE");
+        var known = await _client.PostAsJsonAsync("/api/auth/forgot-password", new { email = _email });
+        var unknown = await _client.PostAsJsonAsync("/api/auth/forgot-password", new { email = "unknown@example.test" });
+        known.StatusCode.Should().Be(HttpStatusCode.Accepted);
+        var text = await known.Content.ReadAsStringAsync();
+        text.Should().Be(await unknown.Content.ReadAsStringAsync()).And.Contain("berechtigt").And.NotContain(_email);
+        var queue = _host.Services.GetRequiredService<PasswordResetQueue>();
+        await using var entries = queue.ReadAllAsync(CancellationToken.None).GetAsyncEnumerator();
+        (await entries.MoveNextAsync()).Should().BeTrue();
+        entries.Current.Email.Should().Be(_email); entries.Current.Language.Should().Be("de");
+        using var scope = _host.Services.CreateScope();
+        await scope.ServiceProvider.GetRequiredService<PasswordResetService>().DeliverAsync(entries.Current.Email, language: entries.Current.Language);
+        _mail.Language.Should().Be("de");
+        _mail.Link!.Fragment.Should().EndWith("&lang=de");
+        _mail.Token.Should().HaveLength(64);
+        (await Reset()).StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
     [Fact]
@@ -243,10 +265,11 @@ public class PasswordResetTests : IDisposable
     {
         public int Sent { get; private set; }
         public Uri? Link { get; private set; }
-        public string Token => Link!.Fragment.Split("token=")[1];
+        public string Token => Link!.Fragment.Split("token=")[1].Split('&')[0];
         public bool Fail { get; set; }
-        public Task SendAsync(string email, Uri resetLink, CancellationToken ct)
-        { Sent++; Link = resetLink; if (Fail) throw new IOException("Fake delivery failure"); return Task.CompletedTask; }
+        public string? Language { get; private set; }
+        public Task SendAsync(string email, Uri resetLink, CancellationToken ct, string language = "en")
+        { Sent++; Link = resetLink; Language = language; if (Fail) throw new IOException("Fake delivery failure"); return Task.CompletedTask; }
     }
 
     [Fact]
