@@ -45,5 +45,9 @@ public enum UserRole
 {
     TenantAdmin,
     User,
+    /// <summary>
+    /// Legacy value kept for stored rows. Cannot be assigned and grants no
+    /// access (issue #80); only TenantAdmin and User members use the app.
+    /// </summary>
     Contractor
 }

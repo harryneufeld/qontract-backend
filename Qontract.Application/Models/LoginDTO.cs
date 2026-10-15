@@ -8,7 +8,8 @@ public class LoginDTO
     [EmailAddress]
     public string Email { get; set; } = string.Empty;
 
+    // No minimum: passwords set before the current policy must still sign in.
     [Required]
-    [MinLength(6)]
+    [MaxLength(Qontract.Core.Security.PasswordPolicy.MaximumLength)]
     public string Password { get; set; } = string.Empty;
 }

@@ -109,7 +109,6 @@ public class ContractorService : IContractorService
             Notes = dto.Notes,
             TenantId = tenantId == 0 ? null : tenantId,
             OwnerUserId = RecordAccess.Owner(tenantId, _identity?.UserId),
-            UserId = dto.UserId,
             IsActive = true,
             CreatedBy = createdBy,
             ModifiedBy = createdBy,

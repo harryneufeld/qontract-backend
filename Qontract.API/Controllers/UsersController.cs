@@ -7,9 +7,10 @@ using Qontract.Application.Services;
 namespace Qontract.API.Controllers;
 
 [ApiController]
-// User management (list, read, create/invite, update, deactivate) is an
+// Member management (list, read, role/activity update, deactivate) is an
 // admin-only operation (issue #24): only tenant admins may manage the
-// members of their tenant.
+// members of their tenant. Members are added through invitations; account
+// credentials are never set by an administrator (issue #80).
 [Authorize(Roles = AppRoles.TenantAdmin)]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/[controller]")]
@@ -17,16 +18,11 @@ namespace Qontract.API.Controllers;
 public class UsersController : ControllerBase
 {
     private readonly IUserService _userService;
-    private readonly IValidator<UserCreateDTO> _createValidator;
     private readonly IValidator<UserUpdateDTO> _updateValidator;
 
-    public UsersController(
-        IUserService userService,
-        IValidator<UserCreateDTO> createValidator,
-        IValidator<UserUpdateDTO> updateValidator)
+    public UsersController(IUserService userService, IValidator<UserUpdateDTO> updateValidator)
     {
         _userService = userService;
-        _createValidator = createValidator;
         _updateValidator = updateValidator;
     }
 
@@ -50,21 +46,6 @@ public class UsersController : ControllerBase
     {
         var user = await _userService.GetUserByIdAsync(id, CurrentTenantId);
         return Ok(user);
-    }
-
-    [HttpPost]
-    public async Task<ActionResult<UserDTO>> CreateUser([FromBody] UserCreateDTO dto)
-    {
-        var reject = await DtoValidation.RejectIfInvalidAsync(_createValidator, dto);
-        if (reject is not null)
-            return reject;
-
-        // Always scope to the authenticated tenant, never trust the client
-        // (issue #32) — same convention as the contractor controller.
-        dto.TenantId = CurrentTenantId;
-
-        var user = await _userService.CreateUserAsync(dto, User.Identity?.Name);
-        return CreatedAtAction(nameof(GetUser), new { id = user.Id }, user);
     }
 
     [HttpPut("{id}")]

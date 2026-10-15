@@ -12,6 +12,9 @@
     <Using Include="Asp.Versioning" />
   </ItemGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="Qontract.Tests" />
+  </ItemGroup>
+  <ItemGroup>
     <None Update="debugSettings.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>Never</CopyToPublishDirectory>

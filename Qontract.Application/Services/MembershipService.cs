@@ -31,6 +31,8 @@ public class MembershipService(IApplicationDbContext context, IConfiguration con
     public async Task<InvitationDTO> InviteAsync(int userId, int tenantId, InvitationCreateDTO dto, string? actor, CancellationToken ct = default)
     {
         await RequireAdmin(userId, tenantId, ct);
+        // (issue #80) Only members sign in; the legacy Contractor role grants nothing.
+        if (dto.Role is not (UserRole.TenantAdmin or UserRole.User)) throw new InvalidOperationException("Invalid role.");
         var code = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
         var invitation = new TenantInvitation
         {

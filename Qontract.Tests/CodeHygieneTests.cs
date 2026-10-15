@@ -31,6 +31,7 @@ namespace Qontract.Tests;
 public class CodeHygieneTests : IClassFixture<QontractWebApplicationFactory>
 {
     private readonly HttpClient _client;
+    private readonly QontractWebApplicationFactory _factory;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -40,6 +41,7 @@ public class CodeHygieneTests : IClassFixture<QontractWebApplicationFactory>
 
     public CodeHygieneTests(QontractWebApplicationFactory factory)
     {
+        _factory = factory;
         _client = factory.CreateClient();
     }
 
@@ -122,22 +124,15 @@ public class CodeHygieneTests : IClassFixture<QontractWebApplicationFactory>
     }
 
     [Fact]
-    public async Task CreateUser_WithBadEmail_Returns400_EmailError()
+    public async Task UpdateUser_WithContractorRole_Returns400_RoleError()
     {
-        // User validation used to run inside UserService (new
-        // UserCreateValidator()); it must now run in the controller.
+        // User validation runs in the controller; the legacy Contractor role
+        // is not assignable (issue #80).
         await AuthenticateAsAdminAsync();
 
-        var response = await _client.PostAsJsonAsync("/api/users", new
-        {
-            name = "Bad Email",
-            email = "not-an-email",
-            password = "secret123",
-            role = "User",
-            tenantId = 1
-        });
+        var response = await _client.PutAsJsonAsync("/api/users/1", new { role = "Contractor" });
 
-        await AssertValidationErrorAsync(response, nameof(UserCreateDTO.Email));
+        await AssertValidationErrorAsync(response, nameof(UserUpdateDTO.Role));
     }
 
     [Fact]
@@ -257,20 +252,9 @@ public class CodeHygieneTests : IClassFixture<QontractWebApplicationFactory>
     {
         await AuthenticateAsAdminAsync();
 
-        var email = $"deact{Guid.NewGuid():N}@qontract.com";
-        var create = await _client.PostAsJsonAsync("/api/users", new
-        {
-            name = "To Deactivate",
-            email,
-            password = "secret123",
-            role = "User",
-            tenantId = 1
-        });
-        create.StatusCode.Should().Be(HttpStatusCode.Created);
-        var user = await create.Content.ReadFromJsonAsync<UserDTO>(JsonOptions);
-        user.Should().NotBeNull();
+        var user = await TestAccounts.CreateMemberAsync(_factory.Services, tenantId: 1);
 
-        var deact = await _client.PatchAsync($"/api/users/{user!.Id}/deactivate", new StringContent(""));
+        var deact = await _client.PatchAsync($"/api/users/{user.Id}/deactivate", new StringContent(""));
         deact.StatusCode.Should().Be(HttpStatusCode.OK);
 
         var result = await deact.Content.ReadFromJsonAsync<UserDTO>(JsonOptions);

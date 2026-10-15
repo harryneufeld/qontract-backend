@@ -35,6 +35,9 @@ public class AuthService : IAuthService
 
             if (user == null || user.RequiresPasswordSetup)
             {
+                // (issue #80) Spend the same PBKDF2 work as a real account so
+                // response timing does not reveal which emails are registered.
+                Passwords.Verify(dto.Password, DummyPasswordHash);
                 _logger.LogWarning("Invalid login attempt for email: {Email}", dto.Email);
                 throw new InvalidOperationException("Invalid email or password");
             }
@@ -44,6 +47,8 @@ public class AuthService : IAuthService
                 _logger.LogWarning("Invalid login attempt for email: {Email}", dto.Email);
                 throw new InvalidOperationException("Invalid email or password");
             }
+
+            await UpgradeLegacyHashAsync(user, dto.Password, cancellationToken);
 
             var membership = await _context.TenantMemberships
                 .Where(m => m.UserId == user.Id && m.IsActive && m.Tenant.IsActive)
@@ -173,6 +178,30 @@ public class AuthService : IAuthService
 
     public Task<string> HashPasswordAsync(string password) => Task.FromResult(Passwords.Hash(password));
 
+    // Verified against on failed logins for unknown accounts; never stored.
+    private static readonly string DummyPasswordHash = Passwords.Hash(Guid.NewGuid().ToString("N"));
+
+    /// <summary>
+    /// (issue #80) Replaces a verified legacy single-round SHA-256 hash with
+    /// PBKDF2 of the full submitted password. The conditional update leaves a
+    /// concurrently changed hash untouched; the session stays valid because
+    /// AuthVersion is unchanged (same password, stronger storage).
+    /// </summary>
+    private async Task UpgradeLegacyHashAsync(User user, string password, CancellationToken cancellationToken)
+    {
+        if (user.PasswordHash.StartsWith("pbkdf2-sha512:", StringComparison.Ordinal)) return;
+        var upgraded = Passwords.Hash(password);
+        var legacy = user.PasswordHash;
+        var updated = await _context.Users.Where(u => u.Id == user.Id && u.PasswordHash == legacy)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(u => u.PasswordHash, upgraded)
+                .SetProperty(u => u.ModifiedAt, DateTime.UtcNow), cancellationToken);
+        if (updated == 1)
+        {
+            user.PasswordHash = upgraded;
+            _logger.LogInformation("Upgraded legacy password hash for user {UserId}", user.Id);
+        }
+    }
+
     private bool VerifyPassword(string password, string storedHash)
     {
         if (storedHash.StartsWith("pbkdf2-sha512:", StringComparison.Ordinal))
@@ -188,9 +217,14 @@ public class AuthService : IAuthService
             var salt = Convert.FromBase64String(hashParts[0]);
             var hash = Convert.FromBase64String(hashParts[1]);
 
-            var inputHash = Convert.FromBase64String(LegacyHashPassword(password, salt));
-
-            return CryptographicOperations.FixedTimeEquals(hash, inputHash);
+            // Historic hashes were computed over the UTF-8 bytes truncated to
+            // the UTF-16 character count, which drops trailing bytes of
+            // non-ASCII passwords. Accept that layout for compatibility and the
+            // full encoding; a successful login then upgrades to PBKDF2.
+            var historic = LegacyHash(password, salt, truncateToCharCount: true);
+            var full = LegacyHash(password, salt, truncateToCharCount: false);
+            return CryptographicOperations.FixedTimeEquals(hash, historic)
+                | CryptographicOperations.FixedTimeEquals(hash, full);
         }
         catch (Exception ex)
         {
@@ -199,18 +233,15 @@ public class AuthService : IAuthService
         }
     }
 
-    // Preserve the original byte layout solely for existing stored hashes.
-    private string LegacyHashPassword(string password, byte[] salt)
+    // Preserve the original byte layout solely for verifying existing stored hashes.
+    private static byte[] LegacyHash(string password, byte[] salt, bool truncateToCharCount)
     {
-        using (var sha256 = SHA256.Create())
-        {
-            var combined = new byte[salt.Length + password.Length];
-            Buffer.BlockCopy(salt, 0, combined, 0, salt.Length);
-            Buffer.BlockCopy(System.Text.Encoding.UTF8.GetBytes(password), 0, combined, salt.Length, password.Length);
-
-            var hash = sha256.ComputeHash(combined);
-            return Convert.ToBase64String(hash);
-        }
+        var encoded = Encoding.UTF8.GetBytes(password);
+        var length = truncateToCharCount ? Math.Min(password.Length, encoded.Length) : encoded.Length;
+        var combined = new byte[salt.Length + length];
+        Buffer.BlockCopy(salt, 0, combined, 0, salt.Length);
+        Buffer.BlockCopy(encoded, 0, combined, salt.Length, length);
+        return SHA256.HashData(combined);
     }
 
     private string GenerateJwtToken(User user, TenantMembership? membership, AuthSession session)

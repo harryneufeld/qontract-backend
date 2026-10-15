@@ -42,7 +42,8 @@ public class ContractorCreateDTO
 
     public int TenantId { get; set; }
 
-    public int? UserId { get; set; }
+    // No UserId: contractors are counterparties, never sign-in accounts, so a
+    // client-supplied account link is not accepted (issue #80).
 }
 
 public class ContractorUpdateDTO

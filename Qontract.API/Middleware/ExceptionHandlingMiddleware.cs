@@ -14,7 +14,7 @@ namespace Qontract.API.Middleware;
 /// Exception -> response mapping:
 ///   KeyNotFoundException                     -> 404 not_found
 ///   FluentValidation.ValidationException     -> 400 validation_error
-///   InvalidOperationException                -> 400 bad_request (client-triggered business rule)
+///   InvalidOperationException from Qontract  -> 400 bad_request (client-triggered business rule)
 ///   UnauthorizedAccessException              -> 403 forbidden
 ///   anything else                            -> 500 internal_error (generic message, no internals)
 ///
@@ -103,10 +103,16 @@ public class ExceptionHandlingMiddleware
         // the `details` field in Development.
         KeyNotFoundException => ((int)HttpStatusCode.NotFound, "not_found", "Resource not found."),
         FluentValidation.ValidationException => ((int)HttpStatusCode.BadRequest, "validation_error", ex.Message),
-        InvalidOperationException => ((int)HttpStatusCode.BadRequest, "bad_request", ex.Message),
+        // Only business rules thrown by Qontract code are client-facing. The
+        // same exception type from framework/EF code can carry internals
+        // (issue #80), so it falls through to the generic 500 below.
+        InvalidOperationException when IsThrownByQontract(ex) => ((int)HttpStatusCode.BadRequest, "bad_request", ex.Message),
         UnauthorizedAccessException => ((int)HttpStatusCode.Forbidden, "forbidden", "Access to the requested resource is denied."),
         _ => ((int)HttpStatusCode.InternalServerError, "internal_error", "An unexpected error occurred. Please try again later.")
     };
+
+    private static bool IsThrownByQontract(Exception ex) =>
+        ex.TargetSite?.DeclaringType?.Assembly.GetName().Name?.StartsWith("Qontract.", StringComparison.Ordinal) == true;
 
     private static string GetTitle(int status) => status switch
     {

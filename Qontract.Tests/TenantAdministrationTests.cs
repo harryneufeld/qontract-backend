@@ -130,11 +130,7 @@ public class TenantAdministrationTests : IClassFixture<QontractWebApplicationFac
         var admin = await Login("admin@qontract.com");
         // Use a separate account so fixture seed accounts remain available.
         var email = $"deactivated-{Guid.NewGuid():N}@qontract.com";
-        var createUser = await _client.PostAsJsonAsync("/api/users", new
-        {
-            name = "Former administrator", email, password = "password123", role = "TenantAdmin"
-        });
-        createUser.StatusCode.Should().Be(HttpStatusCode.Created);
+        await TestAccounts.CreateMemberAsync(_factory.Services, admin.User!.TenantId, UserRole.TenantAdmin, email: email);
         var auth = await Login(email);
         var tenant = await CreateTenant();
         using (var scope = _factory.Services.CreateScope())
