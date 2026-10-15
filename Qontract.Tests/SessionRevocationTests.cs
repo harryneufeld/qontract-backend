@@ -174,6 +174,9 @@ public class SessionRevocationTests : IClassFixture<QontractWebApplicationFactor
         var auth = await Login();
         using var scope = _factory.Services.CreateScope();
         var connection = scope.ServiceProvider.GetRequiredService<SqliteConnection>();
+        // Login has upgraded the seeded legacy hash to PBKDF2 (issue #80).
+        var hashAfterLogin = (await scope.ServiceProvider.GetRequiredService<ApplicationDbContext>().Users
+            .AsNoTracking().SingleAsync(u => u.Id == _userId)).PasswordHash;
         var interceptor = new CredentialRace(_userId, deactivate);
         await using var db = new ApplicationDbContext(new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseSqlite(connection).AddInterceptors(interceptor).Options);
@@ -182,7 +185,7 @@ public class SessionRevocationTests : IClassFixture<QontractWebApplicationFactor
         interceptor.Triggered.Should().BeTrue();
         var user = await db.Users.AsNoTracking().SingleAsync(u => u.Id == _userId);
         user.AuthVersion.Should().Be(1);
-        user.PasswordHash.Should().Be(deactivate ? Hash : "concurrent replacement");
+        user.PasswordHash.Should().Be(deactivate ? hashAfterLogin : "concurrent replacement");
         user.IsActive.Should().Be(!deactivate);
         (await Request(auth.AccessToken)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
@@ -205,21 +208,6 @@ public class SessionRevocationTests : IClassFixture<QontractWebApplicationFactor
             }
             return result;
         }
-    }
-
-    [Fact]
-    public async Task AdministratorPasswordReplacementAlsoRevokesUserSessions()
-    {
-        var auth = await Login();
-        using (var scope = _factory.Services.CreateScope())
-        {
-            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-            var tenantId = (await db.Users.SingleAsync(u => u.Id == _userId)).TenantId!.Value;
-            var users = scope.ServiceProvider.GetRequiredService<IUserService>();
-            await users.UpdateUserAsync(_userId, tenantId, new UserUpdateDTO { Password = "replacement123" }, "admin");
-        }
-        (await Request(auth.AccessToken)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
-        (await Request((await Login("replacement123")).AccessToken)).StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
     [Fact]

@@ -24,6 +24,7 @@ namespace Qontract.Tests;
 public class TenantIsolationTests : IClassFixture<QontractWebApplicationFactory>
 {
     private readonly HttpClient _client;
+    private readonly QontractWebApplicationFactory _factory;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -33,6 +34,7 @@ public class TenantIsolationTests : IClassFixture<QontractWebApplicationFactory>
 
     public TenantIsolationTests(QontractWebApplicationFactory factory)
     {
+        _factory = factory;
         _client = factory.CreateClient();
     }
 
@@ -81,23 +83,13 @@ public class TenantIsolationTests : IClassFixture<QontractWebApplicationFactory>
         var token2 = await GetTokenAsync("admin2@qontract.com");
         Authenticate(token2);
 
-        var email = $"ti-deact-{Guid.NewGuid():N}@qontract.com";
-        var create = await _client.PostAsJsonAsync("/api/users", new
-        {
-            name = "Victim",
-            email,
-            password = "victim123",
-            role = "User",
-            tenantId = 1 // client-forged, irrelevant (see test 2)
-        });
-        create.StatusCode.Should().Be(HttpStatusCode.Created);
-        var victim = await create.Content.ReadFromJsonAsync<UserDTO>(JsonOptions);
-        victim.Should().NotBeNull();
+        var tenant2 = (await (await _client.GetAsync("/api/auth/me")).Content.ReadFromJsonAsync<AuthUserDTO>(JsonOptions))!.TenantId;
+        var victim = await TestAccounts.CreateMemberAsync(_factory.Services, tenant2);
 
         // Tenant 1's admin tries to deactivate tenant 2's user.
         var token1 = await GetTokenAsync("admin@qontract.com");
         Authenticate(token1);
-        var deact = await _client.PatchAsync($"/api/users/{victim!.Id}/deactivate", new StringContent(""));
+        var deact = await _client.PatchAsync($"/api/users/{victim.Id}/deactivate", new StringContent(""));
         deact.StatusCode.Should().Be(HttpStatusCode.NotFound);
 
         // And the deactivation must NOT have been committed: the user is
@@ -111,39 +103,9 @@ public class TenantIsolationTests : IClassFixture<QontractWebApplicationFactory>
     }
 
     // -----------------------------------------------------------------
-    // 2. User creation never trusts the client-supplied TenantId
+    // 2. (removed) Administrators no longer create accounts over the API;
+    //    members join through invitations (issue #80).
     // -----------------------------------------------------------------
-
-    [Fact]
-    public async Task CreateUser_ForgedTenantId_IsScopedToCallerTenant()
-    {
-        var token2 = await GetTokenAsync("admin2@qontract.com");
-        Authenticate(token2);
-
-        var email = $"ti-create-{Guid.NewGuid():N}@qontract.com";
-        var create = await _client.PostAsJsonAsync("/api/users", new
-        {
-            name = "Imposter",
-            email,
-            password = "imposter123",
-            role = "User",
-            tenantId = 1 // tenant 1's id, forged by tenant 2's admin
-        });
-        create.StatusCode.Should().Be(HttpStatusCode.Created);
-        var user = await create.Content.ReadFromJsonAsync<UserDTO>(JsonOptions);
-        user.Should().NotBeNull();
-
-        // The user must live in the caller's tenant (2), not tenant 1.
-        user!.TenantId.Should().NotBe(1);
-        var list2 = await (await _client.GetAsync("/api/users")).Content.ReadFromJsonAsync<List<UserDTO>>(JsonOptions);
-        list2!.Any(u => u.Id == user.Id).Should().BeTrue("tenant 2 must see the user it created");
-
-        // And tenant 1 must not see it.
-        var token1 = await GetTokenAsync("admin@qontract.com");
-        Authenticate(token1);
-        var get1 = await _client.GetAsync($"/api/users/{user.Id}");
-        get1.StatusCode.Should().Be(HttpStatusCode.NotFound);
-    }
 
     // -----------------------------------------------------------------
     // 3. Tenant create/update record the acting user in audit fields

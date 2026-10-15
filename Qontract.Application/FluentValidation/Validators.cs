@@ -1,5 +1,6 @@
 using FluentValidation;
 using Qontract.Application.Models;
+using Qontract.Core.Security;
 using Qontract.Domain.Models;
 
 namespace Qontract.Application.FluentValidation;
@@ -44,30 +45,8 @@ public class ChangePasswordValidator : AbstractValidator<ChangePasswordDTO>
 
         RuleFor(x => x.NewPassword)
             .NotEmpty().WithMessage("New password is required.")
-            .MinimumLength(6).WithMessage("New password must be at least 6 characters.")
-            .MaximumLength(255).WithMessage("Password cannot exceed 255 characters.");
-    }
-}
-
-public class UserCreateValidator : AbstractValidator<UserCreateDTO>
-{
-    public UserCreateValidator()
-    {
-        RuleFor(x => x.Name)
-            .NotEmpty().WithMessage("Name is required.")
-            .MaximumLength(100).WithMessage("Name cannot exceed 100 characters.");
-
-        RuleFor(x => x.Email)
-            .NotEmpty().WithMessage("Email is required.")
-            .EmailAddress().WithMessage("Invalid email format.")
-            .MaximumLength(100).WithMessage("Email cannot exceed 100 characters.");
-
-        RuleFor(x => x.Password)
-            .NotEmpty().WithMessage("Password is required.")
-            .MaximumLength(255).WithMessage("Password cannot exceed 255 characters.");
-
-        RuleFor(x => x.Role)
-            .IsInEnum().WithMessage("Invalid role.");
+            .MinimumLength(PasswordPolicy.MinimumLength).WithMessage($"New password must be at least {PasswordPolicy.MinimumLength} characters.")
+            .MaximumLength(PasswordPolicy.MaximumLength).WithMessage($"Password cannot exceed {PasswordPolicy.MaximumLength} characters.");
     }
 }
 
@@ -75,18 +54,8 @@ public class UserUpdateValidator : AbstractValidator<UserUpdateDTO>
 {
     public UserUpdateValidator()
     {
-        RuleFor(x => x.Name)
-            .MaximumLength(100).WithMessage("Name cannot exceed 100 characters.");
-
-        RuleFor(x => x.Email)
-            .EmailAddress().When(x => !string.IsNullOrEmpty(x.Email)).WithMessage("Invalid email format.")
-            .MaximumLength(100).When(x => !string.IsNullOrEmpty(x.Email)).WithMessage("Email cannot exceed 100 characters.");
-
-        RuleFor(x => x.Password)
-            .MaximumLength(255).When(x => !string.IsNullOrEmpty(x.Password)).WithMessage("Password cannot exceed 255 characters.");
-
         RuleFor(x => x.Role)
-            .IsInEnum().When(x => x.Role.HasValue).WithMessage("Invalid role.");
+            .Must(r => r is null or UserRole.TenantAdmin or UserRole.User).WithMessage("Invalid role.");
 
         RuleFor(x => x.IsActive)
             .Cascade(CascadeMode.Stop);

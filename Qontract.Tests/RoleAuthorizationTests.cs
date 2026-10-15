@@ -14,8 +14,9 @@ namespace Qontract.Tests;
 /// Role enforcement tests (issue #24): the JWT carries a role claim
 /// (tenant_admin/user/contractor via UserRole), and the admin-only
 /// endpoints — user management, tenant management, member invitation —
-/// must reject everyone except tenant admins with 403. Regular members
-/// and contractors keep access to the non-management endpoints.
+/// must reject everyone except tenant admins with 403. Regular members keep
+/// access to the non-management endpoints; the legacy Contractor role has
+/// no content access at all (issue #80).
 ///
 /// Tests within this class run sequentially, so mutating the shared
 /// client's Authorization header per test is safe.
@@ -100,17 +101,7 @@ public class RoleAuthorizationTests : IClassFixture<QontractWebApplicationFactor
         var list = await _client.GetAsync("/api/users");
         list.StatusCode.Should().Be(HttpStatusCode.Forbidden);
 
-        var create = await _client.PostAsJsonAsync("/api/users", new
-        {
-            name = "Sneaky Admin",
-            email = "sneaky@qontract.com",
-            password = "hunter2",
-            role = "TenantAdmin",
-            tenantId = 1
-        });
-        create.StatusCode.Should().Be(HttpStatusCode.Forbidden);
-
-        var update = await _client.PutAsJsonAsync("/api/users/1", new { name = "Hijacked" });
+        var update = await _client.PutAsJsonAsync("/api/users/1", new { role = "User" });
         update.StatusCode.Should().Be(HttpStatusCode.Forbidden);
 
         var deactivate = await _client.PatchAsync("/api/users/1/deactivate", null);
@@ -147,6 +138,31 @@ public class RoleAuthorizationTests : IClassFixture<QontractWebApplicationFactor
         tenants.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
+    [Theory]
+    [InlineData("/api/contracts")]
+    [InlineData("/api/contractors")]
+    [InlineData("/api/documents/trash")]
+    [InlineData("/api/invoices")]
+    public async Task LegacyContractorRole_CannotAccessWorkspaceContent(string route)
+    {
+        // Only administrators and regular members use the app (issue #80):
+        // a membership still carrying the legacy Contractor role gets nothing.
+        Authenticate(await GetTokenAsync("contractor1@qontract.com"));
+
+        (await _client.GetAsync(route)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await _client.PostAsJsonAsync("/api/contractors", new { name = "Planted", type = "Company" }))
+            .StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task LegacyContractorRole_CanStillManageOwnSession()
+    {
+        Authenticate(await GetTokenAsync("contractor1@qontract.com"));
+
+        (await _client.GetAsync("/api/auth/me")).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await _client.PostAsync("/api/auth/logout", null)).StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
     [Fact]
     public async Task TenantAdmin_CanStillManageUsersAndTenants()
     {
@@ -155,19 +171,9 @@ public class RoleAuthorizationTests : IClassFixture<QontractWebApplicationFactor
         var listUsers = await _client.GetAsync("/api/users");
         listUsers.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        // Member invitation = user creation. The values below are the
-        // historical workarounds for the issue #40 bugs (plain-password 500,
-        // TenantAdmin role rejected, Family type rejected); #40 is now fixed,
-        // but this call keeps exercising the still-valid role "User".
-        var create = await _client.PostAsJsonAsync("/api/users", new
-        {
-            name = "New Member",
-            email = "newmember@qontract.com",
-            password = "cGFzc3dvcmQxMjM=",
-            role = "User",
-            tenantId = 1
-        });
-        create.StatusCode.Should().Be(HttpStatusCode.Created);
+        // Members join through invitations (issue #80).
+        var invite = await _client.PostAsJsonAsync("/api/tenants/1/invitations", new { role = "User" });
+        invite.StatusCode.Should().Be(HttpStatusCode.OK);
 
         var listTenants = await _client.GetAsync("/api/tenants");
         listTenants.StatusCode.Should().Be(HttpStatusCode.OK);

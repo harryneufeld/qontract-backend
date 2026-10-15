@@ -30,8 +30,8 @@ namespace Qontract.Tests;
 ///    enum default (<c>Family</c> == 0) as empty, so <c>type:"Family"</c>
 ///    always failed. Now <c>IsInEnum()</c>.
 ///
-/// 3. <c>UserCreateValidator</c> had the same quirk on <see cref="UserRole"/>,
-///    so <c>role:"TenantAdmin"</c> (== 0) always failed. Now <c>IsInEnum()</c>.
+/// 3. The user validator had the same quirk on <see cref="UserRole"/>,
+///    so <c>role:"TenantAdmin"</c> (== 0) always failed.
 ///
 /// The earlier workaround tests (RoleAuthorizationTests, UserDtoSecretLeakTests)
 /// deliberately used a base64 password + <c>role:"User"</c> + <c>type:"Company"</c>
@@ -129,35 +129,25 @@ public class UserTenantManagementTests
     [Fact]
     public void UserValidator_AcceptsTenantAdmin()
     {
-        var validator = new UserCreateValidator();
+        var validator = new UserUpdateValidator();
 
-        var result = validator.Validate(new UserCreateDTO
-        {
-            Name = "A",
-            Email = "a@example.com",
-            Password = "x",
-            Role = UserRole.TenantAdmin
-        });
+        var result = validator.Validate(new UserUpdateDTO { Role = UserRole.TenantAdmin });
 
         result.IsValid.Should().BeTrue(
             $"TenantAdmin (0) must be accepted, got: {string.Join("; ", result.Errors.Select(e => e.ErrorMessage))}");
     }
 
-    [Fact]
-    public void UserValidator_RejectsUnknownRole()
+    [Theory]
+    [InlineData((UserRole)99)]
+    [InlineData(UserRole.Contractor)] // legacy, not assignable (issue #80)
+    public void UserValidator_RejectsUnassignableRole(UserRole role)
     {
-        var validator = new UserCreateValidator();
+        var validator = new UserUpdateValidator();
 
-        var result = validator.Validate(new UserCreateDTO
-        {
-            Name = "A",
-            Email = "a@example.com",
-            Password = "x",
-            Role = (UserRole)99
-        });
+        var result = validator.Validate(new UserUpdateDTO { Role = role });
 
         result.IsValid.Should().BeFalse();
-        result.Errors.Should().ContainSingle(e => e.PropertyName == nameof(UserCreateDTO.Role));
+        result.Errors.Should().ContainSingle(e => e.PropertyName == nameof(UserUpdateDTO.Role));
     }
 
     // -----------------------------------------------------------------
@@ -193,38 +183,6 @@ public class UserTenantManagementTests
         }
 
         [Fact]
-        public async Task CreateUser_PlainPassword_And_TenantAdminRole_Succeeds()
-        {
-            // Bug 1 (plain password 500) + Bug 3 (TenantAdmin role rejected),
-            // exercised together the way a real client sends them.
-            await AuthenticateAsAdminAsync();
-
-            const string plainPassword = "Sup3r-Secret!"; // not base64, has special chars
-            var email = $"newadmin{Guid.NewGuid():N}@qontract.com";
-
-            var create = await _client.PostAsJsonAsync("/api/users", new
-            {
-                name = "New Tenant Admin",
-                email,
-                password = plainPassword,
-                role = "TenantAdmin",
-                tenantId = 1
-            });
-
-            create.StatusCode.Should().Be(HttpStatusCode.Created);
-
-            var dto = await create.Content.ReadFromJsonAsync<UserDTO>(JsonOptions);
-            dto!.Role.Should().Be(UserRole.TenantAdmin);
-            dto.Id.Should().BePositive();
-
-            // And the new user must actually be able to log in with the very
-            // plain password that was sent — proves VerifyPassword round-trips.
-            _client.DefaultRequestHeaders.Authorization = null;
-            var login = await _client.PostAsJsonAsync("/api/auth/login", new { email, password = plainPassword });
-            login.StatusCode.Should().Be(HttpStatusCode.OK);
-        }
-
-        [Fact]
         public async Task CreateTenant_FamilyType_Succeeds()
         {
             // Bug 2: type "Family" (TenantType == 0) was rejected.
@@ -253,21 +211,14 @@ public class UserTenantManagementTests
         }
 
         [Fact]
-        public async Task CreateUser_UnknownRole_IsRejected()
+        public async Task UpdateUser_UnknownRole_IsRejected()
         {
-            // IsInEnum() must still reject genuinely invalid enum strings.
+            // Genuinely invalid enum strings must still be rejected.
             await AuthenticateAsAdminAsync();
 
-            var create = await _client.PostAsJsonAsync("/api/users", new
-            {
-                name = "Bad Role",
-                email = $"badrole{Guid.NewGuid():N}@qontract.com",
-                password = "whatever123",
-                role = "DefinitelyNotARole",
-                tenantId = 1
-            });
+            var update = await _client.PutAsJsonAsync("/api/users/1", new { role = "DefinitelyNotARole" });
 
-            create.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+            update.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         }
 
         [Fact]

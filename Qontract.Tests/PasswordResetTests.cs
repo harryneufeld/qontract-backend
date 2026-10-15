@@ -271,19 +271,4 @@ public class PasswordResetTests : IDisposable
         public Task SendAsync(string email, Uri resetLink, CancellationToken ct, string language = "en")
         { Sent++; Link = resetLink; Language = language; if (Fail) throw new IOException("Fake delivery failure"); return Task.CompletedTask; }
     }
-
-    [Fact]
-    public async Task AccountEmailChangeAndReversalDoNotReviveOldLink()
-    {
-        await Deliver();
-        using (var scope = _host.Services.CreateScope())
-        {
-            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-            var tenant = (await db.Users.SingleAsync(u => u.Id == _userId)).TenantId!.Value;
-            var users = scope.ServiceProvider.GetRequiredService<IUserService>();
-            await users.UpdateUserAsync(_userId, tenant, new UserUpdateDTO { Email = "changed@example.test" }, "admin");
-            await users.UpdateUserAsync(_userId, tenant, new UserUpdateDTO { Email = _email }, "admin");
-        }
-        (await Reset()).StatusCode.Should().Be(HttpStatusCode.BadRequest);
-    }
 }

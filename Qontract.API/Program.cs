@@ -222,6 +222,18 @@ if (Encoding.ASCII.GetByteCount(jwtKey) < 32)
         "The HS256 signing key must be at least 32 characters long.");
 }
 
+// A key that is publicly known (the development fallback set explicitly, or
+// an unedited REPLACE_WITH_... placeholder copied from deploy/*.env.example)
+// passes the length check but lets anyone mint valid tokens, so refuse to
+// start with one outside Development.
+if (!isDevelopment && JwtKeys.IsKnownInsecure(jwtKey))
+{
+    throw new InvalidOperationException(
+        "Jwt:Key is set to a publicly known value (the development fallback key or a " +
+        "placeholder from the example env files). Generate a random secret of at least " +
+        "32 characters, e.g. `openssl rand -base64 48`, and set it as Jwt__Key.");
+}
+
 var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "Qontract";
 var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "QontractClients";
 
@@ -291,9 +303,17 @@ builder.Services.AddAuthentication(options =>
 
 builder.Services.AddAuthorization(options =>
 {
-    options.AddPolicy("Account", policy => policy.RequireAuthenticatedUser());
+    // "Session" covers the caller's own account and session (me, logout,
+    // memberships, switching, password change). "Account" additionally
+    // requires a member role for workspace content (issue #80): only
+    // administrators and regular members sign in to use content, so a
+    // membership still carrying the legacy Contractor role is denied.
+    options.AddPolicy("Session", policy => policy.RequireAuthenticatedUser());
+    options.AddPolicy("Account", policy => policy.RequireAuthenticatedUser()
+        .RequireRole(Qontract.API.AppRoles.TenantAdmin, Qontract.API.AppRoles.User));
     options.DefaultPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
-        .RequireAuthenticatedUser().RequireAssertion(context =>
+        .RequireAuthenticatedUser().RequireRole(Qontract.API.AppRoles.TenantAdmin, Qontract.API.AppRoles.User)
+        .RequireAssertion(context =>
             int.TryParse(context.User.FindFirst("TenantId")?.Value, out var tenantId) && tenantId > 0).Build();
 });
 
@@ -408,7 +428,27 @@ builder.Services.AddRateLimiter(options =>
             }));
 });
 
+// (issue #80) No "Server: Kestrel" banner on responses.
+builder.WebHost.ConfigureKestrel(options => options.AddServerHeader = false);
+
 var app = builder.Build();
+
+// Security headers (issue #80), registered first so successful responses,
+// downloads and error envelopes all carry them. OnStarting runs after the
+// exception middleware has rewritten an error response.
+app.Use(async (context, next) =>
+{
+    context.Response.OnStarting(() =>
+    {
+        var headers = context.Response.Headers;
+        headers.XContentTypeOptions = "nosniff";
+        // Tokens, account data, contract lists and documents must not be
+        // kept by browsers or intermediaries.
+        if (context.Request.Path.StartsWithSegments("/api")) headers.CacheControl = "no-store";
+        return Task.CompletedTask;
+    });
+    await next();
+});
 
 // Negotiate only UI culture. Numeric/date parsing remains invariant and the
 // same API values round-trip regardless of the display language.
@@ -451,6 +491,12 @@ if (app.Environment.EnvironmentName == "Development")
     app.UseSwaggerUI();
 }
 
+if (!isDevelopment)
+{
+    // Emitted for HTTPS requests (as seen through the trusted proxy's
+    // forwarded headers). Configure HSTS at the TLS edge as well.
+    app.UseHsts();
+}
 app.UseHttpsRedirection();
 app.UseCors("AllowLocalhost");
 app.UseAuthentication();

@@ -81,6 +81,23 @@ public class SecurityConfigTests : IClassFixture<QontractWebApplicationFactory>
         messages.Should().Contain("Jwt:Key is not configured");
     }
 
+    [Theory]
+    [InlineData("Production", Qontract.Core.Security.JwtKeys.DevelopmentFallback)]
+    [InlineData("Staging", Qontract.Core.Security.JwtKeys.DevelopmentFallback)]
+    [InlineData("Production", "REPLACE_WITH_RANDOM_SECRET_AT_LEAST_32_CHARACTERS")]
+    [InlineData("Production", "REPLACE_WITH_A_RANDOM_SIGNING_KEY")]
+    public void NonDevelopmentStartup_FailsFast_WhenJwtKeyIsPubliclyKnown(string environment, string jwtKey)
+    {
+        // Both values pass the >=32 byte check, but anyone with repo access
+        // knows them and could mint valid tokens.
+        using var factory = new PlainHostFactory(environment, jwtKey);
+        var ex = Assert.ThrowsAny<Exception>(() => factory.CreateClient());
+
+        var messages = string.Join(" | ",
+            new[] { ex.Message, ex.InnerException?.Message }.Where(m => !string.IsNullOrEmpty(m)));
+        messages.Should().Contain("publicly known value");
+    }
+
     [Fact]
     public async Task ProductionStartup_Succeeds_WhenJwtKeyProvided()
     {

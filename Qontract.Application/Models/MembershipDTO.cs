@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Qontract.Core.Security;
 using Qontract.Domain.Models;
 
 namespace Qontract.Application.Models;
@@ -21,7 +22,7 @@ public class RegisterDTO
 {
     [Required, StringLength(100)] public string Name { get; set; } = string.Empty;
     [Required, EmailAddress, StringLength(100)] public string Email { get; set; } = string.Empty;
-    [Required, StringLength(255, MinimumLength = 10)] public string Password { get; set; } = string.Empty;
+    [Required, StringLength(PasswordPolicy.MaximumLength, MinimumLength = PasswordPolicy.MinimumLength)] public string Password { get; set; } = string.Empty;
     [StringLength(100)] public string? TenantName { get; set; }
     [EnumDataType(typeof(TenantType))] public TenantType TenantType { get; set; } = TenantType.Family;
     [StringLength(64)] public string? InvitationCode { get; set; }

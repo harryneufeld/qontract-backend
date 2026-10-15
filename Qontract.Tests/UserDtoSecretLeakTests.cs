@@ -76,32 +76,14 @@ public class UserDtoSecretLeakTests : IClassFixture<QontractWebApplicationFactor
     }
 
     [Fact]
-    public async Task CreateUser_WithPasswordField_ReturnsUserWithoutPasswordMaterial()
+    public async Task UpdateUser_ReturnsUserWithoutPasswordMaterial()
     {
         await AuthenticateAsAdminAsync();
 
-        // The field "password" carries a plain (unhashed) password. Issue #40
-        // is fixed, so a plain non-base64 password works end to end here.
-        var create = await _client.PostAsJsonAsync("/api/users", new
-        {
-            name = "Leak Check User",
-            email = $"leakcheck{Guid.NewGuid():N}@qontract.com",
-            password = "plain-password-123",
-            role = "User",
-            tenantId = 1
-        });
-        create.StatusCode.Should().Be(HttpStatusCode.Created);
+        var update = await _client.PutAsJsonAsync("/api/users/1", new { role = "TenantAdmin" });
+        update.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var createdJson = await create.Content.ReadAsStringAsync();
-        createdJson.ToLowerInvariant().Should().NotContain("password");
-
-        // And the stored user must not echo the password back on re-read.
-        var dto = await create.Content.ReadFromJsonAsync<UserDTO>(JsonOptions);
-        dto!.Id.Should().BePositive();
-
-        var reread = await _client.GetAsync($"/api/users/{dto.Id}");
-        reread.StatusCode.Should().Be(HttpStatusCode.OK);
-        var rereadJson = await reread.Content.ReadAsStringAsync();
-        rereadJson.ToLowerInvariant().Should().NotContain("password");
+        var json = await update.Content.ReadAsStringAsync();
+        json.ToLowerInvariant().Should().NotContain("password");
     }
 }

@@ -64,6 +64,21 @@ shared links and excluding deleted documents and superseded versions.
 - Tenant administrators can list/read/update/deactivate only tenants where they
   have an active admin membership, with an active account. Foreign and unknown
   IDs return the same 404; the JWT role alone does not grant tenant access.
+- Administrators manage memberships, never account credentials
+  ([#80](https://github.com/harryneufeld/qontract-backend/issues/80)): members join
+  through invitations and choose their own password; name, email and password are
+  changed only by the account owner. Only `TenantAdmin` and `User` members can use
+  workspace content; the legacy `Contractor` role cannot be assigned and grants no
+  access. Contractors are counterparty records, not sign-in accounts.
+- Passwords for registration, reset and change share one policy (10–255
+  characters). Login accepts older shorter passwords, verifies legacy SHA-256
+  hashes and upgrades them to PBKDF2-SHA512 on the next successful login.
+- API responses carry `Cache-Control: no-store` and `X-Content-Type-Options:
+  nosniff`; downloads are served as their stored type only for known document and
+  image types, otherwise as `application/octet-stream`. Non-Development hosts emit
+  HSTS for HTTPS requests; configure HSTS at the TLS edge as well.
+- Outside Development the API refuses to start with a publicly known `Jwt:Key`
+  (the development fallback or an unedited `REPLACE_WITH_…` placeholder).
 - Authentication issues 24-hour JWTs linked to persisted, revocable sessions.
   Logout revokes the current session, including tokens issued during tenant
   switches; independent logins stay active. A successful password change atomically
@@ -236,8 +251,7 @@ dotnet run --project Qontract.API
 ### Users
 - `GET /api/Users` - List users in tenant
 - `GET /api/Users/{id}` - Get user details
-- `POST /api/Users` - Create new user
-- `PUT /api/Users/{id}` - Update user
+- `PUT /api/Users/{id}` - Change membership role/activity only
 - `PATCH /api/Users/{id}/deactivate` - Deactivate user
 
 ### Contractors

@@ -15,6 +15,10 @@ public static class AppRoles
     /// <summary>Regular tenant member.</summary>
     public const string User = nameof(User);
 
-    /// <summary>External contractor.</summary>
+    /// <summary>
+    /// Legacy role kept only so stored memberships still deserialize. It
+    /// cannot be assigned and grants no content or management access: only
+    /// administrators and regular members use the app (issue #80).
+    /// </summary>
     public const string Contractor = nameof(Contractor);
 }

@@ -20,4 +20,21 @@ public static class JwtKeys
     /// </summary>
     public const string DevelopmentFallback =
         "qontract-development-fallback-key-DO-NOT-USE-IN-PROD";
+
+    /// <summary>
+    /// Prefix shared by the <c>Jwt__Key</c> placeholders in the committed
+    /// <c>deploy/*.env.example</c> files. Those placeholders are long enough to
+    /// pass the 32-byte length check, so an env file copied without editing
+    /// would otherwise start with a publicly known signing key.
+    /// </summary>
+    public const string PlaceholderPrefix = "REPLACE_WITH";
+
+    /// <summary>
+    /// True when <paramref name="key"/> is publicly known — the development
+    /// fallback or an unedited placeholder from the example env files — and
+    /// therefore must not sign tokens outside Development.
+    /// </summary>
+    public static bool IsKnownInsecure(string key) =>
+        string.Equals(key.Trim(), DevelopmentFallback, StringComparison.Ordinal)
+        || key.TrimStart().StartsWith(PlaceholderPrefix, StringComparison.OrdinalIgnoreCase);
 }

@@ -85,10 +85,27 @@ public class DocumentsController : ControllerBase
         var document = await _documentService.GetDocumentByIdAsync(id, CurrentTenantId);
         var bytes = await _documentService.GetDocumentContentAsync(id, CurrentTenantId);
 
-        var contentType = string.IsNullOrEmpty(document.FileType)
-            ? "application/octet-stream"
-            : document.FileType;
-        return File(bytes, contentType, document.FileName);
+        return File(bytes, DownloadContentType(document.FileType), document.FileName);
+    }
+
+    // (issue #80) The stored type is whatever the uploader claimed. Serve only
+    // known document/image types as-is; anything else (HTML, SVG, scripts,
+    // malformed values) downloads as opaque binary.
+    private static readonly HashSet<string> SafeDownloadTypes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "application/pdf", "image/png", "image/jpeg", "image/gif", "image/webp", "image/heic", "image/tiff",
+        "text/plain", "text/csv", "application/zip", "application/msword", "application/vnd.ms-excel",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "application/vnd.oasis.opendocument.text", "application/vnd.oasis.opendocument.spreadsheet",
+    };
+
+    internal static string DownloadContentType(string? stored)
+    {
+        var mediaType = stored?.Split(';', 2)[0].Trim();
+        return mediaType is not null && SafeDownloadTypes.Contains(mediaType)
+            ? mediaType.ToLowerInvariant()
+            : "application/octet-stream";
     }
 
     /// <summary>POST /api/documents/contract/{contractId}/documents</summary>

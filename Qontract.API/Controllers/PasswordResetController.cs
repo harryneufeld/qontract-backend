@@ -51,6 +51,6 @@ public class CompletePasswordReset
 {
     [Required, MaxLength(64)]
     public string Token { get; set; } = string.Empty;
-    [Required, MinLength(6), MaxLength(255)]
+    [Required, MinLength(Qontract.Core.Security.PasswordPolicy.MinimumLength), MaxLength(Qontract.Core.Security.PasswordPolicy.MaximumLength)]
     public string NewPassword { get; set; } = string.Empty;
 }

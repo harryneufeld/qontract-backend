@@ -24,7 +24,6 @@ public interface IUserService
 {
     Task<List<UserDTO>> GetUsersAsync(int tenantId, CancellationToken cancellationToken = default);
     Task<UserDTO> GetUserByIdAsync(int id, int tenantId, CancellationToken cancellationToken = default);
-    Task<UserDTO> CreateUserAsync(UserCreateDTO dto, string? createdBy, CancellationToken cancellationToken = default);
     Task<UserDTO> UpdateUserAsync(int id, int tenantId, UserUpdateDTO dto, string? modifiedBy, CancellationToken cancellationToken = default);
     Task<UserDTO> DeactivateUserAsync(int id, int tenantId, string? modifiedBy, CancellationToken cancellationToken = default);
 }
