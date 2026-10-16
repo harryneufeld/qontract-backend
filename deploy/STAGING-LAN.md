@@ -75,7 +75,7 @@ The ARM64 rehearsal recorded in the password-reset guide passed these checks;
 each deployment still needs validation with its own mail and hosting settings.
 
 Start with empty staging storage or an explicitly reviewed **copied** fixture.
-Never mount production/FamilyPlanner storage here. For a copied fixture, relocate
+Never mount production/legacy storage here. For a copied fixture, relocate
 document paths to `/app/Storage`, invalidate restored sessions/reset records and
 advance authentication versions before API startup. Retain source evidence and
 do not guess ownership. See the [local rehearsal tooling](../tools/migration/README.md).

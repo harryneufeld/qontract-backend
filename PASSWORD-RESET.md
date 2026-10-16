@@ -60,7 +60,7 @@ authorization and reverse-proxy request-body redaction before use.
   and asks the user to sign in. Reset is not a factor-disable or recovery bypass;
   future TOTP configuration must remain enabled after password reset.
 
-## Two-user FamilyPlanner migration
+## Two-user legacy migration
 
 Do not copy legacy password hashes or create duplicate accounts. The importer must
 preserve source-ID mappings, memberships and document ownership, validate normalized
