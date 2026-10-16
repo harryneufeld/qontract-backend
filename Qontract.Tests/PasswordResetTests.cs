@@ -127,6 +127,29 @@ public class PasswordResetTests : IDisposable
             .StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
+    [Fact]
+    public async Task EmailPasswordResetPreservesEnrolledAuthenticator()
+    {
+        var protector = _host.Services.GetRequiredService<Qontract.Core.Security.ITwoFactorSecretProtector>();
+        var secret = Qontract.Core.Security.Totp.NewSecret();
+        var encrypted = protector.Protect(secret);
+        await Update(db =>
+        {
+            var user = db.Users.Single(u => u.Id == _userId);
+            user.TwoFactorEnabled = true;
+            user.TwoFactorSecret = encrypted;
+        });
+        await Deliver();
+        (await Reset()).StatusCode.Should().Be(HttpStatusCode.OK);
+        var response = await _client.PostAsJsonAsync("/api/auth/login", new { email = _email, password = "replacement123" });
+        var auth = (await response.Content.ReadFromJsonAsync<AuthDTO>())!;
+        auth.RequiresTwoFactor.Should().BeTrue(); auth.AccessToken.Should().BeEmpty();
+        var code = Qontract.Core.Security.Totp.Code(secret, DateTimeOffset.UtcNow.ToUnixTimeSeconds() / 30);
+        var verified = await _client.PostAsJsonAsync("/api/auth/login", new { email = _email, password = "replacement123", twoFactorCode = code });
+        verified.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await verified.Content.ReadFromJsonAsync<AuthDTO>())!.AccessToken.Should().NotBeEmpty();
+    }
+
     [Theory]
     [InlineData("expired")]
     [InlineData("version")]

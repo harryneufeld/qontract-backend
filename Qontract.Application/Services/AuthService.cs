@@ -12,17 +12,19 @@ using System.Security.Claims;
 
 namespace Qontract.Application.Services;
 
-public class AuthService : IAuthService
+public partial class AuthService : IAuthService
 {
     private readonly IApplicationDbContext _context;
     private readonly IConfiguration _configuration;
     private readonly ILogger<AuthService> _logger;
+    private readonly ITwoFactorSecretProtector? _twoFactorProtector;
 
-    public AuthService(IApplicationDbContext context, IConfiguration configuration, ILogger<AuthService> logger)
+    public AuthService(IApplicationDbContext context, IConfiguration configuration, ILogger<AuthService> logger, ITwoFactorSecretProtector? twoFactorProtector = null)
     {
         _context = context;
         _configuration = configuration;
         _logger = logger;
+        _twoFactorProtector = twoFactorProtector;
     }
 
     public async Task<Qontract.Application.Models.AuthDTO> LoginAsync(Qontract.Application.Models.LoginDTO dto, CancellationToken cancellationToken = default)
@@ -49,6 +51,12 @@ public class AuthService : IAuthService
             }
 
             await UpgradeLegacyHashAsync(user, dto.Password, cancellationToken);
+            if (user.TwoFactorEnabled)
+            {
+                if (string.IsNullOrWhiteSpace(dto.TwoFactorCode)) return new AuthDTO { RequiresTwoFactor = true };
+                if (!await ConsumeSecondFactor(user, dto.TwoFactorCode, dto.UseRecoveryCode, cancellationToken))
+                    throw new InvalidOperationException("Invalid or already used two-factor code. Try a new code or a recovery code.");
+            }
 
             var membership = await _context.TenantMemberships
                 .Where(m => m.UserId == user.Id && m.IsActive && m.Tenant.IsActive)

@@ -4,6 +4,10 @@ namespace Qontract.Application.Models;
 
 public class LoginDTO
 {
+    [MaxLength(32)]
+    public string? TwoFactorCode { get; set; }
+    public bool UseRecoveryCode { get; set; }
+
     [Required]
     [EmailAddress]
     public string Email { get; set; } = string.Empty;

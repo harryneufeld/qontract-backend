@@ -26,6 +26,14 @@ public class User : BaseEntity
     // Incremented atomically with credential changes; invalidates every session.
     [ConcurrencyCheck]
     public int AuthVersion { get; set; }
+    public bool TwoFactorEnabled { get; set; }
+    public string? TwoFactorSecret { get; set; }
+    public string? PendingTwoFactorSecret { get; set; }
+    public DateTime? TwoFactorSetupExpiresAt { get; set; }
+    public long TwoFactorLastStep { get; set; } = -1;
+    public string TwoFactorRecoveryHashes { get; set; } = "[]";
+    public int TwoFactorFailures { get; set; }
+    public DateTime? TwoFactorLockedUntil { get; set; }
     public bool RequiresPasswordSetup { get; set; }
 
     [Required]

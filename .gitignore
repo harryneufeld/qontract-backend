@@ -494,3 +494,6 @@ Storage/
 # Deployment configuration and secrets are local to the operator.
 deploy/*.env
 secrets/
+
+# Persisted Data Protection key ring (secrets).
+Qontract.API/data/keys/

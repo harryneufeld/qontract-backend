@@ -35,6 +35,7 @@ public class AuthController : ControllerBase
     [EnableRateLimiting("auth")]
     public async Task<ActionResult<Qontract.Application.Models.AuthDTO>> Login([FromBody] Qontract.Application.Models.LoginDTO dto)
     {
+        Response.Headers.CacheControl = "no-store";
         try
         {
             var result = await _authService.LoginAsync(dto);
@@ -44,6 +45,32 @@ public class AuthController : ControllerBase
         {
             return Unauthorized(new { error = ex.Message });
         }
+    }
+
+    [HttpGet("two-factor")]
+    [Authorize(Policy = "Account")]
+    public async Task<ActionResult<TwoFactorStatusDTO>> TwoFactorStatus(CancellationToken ct) =>
+        Ok(await _authService.TwoFactorStatusAsync(CurrentUserId, ct));
+
+    [HttpPost("two-factor/{actionName}")]
+    [Authorize(Policy = "Account")]
+    [EnableRateLimiting("auth")]
+    public async Task<IActionResult> ManageTwoFactor(string actionName, TwoFactorProofDTO proof, CancellationToken ct)
+    {
+        Response.Headers.CacheControl = "no-store";
+        try
+        {
+            switch (actionName)
+            {
+                case "setup": return Ok(await _authService.SetupTwoFactorAsync(CurrentUserId, proof.Password, ct));
+                case "enable": return Ok(new { recoveryCodes = await _authService.EnableTwoFactorAsync(CurrentUserId, proof, ct) });
+                case "disable":
+                    await _authService.DisableTwoFactorAsync(CurrentUserId, proof, ct);
+                    return Ok(new { message = "Two-factor authentication disabled. Please sign in again." });
+                default: return NotFound();
+            }
+        }
+        catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
     }
 
     /// <summary>

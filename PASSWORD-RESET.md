@@ -58,7 +58,7 @@ authorization and reverse-proxy request-body redaction before use.
   address back does not revive old links. Password changes invalidate links by version.
 - Completion returns a message, never a login token. The app clears stored sessions
   and asks the user to sign in. Reset is not a factor-disable or recovery bypass;
-  future TOTP configuration must remain enabled after password reset.
+  enrolled TOTP configuration remains enabled after password reset.
 
 ## Two-user legacy migration
 

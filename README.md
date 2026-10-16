@@ -438,8 +438,8 @@ revocation is only confirmed when the backend successfully processes logout.
 
 Refresh tokens, short access-token lifetimes, session listing/revoke-all controls
 and expired-session cleanup remain follow-ups. Password reset atomically updates
-credentials and the same authentication version; TOTP challenges must also be
-bound to it when that feature is implemented.
+credentials and the same authentication version. Authenticator-based 2FA is
+available; see [TWO-FACTOR.md](TWO-FACTOR.md) for enrollment, login and key backups.
 
 Invitation codes contain 32 random bytes, are stored only as SHA256 hashes, and
 are redeemed atomically once. Optional email binding is case-insensitive. The
