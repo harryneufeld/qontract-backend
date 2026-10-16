@@ -1,6 +1,6 @@
 # Qontract Backend - Multi-tenant Contract Management System
 
-The .NET 10 API for the qontract refactor. FamilyPlanner is the production
+The .NET 10 API for the qontract refactor. The legacy system is the production
 system and the reference for full feature parity and complete migration.
 This backend is not yet a complete replacement for it.
 
@@ -132,7 +132,7 @@ shared links and excluding deleted documents and superseded versions.
   personal/tenant documents, shared-file relationships, addresses and audit data.
   Credentials use email password setup. Unused production `Invoices`, `PriceHistories`
   and `ContractPriceHistory` are excluded by agreement. See the proposed
-  [export plan](https://github.com/harryneufeld/FamilyPlanner/issues/2).
+  legacy export plan.
 - Audit cleanup is approved in [#38](https://github.com/harryneufeld/qontract-backend/issues/38#issuecomment-5784379193):
   remove contract Creator/Modifier relationships and the unused new-backend join;
   keep `Documents.UserId`; consolidate upload audit fields into base audit fields.
@@ -386,7 +386,12 @@ Notes:
 
 ## License
 
-MIT
+Copyright © 2026 Harry Neufeld.
+
+qontract is free software: you can redistribute it and/or modify it under the
+terms of the [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0). If you
+run a modified version as a network service, the AGPL requires you to offer its
+users the corresponding source code.
 
 ## Security Considerations
 
@@ -403,7 +408,7 @@ existing package visibility. Private server pulls require GHCR authentication.
 
 New and changed passwords use versioned PBKDF2-SHA512 hashes with random salts
 and 210,000 iterations. Existing refactor SHA256 hashes remain accepted for login;
-FamilyPlanner BCrypt hashes are not supported. Harry confirmed two legacy users
+Legacy BCrypt hashes are not supported. Harry confirmed two legacy users
 and selected email password setup instead of importing their hashes on 2026-10-04.
 Preserve the migrated accounts and their relationships, require password setup
 before login, and deliver expiring one-use links through the existing SMTP service.

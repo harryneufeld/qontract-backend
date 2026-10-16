@@ -1,6 +1,6 @@
 # Local migration dry run
 
-`dry_run.py` consumes the FamilyPlanner local export v1 and produces a private JSON
+`dry_run.py` consumes the legacy local export v1 and produces a private JSON
 validation/mapping report. It never opens a target database, assigns target IDs,
 imports application records, changes permissions or sends credential-setup email.
 
@@ -11,7 +11,7 @@ python -m unittest discover -s tools/migration -p 'test_*.py'
 ```
 
 The source format, local exporter and future protected API proposal are in
-FamilyPlanner's `tools/migration/EXPORT-FORMAT.md`. Store packages/reports outside
+the legacy system's export format documentation. Store packages/reports outside
 Git: they contain private source identities, relationships and mapping candidates.
 Only counts and finding categories belong in PRs/issues. A report path must be new.
 
@@ -56,7 +56,7 @@ Deterministic dry-run output is not proof that imports are idempotent.
 
 Also pending: a protected authenticated export API, operator configuration/trigger,
 production target import, SMTP staging and
-backup restore/cutover rehearsal. This tooling does not complete FamilyPlanner #2
+backup restore/cutover rehearsal. This tooling does not complete the legacy export plan
 or backend #63 and does not authorize a production import.
 
 ## Reviewed decisions and isolated target rehearsal
@@ -113,7 +113,7 @@ directory (database, documents and plan marker) together when backing it up.
 The populated fixture imported 2 users, 1 tenant, 3 contractors, 3 contracts,
 4 addresses and 3 documents with 2 memberships and 2 contract-file links. Twenty
 raw entity/relationship rows are retained in the ledger. Replaying inserted zero.
-Source FamilyPlanner is unchanged and running. A separate runtime copy passed
+The source legacy system is unchanged and running. A separate runtime copy passed
 70 live API checks with both imported accounts: tenant sharing, role restrictions,
 personal ownership, contract/document links and checksum-identical downloads.
 The API used Staging without demo seeding or sensitive SQL logging. Temporary
@@ -179,7 +179,7 @@ contractor, contract, account address and document with a contract link; eight o
 entity/relationship rows remain in the ledger. Automated tests additionally verify
 restore after the original storage is unavailable, foreign-key failures, changed or
 missing files, unfinished capture, concurrent changes and linked storage rejection.
-The user-created FamilyPlanner fixture and production were not changed by this work.
+The user-created legacy fixture and production were not changed by this work.
 
 ## Prepare a separate runnable copy
 

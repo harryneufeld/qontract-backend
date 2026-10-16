@@ -1,8 +1,8 @@
-# FamilyPlanner parity and migration mapping
+# Legacy parity and migration mapping
 
 Repository inventory, 2026-10-01. This is a mapping proposal grounded in the
 legacy models and `FamilyContext`; it is not a production inventory or a cutover approval.
-Productive FamilyPlanner remains supported until all gates below pass.
+The productive legacy system remains supported until all gates below pass.
 
 Legacy `UserFamily` (a family) maps to a refactor tenant, as confirmed by Harry
 on 2026-10-02. Family membership maps to tenant membership; family files map to
@@ -47,7 +47,7 @@ values, currencies, periods, notes, and audit fields remain in the snapshots.
 ## Contract metadata implemented in the refactor
 
 `Contract.Iban`, `Notes`, and nullable `Type` preserve the corresponding legacy
-fields. Type values and numeric codes match FamilyPlanner exactly: `None` (0),
+fields. Type values and numeric codes match the legacy system exactly: `None` (0),
 `Insurance` (1), `Loan` (2), `Subscription` (3), and `Other` (4). Null means the
 classification is unknown; it is distinct from an explicit legacy `None`.
 Business type, workflow status, and billing period are independent fields.
@@ -184,7 +184,7 @@ This is target parity, not source import. Export must retain each original
 source address is reused. Shared source address rows, unresolved references,
 and associations crossing personal/tenant visibility need an explicit mapping
 decision and reconciliation ledger before import. Do not merge addresses by
-their text or silently change visibility. Production FamilyPlanner is unchanged.
+their text or silently change visibility. The production legacy system is unchanged.
 
 ## Cost estimate convention
 
@@ -228,7 +228,7 @@ must explicitly preserve source audit facts without accidentally replacing them.
 
 Invoices support create/read/edit, paged tenant or contract lists, archive and restore.
 Amounts travel as exact invariant decimal strings and support credits. Currency is
-optional; FamilyPlanner does not declare it, so no default is inferred. Amounts that
+optional; the legacy system does not declare it, so no default is inferred. Amounts that
 cannot be represented exactly as a .NET decimal are rejected rather than rounded.
 Dates are ISO calendar dates. The source model does not enforce due-date ordering;
 the target preserves that flexibility. Payment status and invoice totals are separate
@@ -255,7 +255,7 @@ The app exposes invoices from the dashboard menu and contract details, with an
 existing-file picker for the selected contract. Standalone invoices can select
 tenant-library evidence without a contract. Full historical ownership/provenance,
 original-anchor removal, and the staged importer remain gaps. None of this constitutes
-a live FamilyPlanner migration or a proof of complete production parity.
+a live legacy migration or a proof of complete production parity.
 
 Remaining invoice/file parity is tracked in [backend #50](https://github.com/harryneufeld/qontract-backend/issues/50).
 
@@ -326,8 +326,8 @@ unchanged. Retain unresolved records in staging until reviewed.
 ## Export/import gates
 
 Address target parity is merged in backend #62 and app #52. Source AddressId
-reconciliation remains backend #63. FamilyPlanner's
-[protected address inventory and mapping proposal](https://github.com/harryneufeld/FamilyPlanner/blob/master/tools/migration/ADDRESS-RECONCILIATION.md)
+reconciliation remains backend #63. The legacy system's
+protected address inventory and mapping proposal
 preserves raw fields/audit and all user/family/company references, including null,
 missing and reused rows. The proposed one-target-address-per-parent expansion
 requires review before importer writes; source GUID alone cannot identify a target
@@ -337,7 +337,7 @@ restored-copy verification is established by that preparation.
 1. Produce a complete inventory from a restored production copy: all entity/join
    counts, orphan references, duplicate identities, scope, billing anomalies, and
    actual file counts/sizes/checksums. This repository review cannot supply those counts.
-2. Review the authenticated export plan in FamilyPlanner #2. Use a consistent
+2. Review the authenticated legacy export plan. Use a consistent
    snapshot, stable paging, versioned manifests, protected credential handling and
    streamed bytes. Export must not mutate the productive system.
 3. Implement missing in-scope target features, including email password setup,
@@ -350,5 +350,5 @@ restored-copy verification is established by that preparation.
 6. Rehearse backup/restore, bounded write freeze or verified delta export, cutover
    and rollback. Productive cutover requires a separate concrete review.
 
-Track billing in backend #47 and the complete migration in FamilyPlanner #1/#2.
+Track billing in backend #47; the complete migration is tracked separately.
 No production database was read, exported, imported, or migrated by this work.

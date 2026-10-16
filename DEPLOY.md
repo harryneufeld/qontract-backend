@@ -1,7 +1,7 @@
 # Linux Docker staging and migration rehearsals
 
 Prepare staging before any productive cutover. These files do not connect to or
-replace FamilyPlanner. Use separate Compose project names, volumes, public URLs,
+replace the legacy system. Use separate Compose project names, volumes, public URLs,
 JWT keys, database credentials and SMTP configuration for staging and production.
 
 For a dedicated Raspberry Pi / ARM64 LAN test host, see

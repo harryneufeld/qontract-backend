@@ -77,7 +77,7 @@ public enum ContractStatus
     Terminated
 }
 
-// Preserve FamilyPlanner ContractType values, including explicit None.
+// Preserve legacy ContractType values, including explicit None.
 public enum ContractType
 {
     None = 0,
