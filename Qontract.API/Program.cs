@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Http;
@@ -132,6 +133,13 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 builder.Services.AddScoped<IApplicationDbContext, ApplicationDbContext>();
 
 // Register services
+var protection = builder.Services.AddDataProtection().SetApplicationName("qontract");
+// Containers must retain this directory alongside the database. The keys are
+// secrets: protect the directory with host permissions and encrypted backups.
+var keyPath = builder.Configuration["DataProtection:KeyPath"];
+if (builder.Environment.EnvironmentName != "Development" || !string.IsNullOrWhiteSpace(keyPath))
+    protection.PersistKeysToFileSystem(new DirectoryInfo(keyPath ?? Path.Combine(builder.Environment.ContentRootPath, "data", "keys")));
+builder.Services.AddSingleton<ITwoFactorSecretProtector, Qontract.API.Services.TwoFactorSecretProtector>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<PasswordResetService>();
 builder.Services.AddScoped<IResetEmailSender, Qontract.Infrastructure.Email.SmtpResetEmailSender>();

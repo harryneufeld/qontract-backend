@@ -7,6 +7,10 @@ namespace Qontract.Application.Services;
 
 public interface IAuthService
 {
+    Task<TwoFactorStatusDTO> TwoFactorStatusAsync(int userId, CancellationToken ct = default);
+    Task<TwoFactorSetupDTO> SetupTwoFactorAsync(int userId, string password, CancellationToken ct = default);
+    Task<string[]> EnableTwoFactorAsync(int userId, TwoFactorProofDTO proof, CancellationToken ct = default);
+    Task DisableTwoFactorAsync(int userId, TwoFactorProofDTO proof, CancellationToken ct = default);
     Task<Qontract.Application.Models.AuthDTO> LoginAsync(Qontract.Application.Models.LoginDTO dto, CancellationToken cancellationToken = default);
     Task<string> HashPasswordAsync(string password);
     Task<Qontract.Application.Models.AuthUserDTO?> GetCurrentUserAsync(int userId, int tenantId, CancellationToken cancellationToken = default);

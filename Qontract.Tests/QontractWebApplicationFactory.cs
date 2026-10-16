@@ -51,6 +51,9 @@ public class QontractWebApplicationFactory : WebApplicationFactory<Program>
 
         builder.ConfigureServices(services =>
         {
+            // Tests retain no account secrets or key ring in the developer profile.
+            services.AddSingleton<Microsoft.AspNetCore.DataProtection.IDataProtectionProvider>(
+                new Microsoft.AspNetCore.DataProtection.EphemeralDataProtectionProvider());
             // Remove existing DbContext registration
             var dbContextDescriptor = services.SingleOrDefault(d =>
                 d.ServiceType == typeof(DbContextOptions<ApplicationDbContext>));

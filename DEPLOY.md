@@ -174,7 +174,7 @@ Password reset remains disabled by default. Follow [PASSWORD-RESET.md](PASSWORD-
 to configure existing SMTP, sender, mandatory TLS and the trusted public app URL,
 then enable `PASSWORD_RESET_ENABLED=true`. Test actual delivery, single use,
 expiry and browser URL scrubbing with a staging account before onboarding users.
-Never store SMTP secrets in the Flutter build. TOTP remains a separate follow-up.
+Never store SMTP secrets in the Flutter build. Authenticator-based 2FA requires a persistent Data Protection key ring; see [TWO-FACTOR.md](TWO-FACTOR.md).
 
 ## Backup, restore and rollback
 
