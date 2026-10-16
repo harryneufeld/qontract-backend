@@ -120,9 +120,40 @@ public class TwoFactorTests : IClassFixture<QontractWebApplicationFactory>
         var enabled = await Enable();
         for (var n = 0; n < 5; n++) (await Login("invalid")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
         (await Login(enabled.Codes[0], true)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        (await Lockout()).Should().Match<(int Failures, TimeSpan Remaining)>(l =>
+            l.Failures == 5 && l.Remaining > TimeSpan.FromMinutes(4) && l.Remaining <= TimeSpan.FromMinutes(5));
+
+        // An expired lock does not grant a fresh budget: the next failure locks
+        // again for twice as long.
+        await Update(u => u.TwoFactorLockedUntil = DateTime.UtcNow.AddSeconds(-1));
+        (await Login("invalid")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        (await Lockout()).Should().Match<(int Failures, TimeSpan Remaining)>(l =>
+            l.Failures == 6 && l.Remaining > TimeSpan.FromMinutes(9) && l.Remaining <= TimeSpan.FromMinutes(10));
+        (await Login(enabled.Codes[0], true)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+
         await Update(u => u.TwoFactorLockedUntil = DateTime.UtcNow.AddSeconds(-1));
         (await Login(enabled.Codes[0], true)).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Lockout()).Should().Be((0, TimeSpan.Zero));
     }
+
+    private async Task<(int Failures, TimeSpan Remaining)> Lockout()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var user = await scope.ServiceProvider.GetRequiredService<ApplicationDbContext>().Users.AsNoTracking().SingleAsync(u => u.Id == _id);
+        return (user.TwoFactorFailures, user.TwoFactorLockedUntil is { } until ? until - DateTime.UtcNow : TimeSpan.Zero);
+    }
+
+    [Theory]
+    [InlineData(1, null)]
+    [InlineData(4, null)]
+    [InlineData(5, 5)]
+    [InlineData(6, 10)]
+    [InlineData(13, 1280)]
+    [InlineData(14, 1440)]
+    [InlineData(1000, 1440)]
+    public void LockDurationEscalatesToOneDay(int failures, int? minutes) =>
+        Qontract.Application.Services.AuthService.FactorLockDuration(failures)
+            .Should().Be(minutes is { } m ? TimeSpan.FromMinutes(m) : null);
 
     [Fact]
     public async Task SetupNeedsPasswordAndValidUnexpiredConfirmation()

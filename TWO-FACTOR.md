@@ -33,9 +33,17 @@ QR-code service or send keys to one. To obtain a fresh recovery-code set, disabl
 2FA using a remaining code and enroll again.
 
 TOTP steps and recovery codes use an atomic compare-and-swap to prevent reuse,
-including concurrent requests. Only hashes of recovery codes are stored. Five
-failed factor checks lock the account's factor checks for five minutes, in
-addition to the existing IP rate limits. Password changes and email password
+including concurrent requests. Only hashes of recovery codes are stored. Each
+factor check (authenticator or recovery code) is counted before it is verified,
+so simultaneous requests cannot exceed the budget. After four unsuccessful
+checks, every further attempt locks factor checks for the account: 5 minutes,
+then doubling per attempt up to 24 hours. Only a successful check resets the
+count, so an attacker who knows the password gets roughly one guess per day
+once the cap is reached. This is in addition to the existing IP rate limits.
+Someone who knows the password can therefore also keep the account's factor
+checks locked. Changing or resetting the password stops further attempts (a
+factor check is only counted after a correct password); the current lock still
+runs out on its own. Password changes and email password
 resets preserve enrollment. If the authenticator and every recovery code are
 lost, there is no automatic email bypass or administrator reset endpoint.
 

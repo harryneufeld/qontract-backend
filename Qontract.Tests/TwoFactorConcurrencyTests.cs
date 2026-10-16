@@ -53,4 +53,44 @@ public class TwoFactorConcurrencyTests
         }
         finally { File.Delete(path); }
     }
+
+    [Fact]
+    public async Task SimultaneousGuessesCannotExceedTheLockoutBudget()
+    {
+        var path = Path.GetTempFileName();
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite($"Data Source={path};Pooling=False").Options;
+        try
+        {
+            await using (var db = new ApplicationDbContext(options))
+            {
+                await db.Database.EnsureCreatedAsync();
+                db.Users.Add(new User { Name = "Burst", Email = "burst@example.test", PasswordHash = Passwords.Hash("password123"),
+                    IsActive = true, TwoFactorEnabled = true, TwoFactorSecret = "unused-for-recovery",
+                    TwoFactorRecoveryHashes = JsonSerializer.Serialize(new[] { "00" }) });
+                await db.SaveChangesAsync();
+            }
+            const int attempts = 12;
+            using var start = new Barrier(attempts);
+            async Task Attempt(int n)
+            {
+                await using var db = new ApplicationDbContext(options);
+                var service = new AuthService(db, new ConfigurationBuilder().Build(), NullLogger<AuthService>.Instance);
+                start.SignalAndWait();
+                try
+                {
+                    await service.LoginAsync(new LoginDTO { Email = "burst@example.test", Password = "password123",
+                        TwoFactorCode = $"WRONG{n}", UseRecoveryCode = true });
+                }
+                catch (InvalidOperationException) { }
+            }
+            await Task.WhenAll(Enumerable.Range(0, attempts).Select(n => Task.Run(() => Attempt(n))));
+            await using var verify = new ApplicationDbContext(options);
+            var user = await verify.Users.SingleAsync();
+            // Exactly five guesses were admitted; the fifth applied the lock and
+            // every other simultaneous request was refused before verification.
+            user.TwoFactorFailures.Should().Be(5);
+            user.TwoFactorLockedUntil.Should().BeAfter(DateTime.UtcNow.AddMinutes(4));
+        }
+        finally { File.Delete(path); }
+    }
 }

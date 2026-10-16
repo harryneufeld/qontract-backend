@@ -30,7 +30,7 @@ public static partial class UserMessages
         ["Account changed. Please sign in again."] = "Das Konto wurde geändert. Bitte melde dich erneut an.",
         ["Restart two-factor setup."] = "Bitte starte die Einrichtung der Zwei-Faktor-Authentifizierung erneut.",
         ["Invalid or already used two-factor code. Try a new code or a recovery code."] = "Ungültiger oder bereits verwendeter Zwei-Faktor-Code. Verwende einen neuen Code oder einen Wiederherstellungscode.",
-        ["Too many two-factor attempts. Please try again in five minutes."] = "Zu viele Zwei-Faktor-Fehlversuche. Bitte versuche es in fünf Minuten erneut.",
+        ["Too many two-factor attempts. Please try again later."] = "Zu viele Zwei-Faktor-Fehlversuche. Bitte versuche es später erneut.",
         ["Two-factor authentication disabled. Please sign in again."] = "Zwei-Faktor-Authentifizierung deaktiviert. Bitte melde dich erneut an.",
         ["Account unavailable."] = "Das Konto ist nicht verfügbar.",
         ["Two-factor secret protection is unavailable."] = "Die Zwei-Faktor-Authentifizierung ist derzeit nicht verfügbar.",
