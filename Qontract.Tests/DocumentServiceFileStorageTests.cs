@@ -63,6 +63,62 @@ public class DocumentServiceFileStorageTests : IDisposable
         _connection.Dispose();
     }
 
+
+    [Fact]
+    public async Task UploadUpdatesOnlyItsContractAuditTimestampAndActor()
+    {
+        var old = new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var id = ContractId;
+        _context.Contracts.Add(new Contract { Title = "Other contract", TenantId = 1, Status = ContractStatus.Active, IsActive = true });
+        await _context.SaveChangesAsync();
+        await _context.Contracts.ExecuteUpdateAsync(s => s.SetProperty(c => c.ModifiedAt, old));
+        _context.ChangeTracker.Clear();
+        var before = DateTime.UtcNow;
+        await _service.CreateDocumentAsync(UploadDto("new.txt", "content"u8.ToArray()), id, 1, "uploader");
+        var contract = await _context.Contracts.AsNoTracking().SingleAsync(c => c.Id == id);
+        contract.ModifiedAt.Should().BeOnOrAfter(before);
+        contract.ModifiedBy.Should().Be("uploader");
+        (await _context.Contracts.AsNoTracking().SingleAsync(c => c.Id != id)).ModifiedAt.Should().Be(old);
+    }
+
+    [Fact]
+    public async Task RejectedUploadDoesNotChangeContractAudit()
+    {
+        var id = ContractId;
+        var old = new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        await _context.Contracts.ExecuteUpdateAsync(s => s.SetProperty(c => c.ModifiedAt, old));
+        _context.ChangeTracker.Clear();
+        var action = () => _service.CreateDocumentAsync(UploadDto("large.txt", new byte[2048]), id, 1, "uploader");
+        await action.Should().ThrowAsync<InvalidOperationException>();
+        (await _context.Contracts.AsNoTracking().SingleAsync()).ModifiedAt.Should().Be(old);
+    }
+
+    [Fact]
+    public async Task LinkAndReuploadUpdateAffectedContractsButRepeatedLinkDoesNot()
+    {
+        var anchor = ContractId;
+        _context.Contracts.Add(new Contract { Title = "Linked contract", TenantId = 1, Status = ContractStatus.Active, IsActive = true });
+        await _context.SaveChangesAsync();
+        var linked = await _context.Contracts.Where(c => c.Id != anchor).Select(c => c.Id).SingleAsync();
+        var doc = await _service.CreateDocumentAsync(UploadDto("version.txt", "one"u8.ToArray()), anchor, 1, "creator");
+        var old = new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        await _context.Contracts.ExecuteUpdateAsync(s => s.SetProperty(c => c.ModifiedAt, old));
+        _context.ChangeTracker.Clear();
+        await _service.SetContractLinkAsync(doc.Id, linked, 1, true, "linker");
+        var updated = await _context.Contracts.AsNoTracking().SingleAsync(c => c.Id == linked);
+        updated.ModifiedAt.Should().BeAfter(old);
+        updated.ModifiedBy.Should().Be("linker");
+        var linkTime = updated.ModifiedAt;
+        await _service.SetContractLinkAsync(doc.Id, linked, 1, true, "repeat");
+        (await _context.Contracts.AsNoTracking().SingleAsync(c => c.Id == linked)).ModifiedAt.Should().Be(linkTime);
+        var before = DateTime.UtcNow;
+        await _service.ReuploadDocumentAsync(doc.Id, new DocumentReuploadDTO { FileData = Convert.ToBase64String("two"u8) }, 1, "replacer");
+        foreach (var contract in await _context.Contracts.AsNoTracking().ToListAsync()) {
+            contract.ModifiedAt.Should().BeOnOrAfter(before);
+            contract.ModifiedBy.Should().Be("replacer");
+        }
+    }
+
     private int ContractId => _context.Contracts.AsNoTracking().First().Id;
 
     private static DocumentCreateDTO UploadDto(string fileName, byte[] content) => new()

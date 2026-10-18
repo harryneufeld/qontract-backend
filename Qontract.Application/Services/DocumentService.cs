@@ -118,6 +118,10 @@ public class DocumentService : IDocumentService
             ModifiedBy = createdBy ?? "system"
         };
 
+        if (contract is not null) {
+            contract.ModifiedAt = DateTime.UtcNow;
+            contract.ModifiedBy = createdBy ?? "system";
+        }
         await _context.Documents.AddAsync(document, cancellationToken);
         await _context.SaveChangesAsync(cancellationToken);
 
@@ -179,6 +183,8 @@ public class DocumentService : IDocumentService
             ModifiedBy = modifiedBy ?? "system"
         };
 
+        await TouchContractsAsync(current.Links.Select(l => l.ContractId)
+            .Concat(current.ContractId.HasValue ? new[] { current.ContractId.Value } : Array.Empty<int>()), tenantId, modifiedBy, cancellationToken);
         await _context.Documents.AddAsync(document, cancellationToken);
         await _context.SaveChangesAsync(cancellationToken); // assigns document.Id
 
@@ -472,11 +478,13 @@ public class DocumentService : IDocumentService
         var document = await FindCurrentDocumentAsync(id, tenantId, cancellationToken);
         if (document.Scope != (tenantId == 0 ? DocumentScope.Personal : DocumentScope.Tenant))
             throw new InvalidOperationException("Personal files cannot be linked to shared contracts.");
-        if (!await _context.Contracts.VisibleIn(tenantId, _identity?.UserId).AnyAsync(c => c.Id == contractId && c.DeletedAt == null, cancellationToken))
-            throw new KeyNotFoundException("Contract not found.");
+        var contract = await _context.Contracts.VisibleIn(tenantId, _identity?.UserId)
+            .FirstOrDefaultAsync(c => c.Id == contractId && c.DeletedAt == null, cancellationToken)
+            ?? throw new KeyNotFoundException("Contract not found.");
         if (document.ContractId == contractId && !linked)
             throw new InvalidOperationException("The original contract is the storage anchor and cannot be unlinked. You can move the document to trash instead.");
         var existing = document.Links.SingleOrDefault(l => l.ContractId == contractId);
+        var changed = linked && document.ContractId != contractId && existing is null || !linked && existing is not null;
         if (linked && document.ContractId != contractId && existing is null)
             document.Links.Add(new DocumentLink { ContractId = contractId, CreatedBy = actor, ModifiedBy = actor });
         if (!linked && existing is not null)
@@ -486,10 +494,26 @@ public class DocumentService : IDocumentService
             _context.DocumentLinks.Remove(existing);
             document.Links.Remove(existing);
         }
+        if (changed) {
+            contract.ModifiedAt = DateTime.UtcNow;
+            contract.ModifiedBy = actor ?? "system";
+        }
         document.ModifiedBy = actor;
         await _context.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return ToDto(document);
+    }
+
+    private async Task TouchContractsAsync(IEnumerable<int> ids, int tenantId, string? actor, CancellationToken cancellationToken)
+    {
+        var contractIds = ids.Distinct().ToArray();
+        if (contractIds.Length == 0) return;
+        var contracts = await _context.Contracts.VisibleIn(tenantId, _identity?.UserId)
+            .Where(c => contractIds.Contains(c.Id) && c.DeletedAt == null).ToListAsync(cancellationToken);
+        foreach (var contract in contracts) {
+            contract.ModifiedAt = DateTime.UtcNow;
+            contract.ModifiedBy = actor ?? "system";
+        }
     }
 
     private IQueryable<Document> VisibleDocuments(int tenantId)
