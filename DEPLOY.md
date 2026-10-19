@@ -1,7 +1,6 @@
-# Linux Docker staging and migration rehearsals
+# Linux Docker deployment
 
-Prepare staging before any productive cutover. These files do not connect to or
-replace the legacy system. Use separate Compose project names, volumes, public URLs,
+Use separate Compose project names, volumes, public URLs,
 JWT keys, database credentials and SMTP configuration for staging and production.
 
 For a dedicated Raspberry Pi / ARM64 LAN test host, see

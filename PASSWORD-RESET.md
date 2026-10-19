@@ -69,7 +69,7 @@ Create migrated accounts with `RequiresPasswordSetup = true` and an undisclosed
 random password hash; keep account activity independent of this setup state.
 Login and authenticated token validation reject setup-required accounts. Reset
 delivery allows active setup-required accounts and clears this flag after proof.
-Do not bulk-mark existing refactor users: the migration defaults the flag to false
+Do not bulk-mark existing qontract users: the migration defaults the flag to false
 and preserves their hashes, authentication versions and audit fields.
 
 After the production cutover gates are satisfied, request links through the public flow for the
