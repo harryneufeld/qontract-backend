@@ -145,7 +145,12 @@ builder.Services.AddScoped<PasswordResetService>();
 builder.Services.AddScoped<IResetEmailSender, Qontract.Infrastructure.Email.SmtpResetEmailSender>();
 builder.Services.AddSingleton<Qontract.API.Services.PasswordResetQueue>();
 builder.Services.AddHostedService<Qontract.API.Services.PasswordResetWorker>();
-if (PasswordResetService.Enabled(builder.Configuration))
+builder.Services.AddScoped<EmailConfirmationService>();
+builder.Services.AddScoped<IConfirmationEmailSender, Qontract.Infrastructure.Email.SmtpResetEmailSender>();
+builder.Services.AddScoped<TermsService>();
+TermsService.ValidateConfiguration(builder.Configuration);
+// Confirmation links use the same trusted app URL and SMTP relay as password reset.
+if (PasswordResetService.Enabled(builder.Configuration) || EmailConfirmationService.Required(builder.Configuration))
 {
     PasswordResetService.PublicBase(builder.Configuration);
     Qontract.Infrastructure.Email.SmtpResetEmailSender.ValidateConfiguration(builder.Configuration);
@@ -590,6 +595,7 @@ async Task SeedDataAsync(ApplicationDbContext context, IUserService userService)
             PasswordHash = "cW9udHJhY3Rfc2VlZF9zYWx0:IqHPhrNNkcLnI0/caOLUw3Cixr9EUYwymWWdYK8DLcA=", // salted SHA256 of "password123"
             Role = UserRole.TenantAdmin,
             IsActive = true,
+            EmailConfirmedAt = DateTime.UtcNow,
             TenantId = tenant.Id,
             CreatedAt = DateTime.UtcNow,
             ModifiedAt = DateTime.UtcNow
@@ -609,6 +615,7 @@ async Task SeedDataAsync(ApplicationDbContext context, IUserService userService)
             PasswordHash = "dGVzdF9zYWx0XzE2Ynl0ZQ==:jt8FI9ppKsxLD6SNvDkj5HCXkgj++ybAlEXxTaUWmuM=", // salted SHA256 of "password123"
             Role = UserRole.TenantAdmin,
             IsActive = true,
+            EmailConfirmedAt = DateTime.UtcNow,
             TenantId = tenant2.Id,
             CreatedAt = DateTime.UtcNow,
             ModifiedAt = DateTime.UtcNow

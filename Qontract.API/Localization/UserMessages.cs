@@ -93,7 +93,14 @@ public static partial class UserMessages
         ["If this account is eligible, a password reset link will be sent."] = "Falls dieses Konto berechtigt ist, wird ein Link zum Zurücksetzen des Passworts versendet.",
         ["This link is invalid or expired. Please request a new link."] = "Dieser Link ist ungültig oder abgelaufen. Bitte fordere einen neuen Link an.",
         ["Unable to complete reset. Please retry or request a new link."] = "Das Zurücksetzen konnte nicht abgeschlossen werden. Bitte versuche es erneut oder fordere einen neuen Link an.",
-        ["Password updated. Please sign in again."] = "Passwort aktualisiert. Bitte melde dich erneut an."
+        ["Password updated. Please sign in again."] = "Passwort aktualisiert. Bitte melde dich erneut an.",
+        ["Please confirm your email address before signing in."] = "Bitte bestätige deine E-Mail-Adresse, bevor du dich anmeldest.",
+        ["Check your inbox and confirm your email address to activate your account."] = "Prüfe dein Postfach und bestätige deine E-Mail-Adresse, um dein Konto zu aktivieren.",
+        ["Email confirmation is not enabled."] = "Die Bestätigung der E-Mail-Adresse ist nicht aktiviert.",
+        ["If this account still needs confirmation, a new link will be sent."] = "Falls dieses Konto noch bestätigt werden muss, wird ein neuer Link versendet.",
+        ["Unable to confirm your email address. Please retry or request a new link."] = "Die E-Mail-Adresse konnte nicht bestätigt werden. Bitte versuche es erneut oder fordere einen neuen Link an.",
+        ["Email address confirmed. You can now sign in."] = "E-Mail-Adresse bestätigt. Du kannst dich jetzt anmelden.",
+        ["Please accept the current terms of use."] = "Bitte akzeptiere die aktuellen Nutzungsbedingungen."
     };
     private static readonly IReadOnlyDictionary<string, string> Fields = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
     {

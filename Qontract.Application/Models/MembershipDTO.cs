@@ -26,6 +26,8 @@ public class RegisterDTO
     [StringLength(100)] public string? TenantName { get; set; }
     [EnumDataType(typeof(TenantType))] public TenantType TenantType { get; set; } = TenantType.Family;
     [StringLength(64)] public string? InvitationCode { get; set; }
+    // The terms version shown to the user; required when the operator configures terms.
+    [StringLength(50)] public string? AcceptedTermsVersion { get; set; }
 }
 
 public class InvitationCreateDTO

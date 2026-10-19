@@ -18,6 +18,9 @@ services:
       AllowedHosts: "${API_HOST:?Set the public API hostname};127.0.0.1"
       Registration__AllowPublic: ${ALLOW_PUBLIC_REGISTRATION:-false}
       PasswordReset__Enabled: ${PASSWORD_RESET_ENABLED:-false}
+      Registration__RequireEmailConfirmation: ${REQUIRE_EMAIL_CONFIRMATION:-false}
+      Terms__Version: ${TERMS_VERSION:-}
+      Terms__Url: ${TERMS_URL:-}
       PasswordReset__PublicAppUrl: ${PUBLIC_APP_URL:-}
       ReverseProxy__KnownProxies__0: ${TRUSTED_PROXY_IP:?Set Traefik's IP on the proxy network}
     # A missing/unmounted share must not become an empty local document folder.

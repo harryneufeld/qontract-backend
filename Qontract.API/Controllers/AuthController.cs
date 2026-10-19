@@ -16,15 +16,24 @@ public class AuthController : ControllerBase
     private readonly IAuthService _authService;
     private readonly MembershipService _memberships;
     private readonly IValidator<ChangePasswordDTO> _changePasswordValidator;
+    private readonly TermsService _terms;
+    private readonly Qontract.API.Services.PasswordResetQueue _emails;
+    private readonly IConfiguration _configuration;
 
     public AuthController(
         IAuthService authService,
         IValidator<ChangePasswordDTO> changePasswordValidator,
-        MembershipService memberships)
+        MembershipService memberships,
+        TermsService terms,
+        Qontract.API.Services.PasswordResetQueue emails,
+        IConfiguration configuration)
     {
         _authService = authService;
         _changePasswordValidator = changePasswordValidator;
         _memberships = memberships;
+        _terms = terms;
+        _emails = emails;
+        _configuration = configuration;
     }
 
     // [EnableRateLimiting("auth")] (issue #27): the "auth" policy applies a
@@ -40,6 +49,10 @@ public class AuthController : ControllerBase
         {
             var result = await _authService.LoginAsync(dto);
             return Ok(result);
+        }
+        catch (EmailNotConfirmedException ex)
+        {
+            return StatusCode(403, new { error = ex.Message, code = "email_not_confirmed" });
         }
         catch (InvalidOperationException ex)
         {
@@ -108,14 +121,45 @@ public class AuthController : ControllerBase
     private Guid CurrentSessionId => Guid.Parse(User.FindFirst("sid")!.Value);
 
     [HttpGet("registration")]
-    public IActionResult RegistrationPolicy() => Ok(new { allowPublic = _memberships.AllowPublicRegistration });
+    public IActionResult RegistrationPolicy() => Ok(new
+    {
+        allowPublic = _memberships.AllowPublicRegistration,
+        requireEmailConfirmation = EmailConfirmationService.Required(_configuration),
+        termsVersion = TermsService.CurrentVersion(_configuration),
+        termsUrl = TermsService.Url(_configuration)
+    });
 
     [HttpPost("register")]
     [EnableRateLimiting("auth")]
     public async Task<ActionResult<AuthDTO>> Register(RegisterDTO dto)
     {
         var access = await _memberships.RegisterAsync(dto);
+        if (EmailConfirmationService.Required(_configuration))
+        {
+            // No session until the address is confirmed; delivery runs in the background worker.
+            _emails.TryEnqueue(dto.Email.Trim(), Qontract.API.Localization.UserMessages.Language,
+                Qontract.API.Services.AccountEmailKind.EmailConfirmation);
+            return Accepted(new { confirmationRequired = true,
+                message = "Check your inbox and confirm your email address to activate your account." });
+        }
         return Ok(await _authService.SwitchTenantAsync(access.UserId, access.TenantId));
+    }
+
+    /// <summary>
+    /// Current terms of use and whether this account accepted them; Version is null when none are configured.
+    /// </summary>
+    [HttpGet("terms")]
+    [Authorize(Policy = "Account")]
+    public async Task<ActionResult<TermsStatusDTO>> Terms(CancellationToken ct) =>
+        Ok(await _terms.StatusAsync(CurrentUserId, ct));
+
+    [HttpPost("terms/accept")]
+    [Authorize(Policy = "Account")]
+    public async Task<IActionResult> AcceptTerms(AcceptTermsDTO dto, CancellationToken ct)
+    {
+        try { await _terms.AcceptAsync(CurrentUserId, dto.Version, ct); }
+        catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
+        return Ok(await _terms.StatusAsync(CurrentUserId, ct));
     }
 
     [HttpGet("memberships")]
@@ -171,4 +215,10 @@ public class AuthController : ControllerBase
         };
         return BadRequest(new { errors });
     }
+}
+
+public class AcceptTermsDTO
+{
+    [System.ComponentModel.DataAnnotations.Required, System.ComponentModel.DataAnnotations.StringLength(50)]
+    public string Version { get; set; } = string.Empty;
 }
