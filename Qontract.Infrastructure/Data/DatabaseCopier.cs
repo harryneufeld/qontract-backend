@@ -36,6 +36,7 @@ public sealed class DatabaseCopyException(string message) : Exception(message);
 public static class DatabaseCopier
 {
     private const int RowsPerInsert = 200;
+    private const string MigrationsLockTable = "__EFMigrationsLock";
 
     public static async Task<DatabaseCopyReport> CopyAsync(
         ApplicationDbContext source,
@@ -138,7 +139,9 @@ public static class DatabaseCopier
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
             names.Add(reader.GetString(0));
-        var mapped = plan.Tables.Select(t => t.Name).Append(HistoryTableName(source)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        // EF's own bookkeeping (history and the EF 9+ migration lock) is not data.
+        var mapped = plan.Tables.Select(t => t.Name).Append(HistoryTableName(source)).Append(MigrationsLockTable)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
         return names.Where(n => !mapped.Contains(n)).ToList();
     }
 

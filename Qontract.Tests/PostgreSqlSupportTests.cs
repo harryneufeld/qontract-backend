@@ -71,7 +71,7 @@ public class PostgreSqlSupportTests
         var report = await DatabaseCopier.CopyAsync(source, target);
 
         Assert.Equal(target.Model.GetRelationalModel().Tables.Count(), report.Tables.Count);
-        Assert.Contains("LocalSourceLedger", report.SkippedSourceTables);
+        Assert.Equal(["LocalSourceLedger"], report.SkippedSourceTables);
         await AssertSeedCopiedAsync(target);
     }
 

@@ -22,6 +22,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+      # First start runs initdb, which takes about a minute on a Raspberry Pi 4.
+      start_period: 120s
     security_opt:
       - no-new-privileges:true
     logging:
