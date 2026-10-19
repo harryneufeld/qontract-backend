@@ -177,7 +177,10 @@ public class PostgreSqlSupportTests
         await db.SaveChangesAsync();
         var user = await db.Users.FirstAsync();
         Assert.True(await db.TryRedeemInvitationAsync(invitation.Id, user.Id, DateTime.UtcNow));
-        Assert.Equal(2, await db.Contracts.IgnoreQueryFilters().CountAsync(c => c.DeletedAt < DateTime.Now));
+        // A captured local time is sent as a UTC parameter. (DateTime.Now inside
+        // the query would translate to PostgreSQL's zone-less local time.)
+        var cutoff = DateTime.Now;
+        Assert.Equal(2, await db.Contracts.IgnoreQueryFilters().CountAsync(c => c.DeletedAt < cutoff));
     }
 
     private static readonly DateTime SessionCreatedAt = new DateTime(2026, 3, 4, 5, 6, 7, DateTimeKind.Utc).AddTicks(1234567);
