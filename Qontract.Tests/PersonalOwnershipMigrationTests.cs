@@ -15,7 +15,7 @@ public class PersonalOwnershipMigrationTests
 
     [Theory]
     [InlineData("sqlite", "Data Source=unused", "INTEGER")]
-    [InlineData("postgresql", "Host=localhost;Database=unused", "integer")]
+    // PostgreSQL has its own chain (Qontract.Infrastructure.PostgreSql).
     [InlineData("sqlserver", "Server=localhost;Database=unused", "int")]
     public void UpgradeGeneratesForEachProvider(string provider, string connection, string integerType)
     {

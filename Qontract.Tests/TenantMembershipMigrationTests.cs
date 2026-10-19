@@ -12,7 +12,7 @@ public class TenantMembershipMigrationTests
 {
     [Theory]
     [InlineData("sqlite", "Data Source=unused")]
-    [InlineData("postgresql", "Host=localhost;Database=unused")]
+    // PostgreSQL has its own chain (Qontract.Infrastructure.PostgreSql).
     [InlineData("sqlserver", "Server=localhost;Database=unused")]
     public void MembershipMigration_GeneratesForEachSupportedProvider(string provider, string connection)
     {

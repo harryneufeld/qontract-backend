@@ -361,17 +361,32 @@ production deployments it can run on **PostgreSQL** or **SQL Server**:
 | `sqlserver`         | `mssql`, `sql-server`      | `Server=...;Database=qontract;User Id=...;Password=...`      |
 
 Set the value in `appsettings.json` or via the environment variable `Database__Provider`.
-The same migration chain runs on all three providers (the migrations only use DDL that is
-valid on SQLite, PostgreSQL and SQL Server), so a new database is fully set up on first start.
+Migrations run at startup, so a new database is fully set up on first start.
+
+**PostgreSQL is the recommended server database.** It has its own migration chain with native
+column types (`timestamptz`, `uuid`, `boolean`, `date`) in `Qontract.Infrastructure.PostgreSql`.
+SQLite and SQL Server share the original chain in `Qontract.Infrastructure/Migrations`.
+An existing SQLite database moves to PostgreSQL with the built-in copy command; see
+[DEPLOY.md](../DEPLOY.md#moving-from-sqlite-to-postgresql).
+
+**Every model change needs a migration in both chains:**
+
+```bash
+dotnet ef migrations add <Name> --project Qontract.Infrastructure --startup-project Qontract.Infrastructure
+dotnet ef migrations add <Name> --project Qontract.Infrastructure.PostgreSql --startup-project Qontract.Infrastructure.PostgreSql
+```
+
+`PostgreSqlSupportTests.Migration_chain_matches_the_model` fails when either chain is behind.
+Tests against a live PostgreSQL run when `QONTRACT_TEST_POSTGRES` holds a connection string for
+a role that may create databases (CI provides one); otherwise they are skipped.
 
 Notes:
 
 - Primary keys are generated **client-side** (`ClientSideIdValueGenerator`): on first use per
-  table it reads `MAX(Id)` and then increments in memory. This keeps the schema portable
-  (no SQLite `AUTOINCREMENT` / PostgreSQL identity / SQL Server `IDENTITY` columns). One
-  backend instance per database is the supported deployment model.
-- The design-time migrations factory stays on SQLite (`dotnet ef migrations add`); the
-  generated DDL is provider-neutral by construction.
+  table it reads `MAX(Id)` and then increments in memory, so no table needs an identity column
+  or sequence. One backend instance per database is the supported deployment model.
+- On PostgreSQL every `DateTime` is stored as UTC (`UtcDateTimeValueConverter`); values with
+  an unspecified kind are treated as UTC, as they already are on SQLite.
 
 ## Contributing
 

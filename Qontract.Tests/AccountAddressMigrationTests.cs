@@ -15,7 +15,7 @@ public class AccountAddressMigrationTests
 
     [Theory]
     [InlineData("sqlite", "Data Source=unused")]
-    [InlineData("postgresql", "Host=localhost;Database=unused")]
+    // PostgreSQL has its own chain (Qontract.Infrastructure.PostgreSql).
     [InlineData("sqlserver", "Server=localhost;Database=unused")]
     public void UpgradeSupportsEachProvider_AndRefusesDestructiveDowngrade(string provider, string connection)
     {

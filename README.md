@@ -76,6 +76,10 @@ Optional overrides integrate with an existing Traefik network.
 
 See [DEPLOY.md](DEPLOY.md) for the full guide, including backups and restore.
 
+PostgreSQL is the recommended server database. It has its own migration chain
+with native column types, and an existing SQLite database moves over with a
+built-in copy command — see [DEPLOY.md](DEPLOY.md#moving-from-sqlite-to-postgresql).
+
 ## Project structure
 
 ```
@@ -83,6 +87,7 @@ Qontract.Domain/          entities and domain logic
 Qontract.Application/     DTOs, validators and services
 Qontract.Core/            shared security and storage abstractions
 Qontract.Infrastructure/  EF Core, migrations, file storage
+Qontract.Infrastructure.PostgreSql/  PostgreSQL migration chain
 Qontract.API/             controllers, authentication, startup
 Qontract.Tests/           integration and unit tests
 ```

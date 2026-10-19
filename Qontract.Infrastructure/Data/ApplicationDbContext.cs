@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Qontract.Domain.Models;
 using Qontract.Application.Interfaces;
 
@@ -101,9 +102,23 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
         }
     }
 
+    protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
+    {
+        base.ConfigureConventions(configurationBuilder);
+        if (Database.IsNpgsql())
+        {
+            configurationBuilder.Properties<DateTime>().HaveConversion<UtcDateTimeValueConverter>();
+            configurationBuilder.Properties<DateTime?>().HaveConversion<UtcDateTimeValueConverter>();
+        }
+    }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+        // Keys come from ClientSideIdValueGenerator, so PostgreSQL needs no
+        // IDENTITY columns (their sequences would never advance).
+        if (Database.IsNpgsql())
+            modelBuilder.HasAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
 
         // Tenant
         modelBuilder.Entity<Tenant>(entity =>

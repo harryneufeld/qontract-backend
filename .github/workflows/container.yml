@@ -18,6 +18,19 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    # Throwaway PostgreSQL for the live-database tests and the startup check.
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -26,6 +39,8 @@ jobs:
         with:
           dotnet-version: '10.0.x'
       - name: Backend tests
+        env:
+          QONTRACT_TEST_POSTGRES: Host=localhost;Port=5432;Database=postgres;Username=postgres;Password=postgres
         run: dotnet test Qontract.sln --configuration Release
       - name: Set up Docker builder
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
@@ -61,9 +76,24 @@ jobs:
           done
           docker logs qontract-api-verify
           exit 1
-      - name: Remove verification container
+      - name: Check container startup and database migrations on PostgreSQL
+        shell: bash
+        run: |
+          set -euo pipefail
+          jwt_key="$(openssl rand -hex 32)"
+          echo "::add-mask::$jwt_key"
+          docker run -d --name qontract-api-verify-pg --network host             -e ASPNETCORE_ENVIRONMENT=Staging             -e ASPNETCORE_URLS=http://127.0.0.1:8080             -e Database__Provider=postgresql             -e 'ConnectionStrings__DefaultConnection=Host=127.0.0.1;Port=5432;Database=qontract_verify;Username=postgres;Password=postgres'             -e "Jwt__Key=$jwt_key"             -e Storage__Path=/app/Storage             -e AllowedHosts=127.0.0.1             qontract-api:verify
+          for attempt in {1..60}; do
+            if docker exec qontract-api-verify-pg curl --fail --silent http://127.0.0.1:8080/health/ready > /dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs qontract-api-verify-pg
+          exit 1
+      - name: Remove verification containers
         if: always()
-        run: docker rm -f qontract-api-verify || true
+        run: docker rm -f qontract-api-verify qontract-api-verify-pg || true
 
   publish:
     needs: verify

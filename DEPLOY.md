@@ -26,14 +26,15 @@ an SQL Server with a committed password. Choose the provider explicitly:
 | `DATABASE_PROVIDER` | Connection string and persistence |
 | --- | --- |
 | `sqlite` | `Data Source=/app/data/QontractDb.sqlite`; API database volume stores the database. Use one API instance. |
-| `postgresql` | Provision a reachable PostgreSQL database and restricted application user; configure its connection string and persistent storage/backups separately. |
+| `postgresql` | `Host=qontract-postgres;Database=qontract;Username=qontract;Password=...` with the [deploy/compose.postgres.yml](deploy/compose.postgres.yml) overlay, or any reachable PostgreSQL database and restricted application user. |
 | `sqlserver` | Provision a reachable SQL Server database and application user; configure its connection string, certificate trust and persistent storage/backups separately. |
 
-PostgreSQL/SQL Server servers are not provisioned by this Compose file. Verify
-runtime migrations on the chosen server before release; previous provider SQL
-generation does not prove execution. A Docker-internal database service must share
-an explicitly configured private network with the API. The database volume is used
-only by SQLite; documents always use their own volume.
+The [deploy/compose.postgres.yml](deploy/compose.postgres.yml) overlay adds a
+PostgreSQL 17 service on the stack's private network (its password comes from a
+protected file, see [deploy/postgres.env.example](deploy/postgres.env.example)).
+SQL Server is not provisioned. CI starts the image against PostgreSQL and runs
+the migrations; SQL Server runtime migrations remain unverified. The database
+volume is used only by SQLite; documents always use their own volume.
 
 ```bash
 cp deploy/staging.env.example deploy/staging.env
@@ -64,6 +65,47 @@ and a separate protected secrets file. The example publishes port 5001. Do not u
 the staging volumes for production. Record exact app/backend commits, image tags,
 provider/version, backup IDs and configuration version. Retain prior images;
 pin image digests in the approved release environment for reproducible deployments.
+
+## Moving from SQLite to PostgreSQL
+
+The image contains a one-shot copy command. It opens the SQLite file read-only,
+creates the PostgreSQL schema, refuses a target that already holds data, lists
+every value PostgreSQL would reject (too-long text, NUL characters, NULL in a
+required column) before writing anything, copies all tables in one transaction
+and commits only after row counts and per-table checksums match. Tables outside
+the model (such as the old import's `LocalSourceLedger`) are reported and skipped.
+Timestamps keep microsecond precision (SQLite stored 100 ns ticks).
+
+The SQLite database must already be on this release's schema: start the new
+image once on SQLite (it migrates at startup) before copying.
+
+Example for the Traefik/CIFS stack; add `-f deploy/compose.postgres.yml` to every
+command and keep both env files as usual (`$DC` below stands for the full
+`docker compose --project-name ... -f ... -f deploy/compose.postgres.yml --env-file ... --env-file ...` prefix):
+
+```bash
+# 1. Upgrade SQLite to this release's schema, then stop the API and back up the
+#    database volume (see "Backup, restore and rollback").
+$DC stop qontract-api
+# 2. Create the PostgreSQL secret (chmod 600, outside Git) and switch the API's
+#    protected env file to DATABASE_PROVIDER=postgresql and
+#    ConnectionStrings__DefaultConnection=Host=qontract-postgres;Database=qontract;Username=qontract;Password=<same>
+$DC up -d --wait qontract-postgres
+# 3. Copy. The SQLite file stays on the unchanged /app/data volume.
+$DC run --rm --entrypoint dotnet qontract-api Qontract.API.dll migrate-sqlite-to-postgres --source /app/data/QontractDb.sqlite
+# 4. Start the API on PostgreSQL and smoke-test login, contracts and documents.
+$DC up -d --wait qontract-api
+```
+
+Exit code 0 means the copy was verified and committed; 1 means it was refused or
+rolled back (the reason is printed) and 2 is a usage/configuration error. A
+refused copy leaves an empty schema behind; fix the reported values in SQLite
+(or drop and recreate the PostgreSQL database) and run it again.
+
+Rollback: stop the API and switch `DATABASE_PROVIDER` and the connection string
+back to SQLite. The SQLite file is never modified, but writes made on PostgreSQL
+after the switch are not carried back. Keep the SQLite volume until PostgreSQL
+backups (`pg_dump -Fc`) and a restore have been verified.
 
 ## HTTPS proxy, client identity and readiness
 

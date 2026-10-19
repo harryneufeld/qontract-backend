@@ -8,17 +8,21 @@ namespace Qontract.Infrastructure.Data;
 /// for production deployments via the <c>Database:Provider</c> configuration
 /// value (environment variable <c>Database__Provider</c>).
 ///
-/// All three providers share the same migration chain: the migrations only
-/// use DDL that is valid on SQLite, PostgreSQL and SQL Server (TEXT /
-/// INTEGER columns), and primary keys are generated client-side by
-/// <see cref="ClientSideIdValueGenerator"/> so no provider-specific
-/// IDENTITY/AUTOINCREMENT columns are required.
+/// SQLite and SQL Server share the migration chain in this assembly (TEXT /
+/// INTEGER columns). PostgreSQL has its own chain with native column types
+/// in <see cref="PostgreSqlMigrationsAssembly"/>; an existing SQLite
+/// database moves over with <see cref="DatabaseCopier"/>. Primary keys are
+/// generated client-side by <see cref="ClientSideIdValueGenerator"/> on
+/// every provider.
 /// </summary>
 public static class DatabaseProvider
 {
     public const string Sqlite = "sqlite";
     public const string PostgreSql = "postgresql";
     public const string SqlServer = "sqlserver";
+
+    public const string SharedMigrationsAssembly = "Qontract.Infrastructure";
+    public const string PostgreSqlMigrationsAssembly = "Qontract.Infrastructure.PostgreSql";
 
     /// <summary>
     /// Normalizes the <c>Database:Provider</c> configuration value.
@@ -37,7 +41,7 @@ public static class DatabaseProvider
 
     /// <summary>
     /// Configures the <see cref="ApplicationDbContext"/> options for the
-    /// given provider, wiring the shared migration assembly.
+    /// given provider, wiring its migration assembly.
     /// </summary>
     public static void Configure(
         this DbContextOptionsBuilder options,
@@ -48,15 +52,15 @@ public static class DatabaseProvider
         {
             case Sqlite:
                 options.UseSqlite(connectionString,
-                    b => b.MigrationsAssembly("Qontract.Infrastructure"));
+                    b => b.MigrationsAssembly(SharedMigrationsAssembly));
                 break;
             case PostgreSql:
                 options.UseNpgsql(connectionString,
-                    b => b.MigrationsAssembly("Qontract.Infrastructure"));
+                    b => b.MigrationsAssembly(PostgreSqlMigrationsAssembly));
                 break;
             case SqlServer:
                 options.UseSqlServer(connectionString,
-                    b => b.MigrationsAssembly("Qontract.Infrastructure"));
+                    b => b.MigrationsAssembly(SharedMigrationsAssembly));
                 break;
         }
     }

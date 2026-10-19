@@ -1,0 +1,39 @@
+# Overlay: adds a PostgreSQL service next to the API. Combine with the root
+# docker-compose.yml or deploy/compose.traefik-cifs.yml, e.g.
+#   docker compose -f deploy/compose.traefik-cifs.yml -f deploy/compose.postgres.yml ...
+# Set DATABASE_PROVIDER=postgresql and point the API's connection string at
+# Host=qontract-postgres (see deploy/postgres.env.example and DEPLOY.md).
+services:
+  qontract-postgres:
+    image: postgres:17
+    restart: unless-stopped
+    env_file:
+      - ${POSTGRES_SECRETS_FILE:?Set the absolute path to postgres.env}
+    environment:
+      POSTGRES_DB: qontract
+      POSTGRES_USER: qontract
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    # Only on the stack's private network; never published or on the proxy network.
+    networks:
+      - default
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U qontract -d qontract"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  qontract-api:
+    depends_on:
+      qontract-postgres:
+        condition: service_healthy
+
+volumes:
+  postgres:

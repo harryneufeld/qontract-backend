@@ -27,6 +27,7 @@
     <ProjectReference Include="..\Qontract.API\Qontract.API.csproj" />
     <ProjectReference Include="..\Qontract.Infrastructure\Qontract.Infrastructure.csproj" />
     <ProjectReference Include="..\Qontract.Application\Qontract.Application.csproj" />
+    <ProjectReference Include="..\Qontract.Infrastructure.PostgreSql\Qontract.Infrastructure.PostgreSql.csproj" />
   </ItemGroup>
 
 </Project>
