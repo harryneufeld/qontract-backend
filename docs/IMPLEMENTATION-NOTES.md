@@ -3,9 +3,8 @@
 Detailed feature behaviour, design decisions and migration notes, kept as the
 working reference for contributors. For an overview, see the [README](../README.md).
 
-The .NET 10 API for the qontract refactor. The legacy system is the production
-system and the reference for full feature parity and complete migration.
-This backend is not yet a complete replacement for it.
+The .NET 10 API for qontract. Mentions of legacy data describe values migrated
+from the previous system; see [LEGACY-MAPPING.md](../LEGACY-MAPPING.md).
 
 SQLite uses an explicit `SQLitePCLRaw.bundle_e_sqlite3` 2.1.13 reference so EF's
 older minimum cannot select the vulnerable 2.1.11 native library (#49). The loaded
@@ -142,11 +141,6 @@ shared links and excluding deleted documents and superseded versions.
   These schema changes are not yet implemented. Verify actual data before dropping
   columns/tables; preserve legitimate legacy shared-file associations in migration.
   The requested ownership investigation is tracked in [#48](https://github.com/harryneufeld/qontract-backend/issues/48).
-
-Agreed order: documentation cleanup; tenant access/membership; app usability
-([app #38](https://github.com/harryneufeld/qontract-app/issues/38)); parity/migration
-planning; revocable sessions. Staging and production target the owner's Linux
-Docker machine. GitHub Pages will not be used.
 
 ## Architecture
 
@@ -410,7 +404,7 @@ verification. New packages default to private; the workflow does not change
 existing package visibility. Private server pulls require GHCR authentication.
 
 New and changed passwords use versioned PBKDF2-SHA512 hashes with random salts
-and 210,000 iterations. Existing refactor SHA256 hashes remain accepted for login;
+and 210,000 iterations. Earlier qontract SHA256 hashes remain accepted for login;
 Legacy BCrypt hashes are not supported. Harry confirmed two legacy users
 and selected email password setup instead of importing their hashes on 2026-10-04.
 Preserve the migrated accounts and their relationships, require password setup
@@ -449,7 +443,7 @@ are redeemed atomically once. Optional email binding is case-insensitive. The
 default expiry is seven days; the API accepts one to thirty days.
 
 `AddRegistrationAndInvitations` backfills normalized account emails and enforces
-uniqueness. Before upgrading an existing refactor database, check for duplicate
+uniqueness. Before upgrading an existing qontract database, check for duplicate
 emails with `SELECT UPPER(TRIM("Email")), COUNT(*) FROM "Users" GROUP BY UPPER(TRIM("Email")) HAVING COUNT(*) > 1;`.
 Resolve duplicates explicitly before migration; it will fail rather than merge
 accounts or discard their access. Review non-ASCII email casing against the target

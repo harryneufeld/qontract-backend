@@ -12,6 +12,6 @@ Tenant admins can set `contractRetentionDays` in the existing settings JSON (int
 
 ## Upgrade
 
-Back up the database and document storage before applying `ContractResponsibilityAndTrash`. Older refactor deletes were represented by `IsActive=false`; they receive a fresh 90-day trash deadline. In SQLite imports, source-ledger evidence of legacy inactivity keeps those records visible instead. Explicit legacy `UserId` and active tenant membership backfill responsibility; ambiguous records remain unassigned. The local importer creates this provenance ledger only on SQLite. Other providers preserve old inactive refactor records in trash rather than assume migration provenance.
+Back up the database and document storage before applying `ContractResponsibilityAndTrash`. Older qontract deletes were represented by `IsActive=false`; they receive a fresh 90-day trash deadline. In SQLite imports, source-ledger evidence of legacy inactivity keeps those records visible instead. Explicit legacy `UserId` and active tenant membership backfill responsibility; ambiguous records remain unassigned. The local importer creates this provenance ledger only on SQLite. Other providers preserve old inactive refactor records in trash rather than assume migration provenance.
 
 The upgrade does not change password hashes, account setup flags, source-ledger payloads, or stored amounts. Rollback requires restoring the backup: dropping deletion columns alone cannot recover the distinction between inactive and deleted records.
