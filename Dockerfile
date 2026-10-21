@@ -16,6 +16,7 @@ COPY Qontract.Application/Qontract.Application.csproj ./Qontract.Application/
 COPY Qontract.Core/Qontract.Core.csproj ./Qontract.Core/
 COPY Qontract.Domain/Qontract.Domain.csproj ./Qontract.Domain/
 COPY Qontract.Infrastructure/Qontract.Infrastructure.csproj ./Qontract.Infrastructure/
+COPY Qontract.Infrastructure.PostgreSql/Qontract.Infrastructure.PostgreSql.csproj ./Qontract.Infrastructure.PostgreSql/
 COPY Qontract.Tests/Qontract.Tests.csproj ./Qontract.Tests/
 COPY tools/migration/LocalImport/LocalImport.csproj ./tools/migration/LocalImport/
 

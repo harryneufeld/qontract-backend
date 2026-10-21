@@ -41,6 +41,13 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 // at startup with a clear message instead of at first database access.
 var databaseProvider = DatabaseProvider.Normalize(builder.Configuration["Database:Provider"]);
 
+// One-shot SQLite → PostgreSQL copy; runs instead of the web host.
+if (args.FirstOrDefault() == Qontract.API.SqliteToPostgresCommand.Name)
+{
+    Environment.ExitCode = await Qontract.API.SqliteToPostgresCommand.RunAsync(args[1..], databaseProvider, connectionString);
+    return;
+}
+
 // Add services to the container.
 builder.Services.AddControllers(options => options.Filters.Add<Qontract.API.Localization.LocalizedResultFilter>())
     .AddJsonOptions(options =>
@@ -104,7 +111,7 @@ builder.Services.AddValidatorsFromAssembly(typeof(Qontract.Application.Services.
 // password hashes on login — into the log output, so it is enabled only in
 // Development, never in Production/other environments.
 // (issue #26) The provider is selected by "Database:Provider" (default
-// "sqlite"); the shared migration chain runs on all three providers.
+// "sqlite"); PostgreSQL uses its own migration chain (Qontract.Infrastructure.PostgreSql).
 var isDevelopment = builder.Environment.EnvironmentName == "Development";
 // Trust only the explicitly configured immediate reverse proxy.
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
