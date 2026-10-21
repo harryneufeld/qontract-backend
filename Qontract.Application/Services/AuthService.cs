@@ -51,6 +51,8 @@ public partial class AuthService : IAuthService
             }
 
             await UpgradeLegacyHashAsync(user, dto.Password, cancellationToken);
+            if (user.EmailConfirmedAt is null && EmailConfirmationService.Required(_configuration))
+                throw new EmailNotConfirmedException();
             if (user.TwoFactorEnabled)
             {
                 if (string.IsNullOrWhiteSpace(dto.TwoFactorCode)) return new AuthDTO { RequiresTwoFactor = true };

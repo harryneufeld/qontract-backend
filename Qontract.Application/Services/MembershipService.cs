@@ -85,6 +85,8 @@ public class MembershipService(IApplicationDbContext context, IConfiguration con
         if (!invited && !AllowPublicRegistration) throw new UnauthorizedAccessException("Public registration is disabled.");
         if (string.IsNullOrWhiteSpace(dto.Name)) throw new InvalidOperationException("Name is required.");
         if (!invited && string.IsNullOrWhiteSpace(dto.TenantName)) throw new InvalidOperationException("Tenant name is required.");
+        var terms = new TermsService(context, configuration);
+        terms.EnsureAccepted(dto.AcceptedTermsVersion);
         var normalized = NormalizeEmail(dto.Email);
         // Hash before opening the database transaction to avoid holding locks during password work.
         var passwordHash = Passwords.Hash(dto.Password);
@@ -107,6 +109,7 @@ public class MembershipService(IApplicationDbContext context, IConfiguration con
             CreatedBy = dto.Email.Trim(), ModifiedBy = dto.Email.Trim()
         };
         context.Users.Add(user); // The write hook creates its primary membership atomically.
+        terms.Record(user, DateTime.UtcNow);
         await context.SaveChangesAsync(ct);
         if (invitation is not null && !await context.TryRedeemInvitationAsync(invitation.Id, user.Id, DateTime.UtcNow, ct))
             throw new InvalidOperationException("Invitation is no longer available.");

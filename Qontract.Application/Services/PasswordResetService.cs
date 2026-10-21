@@ -77,7 +77,9 @@ public class PasswordResetService(IApplicationDbContext db, IConfiguration confi
                 && u.NormalizedEmail == reset.NormalizedEmail)
             .ExecuteUpdateAsync(s => s.SetProperty(u => u.PasswordHash, replacement)
                 .SetProperty(u => u.AuthVersion, u => u.AuthVersion + 1)
-                .SetProperty(u => u.RequiresPasswordSetup, false).SetProperty(u => u.ModifiedAt, now), cancellationToken);
+                .SetProperty(u => u.RequiresPasswordSetup, false).SetProperty(u => u.ModifiedAt, now)
+                // Following an emailed link proves the address as well.
+                .SetProperty(u => u.EmailConfirmedAt, u => u.EmailConfirmedAt ?? now), cancellationToken);
         if (changed != 1) return false; // Transaction disposal rolls back token consumption.
         await db.PasswordResets.Where(r => r.UserId == reset.UserId && r.ConsumedAt == null)
             .ExecuteUpdateAsync(s => s.SetProperty(r => r.ConsumedAt, now), cancellationToken);

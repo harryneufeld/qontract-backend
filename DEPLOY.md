@@ -173,7 +173,19 @@ Password reset remains disabled by default. Follow [PASSWORD-RESET.md](PASSWORD-
 to configure existing SMTP, sender, mandatory TLS and the trusted public app URL,
 then enable `PASSWORD_RESET_ENABLED=true`. Test actual delivery, single use,
 expiry and browser URL scrubbing with a staging account before onboarding users.
-Never store SMTP secrets in the Flutter build. Authenticator-based 2FA requires a persistent Data Protection key ring; see [TWO-FACTOR.md](TWO-FACTOR.md).
+Never store SMTP secrets in the Flutter build.
+
+With `REQUIRE_EMAIL_CONFIRMATION=true`, new accounts receive a one-use link (valid
+24 hours) and cannot sign in until they follow it; the app can request a new link.
+It reuses the password-reset SMTP settings and trusted app URL, and the API refuses
+to start without them. Accounts that existed before the migration count as
+confirmed, and a completed password reset also confirms the address.
+
+To require terms of use at signup, set `TERMS_VERSION` (for example `2026-10`) and
+`TERMS_URL` (an HTTPS page with the full text). Each acceptance is stored with its
+version and time. Publishing a new version asks signed-in users to accept it again
+before they continue. Leave both empty to show no terms, for example on a private
+self-hosted instance. Authenticator-based 2FA requires a persistent Data Protection key ring; see [TWO-FACTOR.md](TWO-FACTOR.md).
 
 ## Backup, restore and rollback
 

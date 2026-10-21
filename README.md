@@ -70,6 +70,8 @@ Optional overrides integrate with an existing Traefik network.
 | `Database__Provider` | `sqlite` (default), `postgresql`, `sqlserver` |
 | `Storage__Provider` | `local` (default), `s3`, `azure` |
 | `Registration__AllowPublic` | `false` (default) — invitation-only signup |
+| `Registration__RequireEmailConfirmation` | `false` (default) — `true` activates accounts only after an emailed link |
+| `Terms__Version`, `Terms__Url` | empty (default) — set both to require accepting terms of use |
 | `Cors__Origins__0`, … | allowed origins for the web app |
 
 See [DEPLOY.md](DEPLOY.md) for the full guide, including backups and restore.

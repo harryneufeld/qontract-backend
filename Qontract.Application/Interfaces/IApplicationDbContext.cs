@@ -9,6 +9,8 @@ public interface IApplicationDbContext
     DbSet<User> Users { get; }
     DbSet<AuthSession> AuthSessions { get; }
     DbSet<PasswordReset> PasswordResets { get; }
+    DbSet<EmailConfirmation> EmailConfirmations { get; }
+    DbSet<TermsAcceptance> TermsAcceptances { get; }
     DbSet<TenantMembership> TenantMemberships { get; }
     DbSet<TenantInvitation> TenantInvitations { get; }
     DbSet<Contractor> Contractors { get; }

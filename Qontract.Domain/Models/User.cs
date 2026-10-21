@@ -35,6 +35,8 @@ public class User : BaseEntity
     public int TwoFactorFailures { get; set; }
     public DateTime? TwoFactorLockedUntil { get; set; }
     public bool RequiresPasswordSetup { get; set; }
+    // Null until the address is proven via a confirmation or password-reset link.
+    public DateTime? EmailConfirmedAt { get; set; }
 
     [Required]
     [MaxLength(50)]
