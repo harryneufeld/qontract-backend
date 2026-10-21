@@ -497,6 +497,43 @@ namespace Qontract.Infrastructure.PostgreSql.Migrations
                     b.ToTable("DocumentLinks");
                 });
 
+            modelBuilder.Entity("Qontract.Domain.Models.EmailConfirmation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ConsumedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("NormalizedEmail")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
+
+                    b.HasIndex("UserId", "CreatedAt");
+
+                    b.ToTable("EmailConfirmations", (string)null);
+                });
+
             modelBuilder.Entity("Qontract.Domain.Models.Invoice", b =>
                 {
                     b.Property<Guid>("Id")
@@ -739,6 +776,30 @@ namespace Qontract.Infrastructure.PostgreSql.Migrations
                     b.ToTable("TenantMemberships", (string)null);
                 });
 
+            modelBuilder.Entity("Qontract.Domain.Models.TermsAcceptance", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("AcceptedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Version")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "Version")
+                        .IsUnique();
+
+                    b.ToTable("TermsAcceptances", (string)null);
+                });
+
             modelBuilder.Entity("Qontract.Domain.Models.User", b =>
                 {
                     b.Property<int>("Id")
@@ -760,6 +821,9 @@ namespace Qontract.Infrastructure.PostgreSql.Migrations
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime?>("EmailConfirmedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
@@ -1008,6 +1072,17 @@ namespace Qontract.Infrastructure.PostgreSql.Migrations
                     b.Navigation("Document");
                 });
 
+            modelBuilder.Entity("Qontract.Domain.Models.EmailConfirmation", b =>
+                {
+                    b.HasOne("Qontract.Domain.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("Qontract.Domain.Models.Invoice", b =>
                 {
                     b.HasOne("Qontract.Domain.Models.Contract", "Contract")
@@ -1077,6 +1152,17 @@ namespace Qontract.Infrastructure.PostgreSql.Migrations
                         .IsRequired();
 
                     b.Navigation("Tenant");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Qontract.Domain.Models.TermsAcceptance", b =>
+                {
+                    b.HasOne("Qontract.Domain.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
 
                     b.Navigation("User");
                 });
