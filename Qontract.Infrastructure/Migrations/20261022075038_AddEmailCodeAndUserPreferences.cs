@@ -31,6 +31,9 @@ namespace Qontract.Infrastructure.Migrations
                 type: "TEXT",
                 nullable: true);
 
+            // Accounts that exist before first-run setup was introduced must not be sent through it.
+            migrationBuilder.Sql("UPDATE \"Users\" SET \"OnboardingCompletedAt\" = CURRENT_TIMESTAMP WHERE \"OnboardingCompletedAt\" IS NULL;");
+
             migrationBuilder.AddColumn<int>(
                 name: "CodeAttempts",
                 table: "EmailConfirmations",
