@@ -7,10 +7,10 @@ using Qontract.Application.Services;
 namespace Qontract.API.Controllers;
 
 [ApiController]
-// Tenant management (list, read, create, update, deactivate) is an
-// admin-only operation (issue #24): only tenant admins may create or
-// change tenants.
-[Authorize(Roles = AppRoles.TenantAdmin)]
+// Tenant management (list, read, update, deactivate) is an admin-only
+// operation (issue #24). Creating a workspace is open to every signed-in
+// user ("Session" policy: no workspace needed), who becomes its
+// administrator. Each action declares its own authorization.
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/[controller]")]
 [Route("api/[controller]")]
@@ -43,10 +43,8 @@ public class TenantsController : ControllerBase
         User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
         ?? throw new UnauthorizedAccessException());
 
-    private int CurrentTenantId => int.Parse(
-        User.FindFirst("TenantId")?.Value ?? throw new UnauthorizedAccessException());
-
     [HttpGet]
+    [Authorize(Roles = AppRoles.TenantAdmin)]
     public async Task<ActionResult<List<TenantDTO>>> GetTenants()
     {
         var tenants = await _tenantService.GetTenantsAsync(CurrentUserId);
@@ -54,6 +52,7 @@ public class TenantsController : ControllerBase
     }
 
     [HttpGet("{id}")]
+    [Authorize(Roles = AppRoles.TenantAdmin)]
     public async Task<ActionResult<TenantDTO>> GetTenant(int id)
     {
         var tenant = await _tenantService.GetTenantByIdAsync(id, CurrentUserId);
@@ -61,17 +60,19 @@ public class TenantsController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Policy = "Session")]
     public async Task<ActionResult<TenantDTO>> CreateTenant([FromBody] TenantCreateDTO dto)
     {
         var reject = await DtoValidation.RejectIfInvalidAsync(_createValidator, dto);
         if (reject is not null)
             return reject;
 
-        var tenant = await _tenantService.CreateTenantAsync(dto, CurrentUserId, CurrentTenantId, CurrentUser);
+        var tenant = await _tenantService.CreateTenantAsync(dto, CurrentUserId, CurrentUser);
         return CreatedAtAction(nameof(GetTenant), new { id = tenant.Id }, tenant);
     }
 
     [HttpPut("{id}")]
+    [Authorize(Roles = AppRoles.TenantAdmin)]
     public async Task<ActionResult<TenantDTO>> UpdateTenant(int id, [FromBody] TenantUpdateDTO dto)
     {
         var reject = await DtoValidation.RejectIfInvalidAsync(_updateValidator, dto);
@@ -83,6 +84,7 @@ public class TenantsController : ControllerBase
     }
 
     [HttpPost("{id}/apply-default-currency")]
+    [Authorize(Roles = AppRoles.TenantAdmin)]
     public async Task<ActionResult> ApplyDefaultCurrency(int id, [FromBody] ApplyTenantCurrencyDTO dto)
     {
         var changed = await _tenantService.ApplyDefaultCurrencyAsync(id, CurrentUserId,
@@ -91,6 +93,7 @@ public class TenantsController : ControllerBase
     }
 
     [HttpPatch("{id}/deactivate")]
+    [Authorize(Roles = AppRoles.TenantAdmin)]
     public async Task<ActionResult<TenantDTO>> DeactivateTenant(int id)
     {
         var tenant = await _tenantService.DeactivateTenantAsync(id, CurrentUserId, CurrentUser);

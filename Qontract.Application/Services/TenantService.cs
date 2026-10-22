@@ -102,15 +102,12 @@ public class TenantService : ITenantService
         }
     }
 
-    public async Task<TenantDTO> CreateTenantAsync(TenantCreateDTO dto, int userId, int currentTenantId, string? createdBy, CancellationToken cancellationToken = default)
+    public async Task<TenantDTO> CreateTenantAsync(TenantCreateDTO dto, int userId, string? createdBy, CancellationToken cancellationToken = default)
     {
         ValidateContractRetention(dto.Settings);
         TenantCurrency.FromSettings(dto.Settings);
         try
         {
-            if (!await AdministeredTenants(userId).AnyAsync(t => t.Id == currentTenantId && t.IsActive, cancellationToken))
-                throw new UnauthorizedAccessException();
-
             // DTO validation lives in the controller layer (issue #39).
             var tenant = new Tenant
             {

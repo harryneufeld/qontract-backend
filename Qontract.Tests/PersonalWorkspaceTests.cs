@@ -73,6 +73,19 @@ public class PersonalWorkspaceTests(QontractWebApplicationFactory factory) : ICl
     }
 
     [Fact]
+    public async Task AccountWithoutMembership_CanCreateWorkspace_AndBecomesItsAdmin()
+    {
+        var (client, _) = await Personal();
+        var create = await client.PostAsJsonAsync("/api/tenants", new { name = "My Family", type = "Family" });
+        create.StatusCode.Should().Be(HttpStatusCode.Created);
+        var tenant = (await create.Content.ReadFromJsonAsync<TenantDTO>(Json))!;
+
+        var memberships = await client.GetFromJsonAsync<List<MembershipDTO>>("/api/auth/memberships", Json);
+        memberships!.Should().ContainSingle(m => m.TenantId == tenant.Id && m.Role == UserRole.TenantAdmin);
+        (await client.PostAsJsonAsync("/api/auth/switch-tenant", new { tenantId = tenant.Id })).StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
     public async Task PrivateCrud_ContractCountsAndStats_AreIsolatedBetweenOwners()
     {
         var (owner, auth) = await Personal();

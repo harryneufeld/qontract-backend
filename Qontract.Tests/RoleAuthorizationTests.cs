@@ -116,8 +116,9 @@ public class RoleAuthorizationTests : IClassFixture<QontractWebApplicationFactor
         var list = await _client.GetAsync("/api/tenants");
         list.StatusCode.Should().Be(HttpStatusCode.Forbidden);
 
-        var create = await _client.PostAsJsonAsync("/api/tenants", new { name = "Rogue Tenant", type = "Family" });
-        create.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        // Any signed-in user may create a workspace and becomes its admin.
+        var create = await _client.PostAsJsonAsync("/api/tenants", new { name = "Member Created Tenant", type = "Family" });
+        create.StatusCode.Should().Be(HttpStatusCode.Created);
 
         var update = await _client.PutAsJsonAsync("/api/tenants/1", new { name = "Rogue Tenant" });
         update.StatusCode.Should().Be(HttpStatusCode.Forbidden);
