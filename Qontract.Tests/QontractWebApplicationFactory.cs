@@ -84,6 +84,15 @@ public class QontractWebApplicationFactory : WebApplicationFactory<Program>
             {
                 services.Remove(workerDescriptor);
             }
+
+            // Same for the recommendation worker; tests run the engine directly.
+            var recommendationWorker = services.SingleOrDefault(d =>
+                d.ServiceType == typeof(IHostedService)
+                && d.ImplementationType == typeof(Qontract.API.Services.RecommendationWorker));
+            if (recommendationWorker != null)
+            {
+                services.Remove(recommendationWorker);
+            }
         });
     }
 }

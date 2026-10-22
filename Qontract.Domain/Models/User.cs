@@ -45,6 +45,11 @@ public class User : BaseEntity
     public string? Language { get; set; }
     public DateTime? OnboardingCompletedAt { get; set; }
 
+    // Personal notification preferences; the digest email itself ships later.
+    public NotificationDigest NotificationDigest { get; set; }
+    [MaxLength(500)]
+    public string? MutedNotificationKinds { get; set; }
+
     [Required]
     [MaxLength(50)]
     public UserRole Role { get; set; }
@@ -56,6 +61,13 @@ public class User : BaseEntity
 
     // Navigation properties
     public Tenant? Tenant { get; set; }
+}
+
+public enum NotificationDigest
+{
+    Off,
+    Daily,
+    Weekly
 }
 
 public enum UserRole

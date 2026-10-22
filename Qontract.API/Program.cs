@@ -204,6 +204,11 @@ builder.Services.Configure<Qontract.Application.Services.DocumentRetentionOption
 builder.Services.AddScoped<Qontract.Infrastructure.ContractPurgeService>();
 builder.Services.AddScoped<Qontract.Application.Services.DocumentPurgeService>();
 builder.Services.AddHostedService<Qontract.API.Services.DocumentRetentionWorker>();
+builder.Services.Configure<Qontract.Application.Notifications.RecommendationOptions>(
+    builder.Configuration.GetSection(Qontract.Application.Notifications.RecommendationOptions.SectionName));
+builder.Services.AddScoped<Qontract.Application.Notifications.RecommendationEngine>();
+builder.Services.AddScoped<Qontract.Application.Notifications.NotificationService>();
+builder.Services.AddHostedService<Qontract.API.Services.RecommendationWorker>();
 
 // Configure JWT
 // Resolve + validate the JWT settings up front so a missing Jwt:Key fails

@@ -29,6 +29,10 @@ public class ContractDTO
     public BillingPeriod? BillingPeriod { get; set; }
     public string? ContractNumber { get; set; }
     public string? MinimumContractDate { get; set; }
+    public int? NoticePeriodValue { get; set; }
+    public NoticePeriodUnit? NoticePeriodUnit { get; set; }
+    public bool AutoRenews { get; set; }
+    public int? RenewalMonths { get; set; }
     public int? ContractorId { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime ModifiedAt { get; set; }
@@ -56,6 +60,10 @@ public class ContractCreateDTO
     public BillingPeriod? BillingPeriod { get; set; }
     public string? ContractNumber { get; set; }
     public string? MinimumContractDate { get; set; }
+    public int? NoticePeriodValue { get; set; }
+    public NoticePeriodUnit? NoticePeriodUnit { get; set; }
+    public bool AutoRenews { get; set; }
+    public int? RenewalMonths { get; set; }
     public int? ContractorId { get; set; }
 }
 
@@ -97,6 +105,12 @@ public class ContractUpdateDTO
     public BillingPeriod? BillingPeriod { get; set; }
     public string? ContractNumber { get; set; }
     public string? MinimumContractDate { get; set; }
+    public int? NoticePeriodValue { get; set; }
+    public NoticePeriodUnit? NoticePeriodUnit { get; set; }
+    public bool? AutoRenews { get; set; }
+    public int? RenewalMonths { get; set; }
+    // Removes the notice period; omitted values keep the current one.
+    public bool ClearNoticePeriod { get; set; }
     public int? ContractorId { get; set; }
 }
 

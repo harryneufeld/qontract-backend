@@ -99,6 +99,7 @@ Qontract.Tests/           integration and unit tests
 - [TWO-FACTOR.md](TWO-FACTOR.md) — authenticator-app 2FA
 - [PASSWORD-RESET.md](PASSWORD-RESET.md) — SMTP password reset
 - [CONTRACT-LIFECYCLE.md](CONTRACT-LIFECYCLE.md) — contract states and trash
+- [NOTIFICATIONS.md](NOTIFICATIONS.md) — recommendations, reminders and their settings
 - [LEGACY-MAPPING.md](LEGACY-MAPPING.md) — migration from the legacy system
 
 ## Contributing

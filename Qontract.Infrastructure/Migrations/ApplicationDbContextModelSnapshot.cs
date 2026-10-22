@@ -132,6 +132,11 @@ namespace Qontract.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<bool>("AutoRenews")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(false);
+
                     b.Property<int?>("BillingPeriod")
                         .HasColumnType("INTEGER");
 
@@ -194,7 +199,16 @@ namespace Qontract.Infrastructure.Migrations
                     b.Property<string>("Notes")
                         .HasColumnType("TEXT");
 
+                    b.Property<int?>("NoticePeriodUnit")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("NoticePeriodValue")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int?>("OwnerUserId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("RenewalMonths")
                         .HasColumnType("INTEGER");
 
                     b.Property<int?>("ResponsibleUserId")
@@ -608,6 +622,79 @@ namespace Qontract.Infrastructure.Migrations
                     b.ToTable("Invoices");
                 });
 
+            modelBuilder.Entity("Qontract.Domain.Models.Notification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("ContractId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DedupKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("DismissedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateOnly?>("DueOn")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("ModifiedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ModifiedBy")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Params")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("ReadAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("ResolvedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Severity")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("SnoozedUntil")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("TenantId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ContractId");
+
+                    b.HasIndex("UserId", "DedupKey")
+                        .IsUnique();
+
+                    b.HasIndex("UserId", "TenantId", "ResolvedAt");
+
+                    b.ToTable("Notifications", (string)null);
+                });
+
             modelBuilder.Entity("Qontract.Domain.Models.PasswordReset", b =>
                 {
                     b.Property<Guid>("Id")
@@ -849,6 +936,10 @@ namespace Qontract.Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("MutedNotificationKinds")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -858,6 +949,9 @@ namespace Qontract.Infrastructure.Migrations
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("TEXT");
+
+                    b.Property<int>("NotificationDigest")
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("OnboardingCompletedAt")
                         .HasColumnType("TEXT");
@@ -1123,6 +1217,24 @@ namespace Qontract.Infrastructure.Migrations
                     b.Navigation("Document");
 
                     b.Navigation("Tenant");
+                });
+
+            modelBuilder.Entity("Qontract.Domain.Models.Notification", b =>
+                {
+                    b.HasOne("Qontract.Domain.Models.Contract", "Contract")
+                        .WithMany()
+                        .HasForeignKey("ContractId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.HasOne("Qontract.Domain.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Contract");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("Qontract.Domain.Models.PasswordReset", b =>
