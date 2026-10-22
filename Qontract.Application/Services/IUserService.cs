@@ -14,6 +14,8 @@ public interface IAuthService
     Task<Qontract.Application.Models.AuthDTO> LoginAsync(Qontract.Application.Models.LoginDTO dto, CancellationToken cancellationToken = default);
     Task<string> HashPasswordAsync(string password);
     Task<Qontract.Application.Models.AuthUserDTO?> GetCurrentUserAsync(int userId, int tenantId, CancellationToken cancellationToken = default);
+    Task<AuthDTO> StartConfirmedSessionAsync(int userId, CancellationToken cancellationToken = default);
+    Task<Qontract.Application.Models.AuthUserDTO?> UpdateProfileAsync(int userId, int tenantId, Qontract.Application.Models.ProfileUpdateDTO dto, CancellationToken cancellationToken = default);
     Task<AuthDTO> SwitchTenantAsync(int userId, int tenantId, CancellationToken cancellationToken = default, Guid? sessionId = null);
     Task LogoutAsync(int userId, Guid sessionId, CancellationToken cancellationToken = default);
     /// <summary>

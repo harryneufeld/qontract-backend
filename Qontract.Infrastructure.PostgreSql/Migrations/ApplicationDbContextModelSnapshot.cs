@@ -502,6 +502,16 @@ namespace Qontract.Infrastructure.PostgreSql.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid");
 
+                    b.Property<int>("CodeAttempts")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("CodeExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CodeHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
                     b.Property<DateTime?>("ConsumedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -817,6 +827,10 @@ namespace Qontract.Infrastructure.PostgreSql.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<string>("DefaultCurrency")
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)");
+
                     b.Property<string>("Email")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -827,6 +841,10 @@ namespace Qontract.Infrastructure.PostgreSql.Migrations
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
+
+                    b.Property<string>("Language")
+                        .HasMaxLength(5)
+                        .HasColumnType("character varying(5)");
 
                     b.Property<DateTime>("ModifiedAt")
                         .HasColumnType("timestamp with time zone");
@@ -844,6 +862,9 @@ namespace Qontract.Infrastructure.PostgreSql.Migrations
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime?>("OnboardingCompletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("PasswordHash")
                         .IsRequired()

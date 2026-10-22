@@ -162,6 +162,22 @@ public class AuthController : ControllerBase
         return Ok(await _terms.StatusAsync(CurrentUserId, ct));
     }
 
+    /// <summary>
+    /// First-run setup and later preference changes: name, default currency, language, onboarding done.
+    /// </summary>
+    [HttpPut("profile")]
+    [Authorize(Policy = "Session")]
+    public async Task<ActionResult<AuthUserDTO>> UpdateProfile(ProfileUpdateDTO dto)
+    {
+        if (!int.TryParse(User.FindFirst("TenantId")?.Value, out var tenantId)) return Unauthorized();
+        try
+        {
+            var user = await _authService.UpdateProfileAsync(CurrentUserId, tenantId, dto);
+            return user is null ? Unauthorized() : Ok(user);
+        }
+        catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
+    }
+
     [HttpGet("memberships")]
     [Authorize(Policy = "Session")]
     public async Task<ActionResult<List<MembershipDTO>>> Memberships() =>

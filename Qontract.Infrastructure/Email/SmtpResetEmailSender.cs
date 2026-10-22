@@ -39,7 +39,7 @@ public class SmtpResetEmailSender(IConfiguration config) : IResetEmailSender, IC
                 : "\n\nIf you did not request this, ignore this message. Your password has not changed.") };
         return message;
     }
-    public MimeMessage CreateConfirmationMessage(string email, Uri confirmationLink, string language = "en")
+    public MimeMessage CreateConfirmationMessage(string email, Uri confirmationLink, string code, string language = "en")
     {
         ValidateConfiguration(config);
         var message = new MimeMessage();
@@ -49,15 +49,17 @@ public class SmtpResetEmailSender(IConfiguration config) : IResetEmailSender, IC
         message.Subject = german ? "Bestätige deine E-Mail-Adresse für qontract" : "Confirm your email address for qontract";
         message.Body = new TextPart("plain") { Text =
             (german
-                ? "Willkommen bei qontract! Bestätige mit diesem Link deine E-Mail-Adresse, um dein Konto zu aktivieren. Er ist 24 Stunden gültig und kann einmal verwendet werden.\n\n"
-                : "Welcome to qontract! Use this link to confirm your email address and activate your account. It expires in 24 hours and can be used once.\n\n")
+                ? "Willkommen bei qontract! Gib diesen Code in der App ein, um deine E-Mail-Adresse zu bestätigen:\n\n    " + code
+                    + "\n\nDer Code ist 30 Minuten gültig. Oder tippe auf diesen Link (24 Stunden gültig, einmal verwendbar):\n\n"
+                : "Welcome to qontract! Enter this code in the app to confirm your email address:\n\n    " + code
+                    + "\n\nThe code is valid for 30 minutes. Or tap this link (valid for 24 hours, usable once):\n\n")
             + confirmationLink.AbsoluteUri + (german
                 ? "\n\nFalls du kein qontract-Konto erstellt hast, ignoriere diese Nachricht."
                 : "\n\nIf you did not create a qontract account, ignore this message.") };
         return message;
     }
-    public Task SendConfirmationAsync(string email, Uri confirmationLink, CancellationToken cancellationToken, string language = "en") =>
-        DeliverAsync(CreateConfirmationMessage(email, confirmationLink, language), cancellationToken);
+    public Task SendConfirmationAsync(string email, Uri confirmationLink, string code, CancellationToken cancellationToken, string language = "en") =>
+        DeliverAsync(CreateConfirmationMessage(email, confirmationLink, code, language), cancellationToken);
     public Task SendAsync(string email, Uri resetLink, CancellationToken cancellationToken, string language = "en") =>
         DeliverAsync(CreateMessage(email, resetLink, language), cancellationToken);
     private async Task DeliverAsync(MimeMessage message, CancellationToken cancellationToken)

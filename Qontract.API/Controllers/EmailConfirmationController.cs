@@ -11,7 +11,7 @@ namespace Qontract.API.Controllers;
 [Route("api/v{version:apiVersion}/auth")]
 [Route("api/auth")]
 [EnableRateLimiting("auth")]
-public class EmailConfirmationController(PasswordResetQueue queue, EmailConfirmationService confirmations, IConfiguration config) : ControllerBase
+public class EmailConfirmationController(PasswordResetQueue queue, EmailConfirmationService confirmations, IAuthService auth, IConfiguration config) : ControllerBase
 {
     [HttpPost("resend-confirmation")]
     public IActionResult Resend(RequestEmailConfirmation dto)
@@ -29,20 +29,49 @@ public class EmailConfirmationController(PasswordResetQueue queue, EmailConfirma
     {
         try
         {
-            if (!await confirmations.ConfirmAsync(dto.Token, cancellationToken))
+            var userId = await confirmations.ConfirmTokenAsync(dto.Token, cancellationToken);
+            if (userId is null)
                 return BadRequest(new { message = "This link is invalid or expired. Please request a new link." });
+            // The link proves the address just like the code does, so the app can continue without a second sign-in.
+            return Ok(new { message = "Email address confirmed. You can now sign in.",
+                session = await auth.StartConfirmedSessionAsync(userId.Value, cancellationToken) });
         }
         catch (DbException)
         {
             return Conflict(new { message = "Unable to confirm your email address. Please retry or request a new link." });
         }
-        return Ok(new { message = "Email address confirmed. You can now sign in." });
+    }
+
+    [HttpPost("confirm-email-code")]
+    public async Task<IActionResult> ConfirmCode(CompleteEmailConfirmationCode dto, CancellationToken cancellationToken)
+    {
+        if (!EmailConfirmationService.Required(config))
+            return StatusCode(503, new { message = "Email confirmation is not enabled." });
+        try
+        {
+            var userId = await confirmations.ConfirmCodeAsync(dto.Email, dto.Code, cancellationToken);
+            if (userId is null)
+                return BadRequest(new { message = "This code is invalid or expired. Please request a new one." });
+            return Ok(new { message = "Email address confirmed.",
+                session = await auth.StartConfirmedSessionAsync(userId.Value, cancellationToken) });
+        }
+        catch (DbException)
+        {
+            return Conflict(new { message = "Unable to confirm your email address. Please retry or request a new code." });
+        }
     }
 }
 public class RequestEmailConfirmation
 {
     [Required, EmailAddress, MaxLength(100)]
     public string Email { get; set; } = string.Empty;
+}
+public class CompleteEmailConfirmationCode
+{
+    [Required, EmailAddress, MaxLength(100)]
+    public string Email { get; set; } = string.Empty;
+    [Required, StringLength(6, MinimumLength = 6)]
+    public string Code { get; set; } = string.Empty;
 }
 public class CompleteEmailConfirmation
 {

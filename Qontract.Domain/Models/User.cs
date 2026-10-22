@@ -38,6 +38,13 @@ public class User : BaseEntity
     // Null until the address is proven via a confirmation or password-reset link.
     public DateTime? EmailConfirmedAt { get; set; }
 
+    // Personal preferences chosen during first-run setup. Null until set.
+    [MaxLength(3)]
+    public string? DefaultCurrency { get; set; }
+    [MaxLength(5)]
+    public string? Language { get; set; }
+    public DateTime? OnboardingCompletedAt { get; set; }
+
     [Required]
     [MaxLength(50)]
     public UserRole Role { get; set; }
