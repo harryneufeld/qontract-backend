@@ -11,24 +11,29 @@ namespace Qontract.Infrastructure.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            var sqlServer = ActiveProvider.Contains("SqlServer");
+            var postgres = ActiveProvider.Contains("Npgsql");
+            var intType = sqlServer ? "int" : postgres ? "integer" : "INTEGER";
+            var dateType = sqlServer ? "datetime2" : postgres ? "timestamp with time zone" : "TEXT";
+            string StringType(int length) => sqlServer ? $"nvarchar({length})" : postgres ? $"character varying({length})" : "TEXT";
             migrationBuilder.AddColumn<string>(
                 name: "DefaultCurrency",
                 table: "Users",
-                type: "TEXT",
+                type: StringType(3),
                 maxLength: 3,
                 nullable: true);
 
             migrationBuilder.AddColumn<string>(
                 name: "Language",
                 table: "Users",
-                type: "TEXT",
+                type: StringType(5),
                 maxLength: 5,
                 nullable: true);
 
             migrationBuilder.AddColumn<DateTime>(
                 name: "OnboardingCompletedAt",
                 table: "Users",
-                type: "TEXT",
+                type: dateType,
                 nullable: true);
 
             // Accounts that exist before first-run setup was introduced must not be sent through it.
@@ -37,20 +42,20 @@ namespace Qontract.Infrastructure.Migrations
             migrationBuilder.AddColumn<int>(
                 name: "CodeAttempts",
                 table: "EmailConfirmations",
-                type: "INTEGER",
+                type: intType,
                 nullable: false,
                 defaultValue: 0);
 
             migrationBuilder.AddColumn<DateTime>(
                 name: "CodeExpiresAt",
                 table: "EmailConfirmations",
-                type: "TEXT",
+                type: dateType,
                 nullable: true);
 
             migrationBuilder.AddColumn<string>(
                 name: "CodeHash",
                 table: "EmailConfirmations",
-                type: "TEXT",
+                type: StringType(64),
                 maxLength: 64,
                 nullable: true);
         }
