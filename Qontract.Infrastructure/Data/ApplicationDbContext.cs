@@ -184,6 +184,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
             entity.Property(e => e.Id).ValueGeneratedNever();
             entity.Property(e => e.TokenHash).IsRequired().HasMaxLength(64);
             entity.Property(e => e.NormalizedEmail).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.CodeHash).HasMaxLength(64);
             entity.HasIndex(e => e.TokenHash).IsUnique();
             entity.HasIndex(e => new { e.UserId, e.CreatedAt });
             entity.HasOne(e => e.User).WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.Restrict);

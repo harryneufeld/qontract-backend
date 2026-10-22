@@ -73,6 +73,33 @@ public partial class AuthService : IAuthService
         }
     }
 
+    // Starts the first session right after email confirmation (code or link), without a second sign-in.
+    public async Task<AuthDTO> StartConfirmedSessionAsync(int userId, CancellationToken cancellationToken = default)
+    {
+        var user = await _context.Users.AsNoTracking().SingleOrDefaultAsync(u => u.Id == userId && u.IsActive
+                && !u.RequiresPasswordSetup && u.EmailConfirmedAt != null, cancellationToken)
+            ?? throw new KeyNotFoundException("Account not found.");
+        var membership = await _context.TenantMemberships
+            .Where(m => m.UserId == user.Id && m.IsActive && m.Tenant.IsActive)
+            .OrderByDescending(m => m.TenantId == user.TenantId).ThenBy(m => m.TenantId)
+            .FirstOrDefaultAsync(cancellationToken);
+        return await SessionAsync(user, membership, cancellationToken);
+    }
+
+    public async Task<AuthUserDTO?> UpdateProfileAsync(int userId, int tenantId, ProfileUpdateDTO dto, CancellationToken cancellationToken = default)
+    {
+        var user = await _context.Users.SingleOrDefaultAsync(u => u.Id == userId && u.IsActive, cancellationToken);
+        if (user is null) return null;
+        if (!string.IsNullOrWhiteSpace(dto.Name)) user.Name = dto.Name.Trim();
+        if (!string.IsNullOrWhiteSpace(dto.DefaultCurrency)) user.DefaultCurrency = TenantCurrency.Normalize(dto.DefaultCurrency);
+        if (!string.IsNullOrWhiteSpace(dto.Language))
+            user.Language = Qontract.Application.Localization.SupportedLanguage.Normalize(dto.Language);
+        if (dto.OnboardingCompleted == true) user.OnboardingCompletedAt ??= DateTime.UtcNow;
+        user.ModifiedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync(cancellationToken);
+        return await GetCurrentUserAsync(userId, tenantId, cancellationToken);
+    }
+
     public async Task<AuthUserDTO?> GetCurrentUserAsync(int userId, int tenantId, CancellationToken cancellationToken = default)
     {
         if (tenantId == 0)
@@ -183,7 +210,10 @@ public partial class AuthService : IAuthService
         Email = user.Email,
         Role = (membership?.Role ?? UserRole.User).ToString(),
         TenantId = membership?.TenantId ?? 0,
-        CreatedAt = user.CreatedAt
+        CreatedAt = user.CreatedAt,
+        DefaultCurrency = user.DefaultCurrency,
+        Language = user.Language,
+        OnboardingCompleted = user.OnboardingCompletedAt != null
     };
 
     public Task<string> HashPasswordAsync(string password) => Task.FromResult(Passwords.Hash(password));

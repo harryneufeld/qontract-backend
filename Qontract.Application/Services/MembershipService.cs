@@ -83,8 +83,6 @@ public class MembershipService(IApplicationDbContext context, IConfiguration con
     {
         var invited = !string.IsNullOrWhiteSpace(dto.InvitationCode);
         if (!invited && !AllowPublicRegistration) throw new UnauthorizedAccessException("Public registration is disabled.");
-        if (string.IsNullOrWhiteSpace(dto.Name)) throw new InvalidOperationException("Name is required.");
-        if (!invited && string.IsNullOrWhiteSpace(dto.TenantName)) throw new InvalidOperationException("Tenant name is required.");
         var terms = new TermsService(context, configuration);
         terms.EnsureAccepted(dto.AcceptedTermsVersion);
         var normalized = NormalizeEmail(dto.Email);
@@ -95,7 +93,9 @@ public class MembershipService(IApplicationDbContext context, IConfiguration con
             throw new InvalidOperationException("An account already exists. Sign in to accept an invitation.");
         TenantInvitation? invitation = invited ? await ValidInvitation(dto.InvitationCode!, dto.Email, ct) : null;
         int tenantId;
-        if (invitation is null)
+        if (invitation is null && string.IsNullOrWhiteSpace(dto.TenantName))
+            tenantId = 0; // Personal workspace only: every account has one, no shared workspace is created.
+        else if (invitation is null)
         {
             var tenant = new Tenant { Name = dto.TenantName!.Trim(), Type = dto.TenantType, IsActive = true, CreatedBy = dto.Email.Trim() };
             context.Tenants.Add(tenant);
@@ -104,8 +104,9 @@ public class MembershipService(IApplicationDbContext context, IConfiguration con
         else tenantId = invitation.TenantId;
         var user = new User
         {
-            Name = dto.Name.Trim(), Email = dto.Email.Trim(), PasswordHash = passwordHash,
-            TenantId = tenantId, Role = invitation?.Role ?? UserRole.TenantAdmin, IsActive = true,
+            Name = string.IsNullOrWhiteSpace(dto.Name) ? DefaultName(dto.Email) : dto.Name.Trim(),
+            Email = dto.Email.Trim(), PasswordHash = passwordHash,
+            TenantId = tenantId == 0 ? null : tenantId, Role = invitation?.Role ?? UserRole.TenantAdmin, IsActive = true,
             CreatedBy = dto.Email.Trim(), ModifiedBy = dto.Email.Trim()
         };
         context.Users.Add(user); // The write hook creates its primary membership atomically.
@@ -115,6 +116,13 @@ public class MembershipService(IApplicationDbContext context, IConfiguration con
             throw new InvalidOperationException("Invitation is no longer available.");
         await transaction.CommitAsync(ct);
         return (user.Id, tenantId);
+    }
+
+    // Placeholder shown until first-run setup asks for the real name.
+    private static string DefaultName(string email)
+    {
+        var local = email.Trim().Split('@')[0];
+        return local.Length is > 0 and <= 100 ? local : "qontract";
     }
 
     public async Task<int> RedeemAsync(int userId, string code, CancellationToken ct = default)

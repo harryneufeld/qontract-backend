@@ -282,7 +282,13 @@ public class ContractService : IContractService
 
     public async Task<string> GetDefaultCurrencyAsync(int tenantId, CancellationToken cancellationToken = default)
     {
-        if (tenantId == 0) return "EUR";
+        if (tenantId == 0)
+        {
+            if (_identity?.UserId is not > 0) return "EUR";
+            var own = await _context.Users.Where(u => u.Id == _identity.UserId).Select(u => u.DefaultCurrency)
+                .SingleOrDefaultAsync(cancellationToken);
+            return string.IsNullOrWhiteSpace(own) ? "EUR" : own;
+        }
         var settings = await _context.Tenants.Where(t => t.Id == tenantId && t.IsActive)
             .Select(t => t.Settings).SingleOrDefaultAsync(cancellationToken);
         return TenantCurrency.FromSettings(settings);

@@ -21,6 +21,15 @@ public class PasswordResetService(IApplicationDbContext db, IConfiguration confi
         return uri;
     }
 
+    // Emailed links use real paths (not a #fragment) so Android App Links and iOS Universal Links can open the app.
+    public static Uri PathLink(IConfiguration config, string route, string token, string language)
+    {
+        var builder = new UriBuilder(PublicBase(config));
+        builder.Path = builder.Path.TrimEnd('/') + "/" + route;
+        builder.Query = "token=" + token + "&lang=" + language;
+        return builder.Uri;
+    }
+
     // Worker-only: no account lookup or SMTP latency in the public request path.
     public async Task DeliverAsync(string email, CancellationToken cancellationToken = default, string language = "en")
     {
@@ -49,7 +58,7 @@ public class PasswordResetService(IApplicationDbContext db, IConfiguration confi
             await transaction.CommitAsync(cancellationToken);
         }
         language = Qontract.Application.Localization.SupportedLanguage.Normalize(language);
-        var link = new UriBuilder(PublicBase(config)) { Fragment = "/reset-password?token=" + token + "&lang=" + language }.Uri;
+        var link = PathLink(config, "reset-password", token, language);
         try { await sender.SendAsync(destination, link, cancellationToken, language); }
         catch
         {

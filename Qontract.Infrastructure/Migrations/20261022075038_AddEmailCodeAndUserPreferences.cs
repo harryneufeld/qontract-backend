@@ -1,0 +1,83 @@
+﻿using System;
+using Microsoft.EntityFrameworkCore.Migrations;
+
+#nullable disable
+
+namespace Qontract.Infrastructure.Migrations
+{
+    /// <inheritdoc />
+    public partial class AddEmailCodeAndUserPreferences : Migration
+    {
+        /// <inheritdoc />
+        protected override void Up(MigrationBuilder migrationBuilder)
+        {
+            migrationBuilder.AddColumn<string>(
+                name: "DefaultCurrency",
+                table: "Users",
+                type: "TEXT",
+                maxLength: 3,
+                nullable: true);
+
+            migrationBuilder.AddColumn<string>(
+                name: "Language",
+                table: "Users",
+                type: "TEXT",
+                maxLength: 5,
+                nullable: true);
+
+            migrationBuilder.AddColumn<DateTime>(
+                name: "OnboardingCompletedAt",
+                table: "Users",
+                type: "TEXT",
+                nullable: true);
+
+            migrationBuilder.AddColumn<int>(
+                name: "CodeAttempts",
+                table: "EmailConfirmations",
+                type: "INTEGER",
+                nullable: false,
+                defaultValue: 0);
+
+            migrationBuilder.AddColumn<DateTime>(
+                name: "CodeExpiresAt",
+                table: "EmailConfirmations",
+                type: "TEXT",
+                nullable: true);
+
+            migrationBuilder.AddColumn<string>(
+                name: "CodeHash",
+                table: "EmailConfirmations",
+                type: "TEXT",
+                maxLength: 64,
+                nullable: true);
+        }
+
+        /// <inheritdoc />
+        protected override void Down(MigrationBuilder migrationBuilder)
+        {
+            migrationBuilder.DropColumn(
+                name: "DefaultCurrency",
+                table: "Users");
+
+            migrationBuilder.DropColumn(
+                name: "Language",
+                table: "Users");
+
+            migrationBuilder.DropColumn(
+                name: "OnboardingCompletedAt",
+                table: "Users");
+
+            migrationBuilder.DropColumn(
+                name: "CodeAttempts",
+                table: "EmailConfirmations");
+
+            migrationBuilder.DropColumn(
+                name: "CodeExpiresAt",
+                table: "EmailConfirmations");
+
+            migrationBuilder.DropColumn(
+                name: "CodeHash",
+                table: "EmailConfirmations");
+        }
+    }
+}

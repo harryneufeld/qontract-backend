@@ -96,7 +96,7 @@ public class PasswordResetTests : IDisposable
         using var scope = _host.Services.CreateScope();
         await scope.ServiceProvider.GetRequiredService<PasswordResetService>().DeliverAsync(entries.Current.Email, language: entries.Current.Language);
         _mail.Language.Should().Be("de");
-        _mail.Link!.Fragment.Should().EndWith("&lang=de");
+        _mail.Link!.Query.Should().EndWith("&lang=de");
         _mail.Token.Should().HaveLength(64);
         (await Reset()).StatusCode.Should().Be(HttpStatusCode.OK);
     }
@@ -107,7 +107,7 @@ public class PasswordResetTests : IDisposable
         var login = await _client.PostAsJsonAsync("/api/auth/login", new { email = _email, password = "password123" });
         var auth = (await login.Content.ReadFromJsonAsync<AuthDTO>())!;
         await Deliver();
-        _mail.Link!.GetLeftPart(UriPartial.Path).Should().Be("https://app.example.test/qontract/");
+        _mail.Link!.GetLeftPart(UriPartial.Path).Should().Be("https://app.example.test/qontract/reset-password");
         using (var scope = _host.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -288,7 +288,7 @@ public class PasswordResetTests : IDisposable
     {
         public int Sent { get; private set; }
         public Uri? Link { get; private set; }
-        public string Token => Link!.Fragment.Split("token=")[1].Split('&')[0];
+        public string Token => Link!.Query.Split("token=")[1].Split('&')[0];
         public bool Fail { get; set; }
         public string? Language { get; private set; }
         public Task SendAsync(string email, Uri resetLink, CancellationToken ct, string language = "en")

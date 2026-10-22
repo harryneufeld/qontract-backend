@@ -20,7 +20,8 @@ public class SwitchTenantDTO
 
 public class RegisterDTO
 {
-    [Required, StringLength(100)] public string Name { get; set; } = string.Empty;
+    // Optional: first-run setup asks for it after the address is confirmed.
+    [StringLength(100)] public string? Name { get; set; }
     [Required, EmailAddress, StringLength(100)] public string Email { get; set; } = string.Empty;
     [Required, StringLength(PasswordPolicy.MaximumLength, MinimumLength = PasswordPolicy.MinimumLength)] public string Password { get; set; } = string.Empty;
     [StringLength(100)] public string? TenantName { get; set; }

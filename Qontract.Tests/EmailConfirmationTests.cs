@@ -93,13 +93,75 @@ public class EmailConfirmationTests : IDisposable
 
         await Deliver();
         _mail.Sent.Should().Be(1);
-        _mail.Link!.AbsoluteUri.Should().StartWith("https://app.example.test/qontract/#/confirm-email?token=");
+        _mail.Link!.AbsoluteUri.Should().StartWith("https://app.example.test/qontract/confirm-email?token=");
+        _mail.Link.Fragment.Should().BeEmpty();
 
         (await Confirm()).StatusCode.Should().Be(HttpStatusCode.OK);
         var login = await Login();
         login.StatusCode.Should().Be(HttpStatusCode.OK);
         (await login.Content.ReadFromJsonAsync<AuthDTO>(JsonOptions))!.AccessToken.Should().NotBeEmpty();
         (await Confirm()).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Code_ConfirmsAndStartsASession_ForAPersonalWorkspaceAccount()
+    {
+        var response = await _client.PostAsJsonAsync("/api/auth/register", new { email = _email, password = Password });
+        response.StatusCode.Should().Be(HttpStatusCode.Accepted);
+        await Deliver();
+        _mail.Code.Should().MatchRegex("^[0-9]{6}$");
+
+        var confirmed = await _client.PostAsJsonAsync("/api/auth/confirm-email-code", new { email = _email, code = _mail.Code });
+        confirmed.StatusCode.Should().Be(HttpStatusCode.OK);
+        var session = (await confirmed.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("session");
+        session.GetProperty("accessToken").GetString().Should().NotBeEmpty();
+        session.GetProperty("user").GetProperty("tenantId").GetInt32().Should().Be(0);
+        session.GetProperty("user").GetProperty("name").GetString().Should().NotBeNullOrEmpty();
+        session.GetProperty("user").GetProperty("onboardingCompleted").GetBoolean().Should().BeFalse();
+        (await _client.PostAsJsonAsync("/api/auth/confirm-email-code", new { email = _email, code = _mail.Code }))
+            .StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        _client.DefaultRequestHeaders.Authorization = new("Bearer", session.GetProperty("accessToken").GetString());
+        var profile = await _client.PutAsJsonAsync("/api/auth/profile",
+            new { name = "Ada", defaultCurrency = "chf", language = "de", onboardingCompleted = true });
+        profile.StatusCode.Should().Be(HttpStatusCode.OK);
+        var user = await profile.Content.ReadFromJsonAsync<JsonElement>();
+        user.GetProperty("name").GetString().Should().Be("Ada");
+        user.GetProperty("defaultCurrency").GetString().Should().Be("CHF");
+        user.GetProperty("onboardingCompleted").GetBoolean().Should().BeTrue();
+        var currency = await _client.GetFromJsonAsync<JsonElement>("/api/contracts/default-currency");
+        currency.GetProperty("currency").GetString().Should().Be("CHF");
+    }
+
+    [Fact]
+    public async Task Code_IsBurnedAfterFiveWrongGuesses_AndExpires()
+    {
+        (await _client.PostAsJsonAsync("/api/auth/register", new { email = _email, password = Password }))
+            .StatusCode.Should().Be(HttpStatusCode.Accepted);
+        await Deliver();
+        var wrong = _mail.Code == "000000" ? "111111" : "000000";
+        for (var i = 0; i < EmailConfirmationService.MaxCodeAttempts; i++)
+            (await _client.PostAsJsonAsync("/api/auth/confirm-email-code", new { email = _email, code = wrong }))
+                .StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await _client.PostAsJsonAsync("/api/auth/confirm-email-code", new { email = _email, code = _mail.Code }))
+            .StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        await Update(db => db.EmailConfirmations.ExecuteUpdateAsync(s => s.SetProperty(c => c.CreatedAt, DateTime.UtcNow.AddMinutes(-2))));
+        await Deliver();
+        await Update(db => db.EmailConfirmations.ExecuteUpdateAsync(s => s.SetProperty(c => c.CodeExpiresAt, DateTime.UtcNow.AddMinutes(-1))));
+        (await _client.PostAsJsonAsync("/api/auth/confirm-email-code", new { email = _email, code = _mail.Code }))
+            .StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await Login()).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task Link_AlsoStartsASession()
+    {
+        (await Register()).StatusCode.Should().Be(HttpStatusCode.Accepted);
+        await Deliver();
+        var response = await Confirm();
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("session").GetProperty("accessToken").GetString().Should().NotBeEmpty();
     }
 
     [Fact]
@@ -176,9 +238,10 @@ public class EmailConfirmationTests : IDisposable
     {
         public int Sent { get; private set; }
         public Uri? Link { get; private set; }
-        public string Token => Link!.Fragment.Split("token=")[1].Split('&')[0];
-        public Task SendConfirmationAsync(string email, Uri confirmationLink, CancellationToken ct, string language = "en")
-        { Sent++; Link = confirmationLink; return Task.CompletedTask; }
+        public string Token => Link!.Query.Split("token=")[1].Split('&')[0];
+        public string? Code { get; private set; }
+        public Task SendConfirmationAsync(string email, Uri confirmationLink, string code, CancellationToken ct, string language = "en")
+        { Sent++; Link = confirmationLink; Code = code; return Task.CompletedTask; }
         public Task SendAsync(string email, Uri resetLink, CancellationToken ct, string language = "en")
         { Link = resetLink; return Task.CompletedTask; }
     }

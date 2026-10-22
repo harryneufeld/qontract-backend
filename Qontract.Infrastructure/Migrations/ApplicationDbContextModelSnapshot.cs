@@ -498,6 +498,16 @@ namespace Qontract.Infrastructure.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("CodeAttempts")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("CodeExpiresAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CodeHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
                     b.Property<DateTime?>("ConsumedAt")
                         .HasColumnType("TEXT");
 
@@ -813,6 +823,10 @@ namespace Qontract.Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("DefaultCurrency")
+                        .HasMaxLength(3)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Email")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -823,6 +837,10 @@ namespace Qontract.Infrastructure.Migrations
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("Language")
+                        .HasMaxLength(5)
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("ModifiedAt")
                         .HasColumnType("TEXT");
@@ -839,6 +857,9 @@ namespace Qontract.Infrastructure.Migrations
                     b.Property<string>("NormalizedEmail")
                         .IsRequired()
                         .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("OnboardingCompletedAt")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("PasswordHash")
