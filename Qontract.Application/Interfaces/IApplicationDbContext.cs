@@ -19,6 +19,7 @@ public interface IApplicationDbContext
     DbSet<DocumentLink> DocumentLinks { get; }
     DbSet<Invoice> Invoices { get; }
     DbSet<Address> Addresses { get; }
+    DbSet<Notification> Notifications { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
     Task<Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction> BeginSerializableTransactionAsync(CancellationToken cancellationToken = default);

@@ -132,6 +132,7 @@ public class ContractService : IContractService
                 }).ToList(),
                 ContractNumber = c.ContractNumber,
                 MinimumContractDate = c.MinimumContractDate,
+                NoticePeriodValue = c.NoticePeriodValue, NoticePeriodUnit = c.NoticePeriodUnit, AutoRenews = c.AutoRenews, RenewalMonths = c.RenewalMonths,
                 ContractorId = c.ContractorId,
                 CreatedAt = c.CreatedAt,
                 ModifiedAt = c.ModifiedAt,
@@ -271,6 +272,7 @@ public class ContractService : IContractService
             PriceHistory = contract.PriceHistory.OrderBy(p => p.EffectiveFrom).ThenBy(p => p.CreatedAt).Select(ToPriceDto).ToList(),
             ContractNumber = contract.ContractNumber,
             MinimumContractDate = contract.MinimumContractDate,
+            NoticePeriodValue = contract.NoticePeriodValue, NoticePeriodUnit = contract.NoticePeriodUnit, AutoRenews = contract.AutoRenews, RenewalMonths = contract.RenewalMonths,
             ContractorId = contract.ContractorId,
             CreatedAt = contract.CreatedAt,
             ModifiedAt = contract.ModifiedAt,
@@ -318,6 +320,10 @@ public class ContractService : IContractService
             BillingPeriod = dto.BillingPeriod,
             ContractNumber = dto.ContractNumber,
             MinimumContractDate = dto.MinimumContractDate,
+            NoticePeriodValue = dto.NoticePeriodValue,
+            NoticePeriodUnit = dto.NoticePeriodValue is null ? null : dto.NoticePeriodUnit ?? NoticePeriodUnit.Days,
+            AutoRenews = dto.AutoRenews,
+            RenewalMonths = dto.AutoRenews ? dto.RenewalMonths : null,
             ContractorId = dto.ContractorId,
             TenantId = tenantId == 0 ? null : tenantId,
             OwnerUserId = RecordAccess.Owner(tenantId, _identity?.UserId),
@@ -395,6 +401,22 @@ public class ContractService : IContractService
         if (dto.ContractorId.HasValue)
             contract.ContractorId = dto.ContractorId.Value;
 
+        if (dto.ClearNoticePeriod)
+        {
+            contract.NoticePeriodValue = null;
+            contract.NoticePeriodUnit = null;
+        }
+        else if (dto.NoticePeriodValue.HasValue)
+        {
+            contract.NoticePeriodValue = dto.NoticePeriodValue;
+            contract.NoticePeriodUnit = dto.NoticePeriodUnit ?? contract.NoticePeriodUnit ?? NoticePeriodUnit.Days;
+        }
+        else if (dto.NoticePeriodUnit.HasValue && contract.NoticePeriodValue.HasValue)
+            contract.NoticePeriodUnit = dto.NoticePeriodUnit;
+        if (dto.AutoRenews.HasValue) contract.AutoRenews = dto.AutoRenews.Value;
+        if (dto.RenewalMonths.HasValue) contract.RenewalMonths = dto.RenewalMonths;
+        if (!contract.AutoRenews) contract.RenewalMonths = null;
+
         if (dto.BillingPeriod.HasValue) contract.BillingPeriod = dto.BillingPeriod;
         contract.Value = CanonicalValue(contract.Value, contract.BillingPeriod);
         if (contract.Value != oldValue || contract.Currency != oldCurrency || contract.BillingPeriod != oldPeriod
@@ -460,6 +482,7 @@ public class ContractService : IContractService
             PriceHistory = contract.PriceHistory.OrderBy(p => p.EffectiveFrom).ThenBy(p => p.CreatedAt).Select(ToPriceDto).ToList(),
             ContractNumber = contract.ContractNumber,
             MinimumContractDate = contract.MinimumContractDate,
+            NoticePeriodValue = contract.NoticePeriodValue, NoticePeriodUnit = contract.NoticePeriodUnit, AutoRenews = contract.AutoRenews, RenewalMonths = contract.RenewalMonths,
             ContractorId = contract.ContractorId,
             CreatedAt = contract.CreatedAt,
             ModifiedAt = contract.ModifiedAt,

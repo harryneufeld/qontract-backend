@@ -105,6 +105,7 @@ public class TenantService : ITenantService
     public async Task<TenantDTO> CreateTenantAsync(TenantCreateDTO dto, int userId, string? createdBy, CancellationToken cancellationToken = default)
     {
         ValidateContractRetention(dto.Settings);
+        Qontract.Application.Notifications.NotificationSettings.Validate(dto.Settings);
         TenantCurrency.FromSettings(dto.Settings);
         try
         {
@@ -146,6 +147,7 @@ public class TenantService : ITenantService
     public async Task<TenantDTO> UpdateTenantAsync(int id, int userId, TenantUpdateDTO dto, string? modifiedBy, CancellationToken cancellationToken = default)
     {
         ValidateContractRetention(dto.Settings);
+        Qontract.Application.Notifications.NotificationSettings.Validate(dto.Settings);
         TenantCurrency.FromSettings(dto.Settings);
         try
         {

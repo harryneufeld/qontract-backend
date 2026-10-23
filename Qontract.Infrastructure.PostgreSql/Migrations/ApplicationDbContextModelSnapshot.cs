@@ -136,6 +136,11 @@ namespace Qontract.Infrastructure.PostgreSql.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer");
 
+                    b.Property<bool>("AutoRenews")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
                     b.Property<int?>("BillingPeriod")
                         .HasColumnType("integer");
 
@@ -198,7 +203,16 @@ namespace Qontract.Infrastructure.PostgreSql.Migrations
                     b.Property<string>("Notes")
                         .HasColumnType("text");
 
+                    b.Property<int?>("NoticePeriodUnit")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("NoticePeriodValue")
+                        .HasColumnType("integer");
+
                     b.Property<int?>("OwnerUserId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("RenewalMonths")
                         .HasColumnType("integer");
 
                     b.Property<int?>("ResponsibleUserId")
@@ -612,6 +626,79 @@ namespace Qontract.Infrastructure.PostgreSql.Migrations
                     b.ToTable("Invoices");
                 });
 
+            modelBuilder.Entity("Qontract.Domain.Models.Notification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("ContractId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("DedupKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime?>("DismissedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateOnly?>("DueOn")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTime>("ModifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ModifiedBy")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Params")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<DateTime?>("ReadAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("ResolvedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Severity")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("SnoozedUntil")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("TenantId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ContractId");
+
+                    b.HasIndex("UserId", "DedupKey")
+                        .IsUnique();
+
+                    b.HasIndex("UserId", "TenantId", "ResolvedAt");
+
+                    b.ToTable("Notifications", (string)null);
+                });
+
             modelBuilder.Entity("Qontract.Domain.Models.PasswordReset", b =>
                 {
                     b.Property<Guid>("Id")
@@ -853,6 +940,10 @@ namespace Qontract.Infrastructure.PostgreSql.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<string>("MutedNotificationKinds")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -862,6 +953,9 @@ namespace Qontract.Infrastructure.PostgreSql.Migrations
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
+
+                    b.Property<int>("NotificationDigest")
+                        .HasColumnType("integer");
 
                     b.Property<DateTime?>("OnboardingCompletedAt")
                         .HasColumnType("timestamp with time zone");
@@ -1127,6 +1221,24 @@ namespace Qontract.Infrastructure.PostgreSql.Migrations
                     b.Navigation("Document");
 
                     b.Navigation("Tenant");
+                });
+
+            modelBuilder.Entity("Qontract.Domain.Models.Notification", b =>
+                {
+                    b.HasOne("Qontract.Domain.Models.Contract", "Contract")
+                        .WithMany()
+                        .HasForeignKey("ContractId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.HasOne("Qontract.Domain.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Contract");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("Qontract.Domain.Models.PasswordReset", b =>

@@ -44,6 +44,13 @@ public class Contract : BaseEntity
     [MaxLength(50)]
     public string? MinimumContractDate { get; set; }
 
+    // Notice period (Kündigungsfrist) and automatic renewal drive the
+    // cancellation-deadline recommendation.
+    public int? NoticePeriodValue { get; set; }
+    public NoticePeriodUnit? NoticePeriodUnit { get; set; }
+    public bool AutoRenews { get; set; }
+    public int? RenewalMonths { get; set; }
+
     // Optional link to a contractor (a contract can reference a free-text
     // counterparty instead); must stay nullable.
     public int? ContractorId { get; set; }
@@ -67,6 +74,13 @@ public class Contract : BaseEntity
     public User? Creator { get; set; }
     public User? Modifier { get; set; }
     public ICollection<Document> Documents { get; set; } = new List<Document>();
+}
+
+public enum NoticePeriodUnit
+{
+    Days,
+    Weeks,
+    Months
 }
 
 public enum ContractStatus

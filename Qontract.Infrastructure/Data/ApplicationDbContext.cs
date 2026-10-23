@@ -36,6 +36,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<DocumentLink> DocumentLinks { get; set; }
     public DbSet<Invoice> Invoices { get; set; }
     public DbSet<Address> Addresses { get; set; }
+    public DbSet<Notification> Notifications { get; set; }
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
@@ -157,6 +158,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
             entity.HasIndex(e => e.NormalizedEmail).IsUnique();
             entity.Property(e => e.PasswordHash).IsRequired().HasMaxLength(255);
             entity.Property(e => e.Role).IsRequired();
+            entity.Property(e => e.MutedNotificationKinds).HasMaxLength(500);
             entity.Property(e => e.TenantId).IsRequired(false);
             entity.Property(e => e.CreatedBy).HasMaxLength(500);
             entity.Property(e => e.ModifiedBy).HasMaxLength(500);
@@ -188,6 +190,22 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
             entity.HasIndex(e => e.TokenHash).IsUnique();
             entity.HasIndex(e => new { e.UserId, e.CreatedAt });
             entity.HasOne(e => e.User).WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<Notification>(entity =>
+        {
+            entity.ToTable("Notifications");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Id).ValueGeneratedNever();
+            entity.Property(e => e.Kind).IsRequired().HasMaxLength(50);
+            entity.Property(e => e.Params).IsRequired().HasMaxLength(2000);
+            entity.Property(e => e.DedupKey).IsRequired().HasMaxLength(200);
+            entity.Property(e => e.CreatedBy).HasMaxLength(500);
+            entity.Property(e => e.ModifiedBy).HasMaxLength(500);
+            entity.HasIndex(e => new { e.UserId, e.DedupKey }).IsUnique();
+            entity.HasIndex(e => new { e.UserId, e.TenantId, e.ResolvedAt });
+            entity.HasOne(e => e.User).WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(e => e.Contract).WithMany().HasForeignKey(e => e.ContractId).OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<TermsAcceptance>(entity =>
@@ -289,6 +307,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
             entity.Property(e => e.Value).HasMaxLength(500);
             entity.Property(e => e.ContractNumber).HasMaxLength(100);
             entity.Property(e => e.MinimumContractDate).HasMaxLength(50);
+            entity.Property(e => e.AutoRenews).HasDefaultValue(false);
             entity.Property(e => e.ContractorId);
             entity.Property(e => e.CreatedBy).HasMaxLength(500);
             entity.Property(e => e.ModifiedBy).HasMaxLength(500);

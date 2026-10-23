@@ -111,6 +111,11 @@ public class ContractCreateValidator : AbstractValidator<ContractCreateDTO>
 {
     public ContractCreateValidator()
     {
+        RuleFor(x => x.NoticePeriodUnit).IsInEnum().When(x => x.NoticePeriodUnit.HasValue);
+        RuleFor(x => x.NoticePeriodValue).InclusiveBetween(1, 3650).When(x => x.NoticePeriodValue.HasValue)
+            .WithMessage("Notice period must be between 1 and 3650.");
+        RuleFor(x => x.RenewalMonths).InclusiveBetween(1, 120).When(x => x.RenewalMonths.HasValue)
+            .WithMessage("Renewal period must be between 1 and 120 months.");
         RuleFor(x => x.Type).IsInEnum().When(x => x.Type.HasValue);
         RuleFor(x => x.BillingPeriod).IsInEnum().When(x => x.BillingPeriod.HasValue);
         RuleFor(x => x.Title)
@@ -147,6 +152,11 @@ public class ContractUpdateValidator : AbstractValidator<ContractUpdateDTO>
 {
     public ContractUpdateValidator()
     {
+        RuleFor(x => x.NoticePeriodUnit).IsInEnum().When(x => x.NoticePeriodUnit.HasValue);
+        RuleFor(x => x.NoticePeriodValue).InclusiveBetween(1, 3650).When(x => x.NoticePeriodValue.HasValue)
+            .WithMessage("Notice period must be between 1 and 3650.");
+        RuleFor(x => x.RenewalMonths).InclusiveBetween(1, 120).When(x => x.RenewalMonths.HasValue)
+            .WithMessage("Renewal period must be between 1 and 120 months.");
         RuleFor(x => x.Type).IsInEnum().When(x => x.Type.HasValue);
         RuleFor(x => x.ClearType).Must((dto, clear) => !clear || dto.Type is null)
             .WithMessage("Do not specify Type together with ClearType.");
