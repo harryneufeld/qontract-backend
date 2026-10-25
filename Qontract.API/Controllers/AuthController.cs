@@ -2,6 +2,8 @@ using System.Collections.Generic;
 using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Options;
+using Qontract.API.Services;
 using Qontract.Application.Services;
 using Qontract.Application.Models;
 
@@ -19,6 +21,7 @@ public class AuthController : ControllerBase
     private readonly TermsService _terms;
     private readonly Qontract.API.Services.PasswordResetQueue _emails;
     private readonly IConfiguration _configuration;
+    private readonly AuthSessionOptions _sessionOptions;
 
     public AuthController(
         IAuthService authService,
@@ -26,8 +29,10 @@ public class AuthController : ControllerBase
         MembershipService memberships,
         TermsService terms,
         Qontract.API.Services.PasswordResetQueue emails,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IOptions<AuthSessionOptions> sessionOptions)
     {
+        _sessionOptions = sessionOptions.Value;
         _authService = authService;
         _changePasswordValidator = changePasswordValidator;
         _memberships = memberships;
@@ -47,8 +52,8 @@ public class AuthController : ControllerBase
         Response.Headers.CacheControl = "no-store";
         try
         {
-            var result = await _authService.LoginAsync(dto);
-            return Ok(result);
+            var result = await _authService.LoginAsync(dto, HttpContext.RequestAborted, Request.Headers.UserAgent.ToString());
+            return Ok(SessionCookies.Deliver(Response, result, SessionCookies.IsWeb(dto.Client), _sessionOptions));
         }
         catch (EmailNotConfirmedException ex)
         {
@@ -114,8 +119,59 @@ public class AuthController : ControllerBase
     public async Task<IActionResult> Logout(CancellationToken cancellationToken)
     {
         await _authService.LogoutAsync(CurrentUserId, CurrentSessionId, cancellationToken);
+        if (Request.Cookies.ContainsKey(SessionCookies.CookieName)) SessionCookies.Clear(Response);
         return Ok(new { message = "Logged out" });
     }
+
+    /// <summary>
+    /// Trades a refresh token (request body for mobile, HttpOnly cookie for web) for a new access
+    /// token and a rotated refresh token. 401 means the session has ended. The custom header is
+    /// required: browsers only send it cross-origin after a CORS preflight that just the allowed
+    /// origins pass, which keeps a foreign site from triggering a refresh with the cookie.
+    /// </summary>
+    [HttpPost("refresh")]
+    [AllowAnonymous]
+    [EnableRateLimiting("refresh")]
+    public async Task<ActionResult<AuthDTO>> Refresh(
+        [FromBody(EmptyBodyBehavior = Microsoft.AspNetCore.Mvc.ModelBinding.EmptyBodyBehavior.Allow)] RefreshRequestDTO? body,
+        CancellationToken cancellationToken)
+    {
+        Response.Headers.CacheControl = "no-store";
+        if (!Request.Headers.ContainsKey(SessionCookies.ClientHeader))
+            return BadRequest(new { error = $"The {SessionCookies.ClientHeader} header is required." });
+
+        var token = body?.RefreshToken;
+        var web = string.IsNullOrWhiteSpace(token);
+        if (web) token = Request.Cookies[SessionCookies.CookieName];
+        var result = string.IsNullOrWhiteSpace(token) ? null : await _authService.RefreshAsync(token, cancellationToken);
+        if (result is null)
+        {
+            if (web && Request.Cookies.ContainsKey(SessionCookies.CookieName)) SessionCookies.Clear(Response);
+            return Unauthorized(new { error = "Session has ended." });
+        }
+        return Ok(SessionCookies.Deliver(Response, result, web, _sessionOptions));
+    }
+
+    /// <summary>The user's active sessions (devices), the one making this request marked.</summary>
+    [HttpGet("sessions")]
+    [Authorize(Policy = "Session")]
+    public async Task<ActionResult<List<SessionInfoDTO>>> Sessions(CancellationToken cancellationToken) =>
+        Ok(await _authService.ListSessionsAsync(CurrentUserId, CurrentSessionId, cancellationToken));
+
+    [HttpDelete("sessions/{id:guid}")]
+    [Authorize(Policy = "Session")]
+    public async Task<IActionResult> RevokeSession(Guid id, CancellationToken cancellationToken)
+    {
+        // Scoped to the caller: another user's session id looks like an unknown one.
+        if (!await _authService.RevokeSessionAsync(CurrentUserId, id, cancellationToken)) return NotFound();
+        if (id == CurrentSessionId && Request.Cookies.ContainsKey(SessionCookies.CookieName)) SessionCookies.Clear(Response);
+        return NoContent();
+    }
+
+    [HttpPost("sessions/revoke-others")]
+    [Authorize(Policy = "Session")]
+    public async Task<IActionResult> RevokeOtherSessions(CancellationToken cancellationToken) =>
+        Ok(new { revoked = await _authService.RevokeOtherSessionsAsync(CurrentUserId, CurrentSessionId, cancellationToken) });
 
     private int CurrentUserId => int.Parse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value);
     private Guid CurrentSessionId => Guid.Parse(User.FindFirst("sid")!.Value);
@@ -142,7 +198,9 @@ public class AuthController : ControllerBase
             return Accepted(new { confirmationRequired = true,
                 message = "Check your inbox and confirm your email address to activate your account." });
         }
-        return Ok(await _authService.SwitchTenantAsync(access.UserId, access.TenantId));
+        var client = new SessionClientInfo(dto.Client, dto.DeviceName, Request.Headers.UserAgent.ToString());
+        var session = await _authService.SwitchTenantAsync(access.UserId, access.TenantId, client: client);
+        return Ok(SessionCookies.Deliver(Response, session, SessionCookies.IsWeb(dto.Client), _sessionOptions));
     }
 
     /// <summary>

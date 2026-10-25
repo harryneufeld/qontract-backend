@@ -224,6 +224,13 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Id).ValueGeneratedNever();
             entity.HasIndex(e => new { e.UserId, e.ExpiresAt });
+            entity.Property(e => e.RefreshTokenHash).HasMaxLength(64);
+            entity.Property(e => e.PreviousRefreshTokenHash).HasMaxLength(64);
+            entity.HasIndex(e => e.RefreshTokenHash).IsUnique();
+            entity.HasIndex(e => e.PreviousRefreshTokenHash);
+            entity.Property(e => e.ClientType).IsRequired().HasMaxLength(16).HasDefaultValue("api");
+            entity.Property(e => e.DeviceName).HasMaxLength(100);
+            entity.Property(e => e.UserAgent).HasMaxLength(256);
             entity.HasOne(e => e.User).WithMany().HasForeignKey(e => e.UserId)
                 .OnDelete(DeleteBehavior.Restrict);
         });

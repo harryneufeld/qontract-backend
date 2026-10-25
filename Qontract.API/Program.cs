@@ -204,6 +204,11 @@ builder.Services.Configure<Qontract.Application.Services.DocumentRetentionOption
 builder.Services.AddScoped<Qontract.Infrastructure.ContractPurgeService>();
 builder.Services.AddScoped<Qontract.Application.Services.DocumentPurgeService>();
 builder.Services.AddHostedService<Qontract.API.Services.DocumentRetentionWorker>();
+// Refresh-token sessions: lifetimes plus the worker that deletes long-ended sessions.
+builder.Services.Configure<Qontract.Application.Services.AuthSessionOptions>(
+    builder.Configuration.GetSection(Qontract.Application.Services.AuthSessionOptions.SectionName));
+builder.Services.AddScoped<Qontract.Application.Services.AuthSessionCleanup>();
+builder.Services.AddHostedService<Qontract.API.Services.AuthSessionCleanupWorker>();
 builder.Services.Configure<Qontract.Application.Notifications.RecommendationOptions>(
     builder.Configuration.GetSection(Qontract.Application.Notifications.RecommendationOptions.SectionName));
 builder.Services.AddScoped<Qontract.Application.Notifications.RecommendationEngine>();
@@ -346,9 +351,10 @@ builder.Services.AddAuthorization(options =>
 //
 // In Development the Flutter web app may be served from any localhost
 // port (flutter run picks a random high port, e.g. 5354 — issue #12),
-// so allow any origin. AllowCredentials is intentionally omitted there:
-// it cannot be combined with AllowAnyOrigin, and the app authenticates
-// with a JWT bearer header, not cookies.
+// so allow any localhost origin. Credentials are allowed too: the web app
+// keeps its refresh token in an HttpOnly cookie, and browsers only send
+// and store it for credentialed requests. AllowCredentials cannot be
+// combined with AllowAnyOrigin, hence the origin predicate.
 //
 // In Production only the explicitly configured origins (Cors:Origins in
 // appsettings.json) are allowed, and credentials are permitted.
@@ -359,16 +365,21 @@ builder.Services.AddCors(options =>
 {
     if (isDevelopment)
     {
+        static bool IsLocalOrigin(string origin) =>
+            Uri.TryCreate(origin, UriKind.Absolute, out var uri)
+            && (uri.Host == "localhost" || uri.Host == "127.0.0.1" || uri.Host == "[::1]");
         options.AddDefaultPolicy(policy =>
             policy
-                .AllowAnyOrigin()
+                .SetIsOriginAllowed(IsLocalOrigin)
                 .AllowAnyMethod()
-                .AllowAnyHeader());
+                .AllowAnyHeader()
+                .AllowCredentials());
         options.AddPolicy("AllowLocalhost",
             policy => policy
-                .AllowAnyOrigin()
+                .SetIsOriginAllowed(IsLocalOrigin)
                 .AllowAnyMethod()
-                .AllowAnyHeader());
+                .AllowAnyHeader()
+                .AllowCredentials());
     }
     else
     {
@@ -406,6 +417,9 @@ var globalPermit = int.TryParse(rlGlobal["PermitLimit"], out var g) ? g : 300;
 var globalWindow = TimeSpan.FromSeconds(int.TryParse(rlGlobal["WindowSeconds"], out var gw) ? gw : 60);
 var authPermit = int.TryParse(rlAuth["PermitLimit"], out var a) ? a : 5;
 var authWindow = TimeSpan.FromSeconds(int.TryParse(rlAuth["WindowSeconds"], out var aw) ? aw : 60);
+var rlRefresh = builder.Configuration.GetSection("RateLimiting:Refresh");
+var refreshPermit = int.TryParse(rlRefresh["PermitLimit"], out var rp) ? rp : 30;
+var refreshWindow = TimeSpan.FromSeconds(int.TryParse(rlRefresh["WindowSeconds"], out var rw) ? rw : 60);
 
 // All requests in the TestServer / Kestrel pipeline carry the client IP;
 // fall back to a stable sentinel when it is unavailable so partitioning
@@ -449,6 +463,18 @@ builder.Services.AddRateLimiter(options =>
             {
                 PermitLimit = authPermit,
                 Window = authWindow,
+                QueueLimit = 0,
+            }));
+
+    // Token refresh runs on every access-token expiry of every client, so it
+    // gets a more generous per-IP ceiling than the credential endpoints.
+    options.AddPolicy<string>("refresh", context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            IpKey(context),
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = refreshPermit,
+                Window = refreshWindow,
                 QueueLimit = 0,
             }));
 });
