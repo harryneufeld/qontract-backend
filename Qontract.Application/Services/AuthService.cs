@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Qontract.Application.Interfaces;
 using Qontract.Application.Models;
 using Qontract.Core.Security;
@@ -18,16 +19,19 @@ public partial class AuthService : IAuthService
     private readonly IConfiguration _configuration;
     private readonly ILogger<AuthService> _logger;
     private readonly ITwoFactorSecretProtector? _twoFactorProtector;
+    private readonly AuthSessionOptions _sessionOptions;
 
-    public AuthService(IApplicationDbContext context, IConfiguration configuration, ILogger<AuthService> logger, ITwoFactorSecretProtector? twoFactorProtector = null)
+    public AuthService(IApplicationDbContext context, IConfiguration configuration, ILogger<AuthService> logger,
+        ITwoFactorSecretProtector? twoFactorProtector = null, IOptions<AuthSessionOptions>? sessionOptions = null)
     {
+        _sessionOptions = sessionOptions?.Value ?? new AuthSessionOptions();
         _context = context;
         _configuration = configuration;
         _logger = logger;
         _twoFactorProtector = twoFactorProtector;
     }
 
-    public async Task<Qontract.Application.Models.AuthDTO> LoginAsync(Qontract.Application.Models.LoginDTO dto, CancellationToken cancellationToken = default)
+    public async Task<Qontract.Application.Models.AuthDTO> LoginAsync(Qontract.Application.Models.LoginDTO dto, CancellationToken cancellationToken = default, string? userAgent = null)
     {
         try
         {
@@ -64,7 +68,7 @@ public partial class AuthService : IAuthService
                 .Where(m => m.UserId == user.Id && m.IsActive && m.Tenant.IsActive)
                 .OrderByDescending(m => m.TenantId == user.TenantId).ThenBy(m => m.TenantId)
                 .FirstOrDefaultAsync(cancellationToken);
-            return await SessionAsync(user, membership, cancellationToken);
+            return await SessionAsync(user, membership, cancellationToken, client: new SessionClientInfo(dto.Client, dto.DeviceName, userAgent));
         }
         catch (Exception ex)
         {
@@ -74,7 +78,7 @@ public partial class AuthService : IAuthService
     }
 
     // Starts the first session right after email confirmation (code or link), without a second sign-in.
-    public async Task<AuthDTO> StartConfirmedSessionAsync(int userId, CancellationToken cancellationToken = default)
+    public async Task<AuthDTO> StartConfirmedSessionAsync(int userId, CancellationToken cancellationToken = default, SessionClientInfo? client = null)
     {
         var user = await _context.Users.AsNoTracking().SingleOrDefaultAsync(u => u.Id == userId && u.IsActive
                 && !u.RequiresPasswordSetup && u.EmailConfirmedAt != null, cancellationToken)
@@ -83,7 +87,7 @@ public partial class AuthService : IAuthService
             .Where(m => m.UserId == user.Id && m.IsActive && m.Tenant.IsActive)
             .OrderByDescending(m => m.TenantId == user.TenantId).ThenBy(m => m.TenantId)
             .FirstOrDefaultAsync(cancellationToken);
-        return await SessionAsync(user, membership, cancellationToken);
+        return await SessionAsync(user, membership, cancellationToken, client: client);
     }
 
     public async Task<AuthUserDTO?> UpdateProfileAsync(int userId, int tenantId, ProfileUpdateDTO dto, CancellationToken cancellationToken = default)
@@ -115,24 +119,25 @@ public partial class AuthService : IAuthService
         _context.TenantMemberships.Include(m => m.User).Where(m => m.UserId == userId && m.TenantId == tenantId
             && m.IsActive && m.User.IsActive && !m.User.RequiresPasswordSetup && m.Tenant.IsActive);
 
-    public async Task<AuthDTO> SwitchTenantAsync(int userId, int tenantId, CancellationToken cancellationToken = default, Guid? sessionId = null)
+    public async Task<AuthDTO> SwitchTenantAsync(int userId, int tenantId, CancellationToken cancellationToken = default, Guid? sessionId = null, SessionClientInfo? client = null)
     {
         if (tenantId == 0)
         {
             var user = await _context.Users.AsNoTracking().SingleOrDefaultAsync(u => u.Id == userId && u.IsActive && !u.RequiresPasswordSetup, cancellationToken)
                 ?? throw new KeyNotFoundException("Account not found.");
-            return await SessionAsync(user, null, cancellationToken, sessionId);
+            return await SessionAsync(user, null, cancellationToken, sessionId, client);
         }
         var membership = await ActiveMembership(userId, tenantId).FirstOrDefaultAsync(cancellationToken)
             ?? throw new KeyNotFoundException("Tenant not found.");
-        return await SessionAsync(membership.User, membership, cancellationToken, sessionId);
+        return await SessionAsync(membership.User, membership, cancellationToken, sessionId, client);
     }
 
     private async Task<AuthDTO> SessionAsync(User user, TenantMembership? membership,
-        CancellationToken cancellationToken, Guid? sessionId = null)
+        CancellationToken cancellationToken, Guid? sessionId = null, SessionClientInfo? client = null)
     {
         var now = DateTime.UtcNow;
         AuthSession session;
+        string? refreshToken = null;
         if (sessionId.HasValue)
         {
             session = await _context.AuthSessions.AsNoTracking().SingleOrDefaultAsync(s => s.Id == sessionId
@@ -142,19 +147,153 @@ public partial class AuthService : IAuthService
             // JWT and DTO, including after a tenant switch.
             session.ExpiresAt = DateTime.SpecifyKind(session.ExpiresAt, DateTimeKind.Utc);
             if (session.ExpiresAt <= now) throw new InvalidOperationException("Session expired.");
+            // The next refresh issues a token for the workspace the user switched to.
+            var tenantId = membership?.TenantId;
+            if (session.TenantId != tenantId)
+            {
+                await _context.AuthSessions.Where(s => s.Id == session.Id)
+                    .ExecuteUpdateAsync(setters => setters.SetProperty(s => s.TenantId, tenantId), cancellationToken);
+                session.TenantId = tenantId;
+            }
         }
         else
         {
-            session = new AuthSession { UserId = user.Id, AuthVersion = user.AuthVersion,
-                CreatedAt = now, ExpiresAt = now.AddHours(24) };
+            session = new AuthSession { UserId = user.Id, AuthVersion = user.AuthVersion, CreatedAt = now,
+                TenantId = membership?.TenantId, UserAgent = Truncate(client?.UserAgent, 256),
+                DeviceName = Truncate(client?.DeviceName, 100) };
+            var clientType = client?.Client?.Trim().ToLowerInvariant();
+            var lifetime = clientType switch
+            {
+                AuthSession.ClientWeb => _sessionOptions.Web,
+                AuthSession.ClientMobile => _sessionOptions.Mobile,
+                _ => null
+            };
+            if (lifetime is null)
+            {
+                // Clients that do not identify themselves cannot refresh: a plain 24h session.
+                session.ClientType = AuthSession.ClientApi;
+                session.ExpiresAt = now.AddHours(24);
+            }
+            else
+            {
+                session.ClientType = clientType!;
+                session.ExpiresAt = now.AddDays(lifetime.AbsoluteDays);
+                session.IdleExpiresAt = MinTime(now.AddDays(lifetime.IdleDays), session.ExpiresAt);
+                session.LastUsedAt = now;
+                refreshToken = NewRefreshToken();
+                session.RefreshTokenHash = HashToken(refreshToken);
+            }
             _context.AuthSessions.Add(session);
             await _context.SaveChangesAsync(cancellationToken);
         }
+        return ToAuthDto(user, membership, session, refreshToken);
+    }
+
+    private AuthDTO ToAuthDto(User user, TenantMembership? membership, AuthSession session, string? refreshToken)
+    {
+        var accessToken = GenerateJwtToken(user, membership, session, out var accessExpiresAt);
         return new AuthDTO
         {
-            AccessToken = GenerateJwtToken(user, membership, session), UserId = user.Id, Email = user.Email,
-            ExpiresAt = session.ExpiresAt, User = ToAuthUser(user, membership)
+            AccessToken = accessToken, UserId = user.Id, Email = user.Email,
+            ExpiresAt = Utc(session.ExpiresAt), AccessTokenExpiresAt = accessExpiresAt,
+            RefreshToken = refreshToken, User = ToAuthUser(user, membership)
         };
+    }
+
+    // Same pattern as PasswordResetService: random 32 bytes as hex, stored as SHA-256 hex.
+    private static string NewRefreshToken() => Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+    private static string HashToken(string token) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
+    private static DateTime MinTime(DateTime a, DateTime b) => a <= b ? a : b;
+    private static DateTime Utc(DateTime value) => DateTime.SpecifyKind(value, DateTimeKind.Utc);
+    private static string? Truncate(string? value, int max)
+    {
+        var trimmed = value?.Trim();
+        return string.IsNullOrEmpty(trimmed) ? null : trimmed.Length <= max ? trimmed : trimmed[..max];
+    }
+
+    /// <summary>
+    /// Exchanges a refresh token for a new access token and a rotated refresh token.
+    /// Returns null when the session has ended (unknown, expired, revoked or reused token).
+    /// </summary>
+    public async Task<AuthDTO?> RefreshAsync(string refreshToken, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(refreshToken) || refreshToken.Length > 64) return null;
+        var hash = HashToken(refreshToken.Trim());
+        var now = DateTime.UtcNow;
+        var session = await _context.AuthSessions.AsNoTracking().Include(s => s.User)
+            .SingleOrDefaultAsync(s => s.RefreshTokenHash == hash || s.PreviousRefreshTokenHash == hash, cancellationToken);
+        if (session is null) return null;
+
+        var user = session.User;
+        if (session.RevokedAt != null || session.AuthVersion != user.AuthVersion || !user.IsActive || user.RequiresPasswordSetup
+            || Utc(session.ExpiresAt) <= now || session.IdleExpiresAt is null || Utc(session.IdleExpiresAt.Value) <= now)
+            return null;
+
+        if (session.RefreshTokenHash == hash)
+        {
+            var rotated = NewRefreshToken();
+            var newHash = HashToken(rotated);
+            var lifetime = session.ClientType == AuthSession.ClientWeb ? _sessionOptions.Web : _sessionOptions.Mobile;
+            var idleExpiresAt = MinTime(now.AddDays(lifetime.IdleDays), Utc(session.ExpiresAt));
+            // Conditional on the old hash: of two racing refreshes only one rotates.
+            var updated = await _context.AuthSessions.Where(s => s.Id == session.Id && s.RefreshTokenHash == hash && s.RevokedAt == null)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(s => s.PreviousRefreshTokenHash, hash)
+                    .SetProperty(s => s.RefreshTokenHash, newHash).SetProperty(s => s.RotatedAt, now)
+                    .SetProperty(s => s.IdleExpiresAt, idleExpiresAt).SetProperty(s => s.LastUsedAt, now), cancellationToken);
+            if (updated == 1)
+                return ToAuthDto(user, await TenantMembershipForSession(session, cancellationToken), session, rotated);
+            // Lost the race: the winner rotated, so this token is now the previous one.
+            session = await _context.AuthSessions.AsNoTracking().Include(s => s.User)
+                .SingleOrDefaultAsync(s => s.Id == session.Id, cancellationToken);
+            if (session is null || session.RevokedAt != null || session.PreviousRefreshTokenHash != hash) return null;
+        }
+
+        var graceEnd = session.RotatedAt is { } rotatedAt
+            ? Utc(rotatedAt).AddSeconds(_sessionOptions.RefreshGraceSeconds) : DateTime.MinValue;
+        if (now > graceEnd)
+        {
+            // An old token reappeared after its successor was in use: assume it was stolen.
+            await _context.AuthSessions.Where(s => s.Id == session.Id && s.RevokedAt == null)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(s => s.RevokedAt, now), cancellationToken);
+            _logger.LogWarning("Refresh token reuse detected for user {UserId}, session {SessionId}; session revoked",
+                session.UserId, session.Id);
+            return null;
+        }
+        // Two tabs at once or a lost response: an access token only, the rotated refresh token stays as it is.
+        return ToAuthDto(session.User, await TenantMembershipForSession(session, cancellationToken), session, null);
+    }
+
+    // The workspace the session last used, or null (personal scope) when that membership is gone.
+    private async Task<TenantMembership?> TenantMembershipForSession(AuthSession session, CancellationToken cancellationToken) =>
+        session.TenantId is { } tenantId && tenantId > 0
+            ? await ActiveMembership(session.UserId, tenantId).FirstOrDefaultAsync(cancellationToken)
+            : null;
+
+    public async Task<List<SessionInfoDTO>> ListSessionsAsync(int userId, Guid currentSessionId, CancellationToken cancellationToken = default)
+    {
+        var now = DateTime.UtcNow;
+        var rows = await _context.AuthSessions.AsNoTracking()
+            .Where(s => s.UserId == userId && s.RevokedAt == null && s.AuthVersion == s.User.AuthVersion
+                && s.ExpiresAt > now && (s.IdleExpiresAt == null || s.IdleExpiresAt > now))
+            .ToListAsync(cancellationToken);
+        return rows.Select(s => new SessionInfoDTO { Id = s.Id, DeviceName = s.DeviceName, ClientType = s.ClientType,
+                CreatedAt = Utc(s.CreatedAt), LastUsedAt = Utc(s.LastUsedAt ?? s.CreatedAt), Current = s.Id == currentSessionId })
+            .OrderByDescending(s => s.Current).ThenByDescending(s => s.LastUsedAt).ToList();
+    }
+
+    /// <summary>Revokes one of the user's own sessions; false when it is not theirs or already ended.</summary>
+    public async Task<bool> RevokeSessionAsync(int userId, Guid sessionId, CancellationToken cancellationToken = default)
+    {
+        var now = DateTime.UtcNow;
+        return await _context.AuthSessions.Where(s => s.Id == sessionId && s.UserId == userId && s.RevokedAt == null)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(s => s.RevokedAt, now), cancellationToken) == 1;
+    }
+
+    public async Task<int> RevokeOtherSessionsAsync(int userId, Guid currentSessionId, CancellationToken cancellationToken = default)
+    {
+        var now = DateTime.UtcNow;
+        return await _context.AuthSessions.Where(s => s.UserId == userId && s.Id != currentSessionId && s.RevokedAt == null)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(s => s.RevokedAt, now), cancellationToken);
     }
 
     public async Task LogoutAsync(int userId, Guid sessionId, CancellationToken cancellationToken = default)
@@ -284,7 +423,7 @@ public partial class AuthService : IAuthService
         return SHA256.HashData(combined);
     }
 
-    private string GenerateJwtToken(User user, TenantMembership? membership, AuthSession session)
+    private string GenerateJwtToken(User user, TenantMembership? membership, AuthSession session, out DateTime expiresAt)
     {
         // (issue #36) The development fallback key is the single shared
         // constant Qontract.Core.Security.JwtKeys.DevelopmentFallback, also
@@ -313,11 +452,17 @@ public partial class AuthService : IAuthService
             new Claim("access_scope", membership is null ? "personal" : "tenant")
         };
 
+        // Refreshable sessions get a short access token; others keep the session's lifetime.
+        var sessionEnd = Utc(session.ExpiresAt);
+        expiresAt = session.RefreshTokenHash is null
+            ? sessionEnd
+            : MinTime(DateTime.UtcNow.AddMinutes(_sessionOptions.AccessTokenMinutes), sessionEnd);
+
         var token = new JwtSecurityToken(
             issuer: _configuration["Jwt:Issuer"] ?? "Qontract",
             audience: _configuration["Jwt:Audience"] ?? "QontractClients",
             claims: claims,
-            expires: session.ExpiresAt,
+            expires: expiresAt,
             signingCredentials: credentials
         );
 

@@ -73,6 +73,16 @@ Optional overrides integrate with an existing Traefik network.
 | `Registration__RequireEmailConfirmation` | `false` (default) — `true` activates accounts only after an emailed link |
 | `Terms__Version`, `Terms__Url` | empty (default) — set both to require accepting terms of use |
 | `Cors__Origins__0`, … | allowed origins for the web app |
+| `Auth__Sessions__AccessTokenMinutes` | `15` (default) — lifetime of the access token; sessions are kept alive by refresh tokens |
+| `Auth__Sessions__Web__IdleDays`, `…__AbsoluteDays` | `30` / `90` (default) — web session lifetimes |
+| `Auth__Sessions__Mobile__IdleDays`, `…__AbsoluteDays` | `90` / `365` (default) — mobile session lifetimes |
+
+**The web app and the API must be on the same site** — for example `app.example.com`
+and `api.example.com`, both under `example.com`. The web app keeps its refresh token in an
+`HttpOnly; Secure; SameSite=Strict` cookie, and browsers that block third-party cookies will
+not send it to an API on a different site, so users would be asked to sign in again
+after every reload. Mobile apps are not affected. See
+[Sessions](docs/IMPLEMENTATION-NOTES.md#sessions-and-refresh-tokens).
 
 See [DEPLOY.md](DEPLOY.md) for the full guide, including backups and restore.
 

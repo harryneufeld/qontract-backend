@@ -222,7 +222,11 @@ dotnet run --project Qontract.API
 ## API Endpoints
 
 ### Authentication
-- `POST /api/Auth/login` - Login and get JWT token
+- `POST /api/Auth/login` - Login and get an access token (plus refresh token, see [Sessions](#sessions-and-refresh-tokens))
+- `POST /api/Auth/refresh` - Rotate the refresh token and get a new access token
+- `GET /api/Auth/sessions` - The account's active sessions (devices)
+- `DELETE /api/Auth/sessions/{id}` - Revoke one session
+- `POST /api/Auth/sessions/revoke-others` - Revoke every session except the current one
 - `GET /api/Auth/me` - Validate current user/session
 - `POST /api/Auth/logout` - Revoke the authenticated session
 - `POST /api/Auth/change-password` - Change current user's password
@@ -349,6 +353,44 @@ dotnet test
 
 Open `https://localhost:65532/swagger` (or `http://localhost:65533/swagger`) to view interactive API documentation.
 
+## Sessions and refresh tokens
+
+A login creates an `AuthSession`. The JWT access token is short-lived
+(`Auth:Sessions:AccessTokenMinutes`, 15 by default, never past the session's
+absolute expiry); a refresh token keeps the session alive.
+
+| Client | Idle expiry | Absolute expiry |
+|--------|-------------|-----------------|
+| `web` | 30 days | 90 days |
+| `mobile` | 90 days | 365 days |
+
+Configure under `Auth:Sessions` (`Web`/`Mobile` → `IdleDays`, `AbsoluteDays`;
+`RefreshGraceSeconds`, default 30). Every refresh pushes the idle expiry forward;
+the absolute expiry (`AuthSession.ExpiresAt`) never moves.
+
+- **Clients identify themselves** with `client: "web" | "mobile"` and an optional
+  `deviceName` on login, register and the email-confirmation endpoints. A client that
+  sends neither gets the old behaviour: a 24h session and 24h JWT without a refresh token.
+- **Rotation with reuse detection.** The refresh token is 32 random bytes; only its
+  SHA-256 hex is stored. `POST /api/auth/refresh` swaps it for a new one with a
+  conditional update on the old hash, so two racing refreshes cannot fork the session.
+  The previous token stays valid for `RefreshGraceSeconds` but yields only an access
+  token (two tabs refreshing together, a lost response). Outside that window it counts as
+  theft: the session is revoked and a warning is logged. If the response carrying a new token
+  is lost, the next refresh after the grace window therefore ends the session.
+- **Mobile** receives the refresh token in the response body and sends it back as `{refreshToken}`.
+  **Web** receives it as the cookie `qontract_rt` (`HttpOnly; Secure; SameSite=Strict; Path=/api/auth`),
+  never in the body. `POST /api/auth/refresh` requires the header `X-Qontract-Client`: a browser can send
+  it cross-origin only after a CORS preflight, which only `Cors:Origins` pass, so it doubles as CSRF protection.
+- **Revocation.** Password change, 2FA changes and `AuthVersion` bumps invalidate refresh tokens through the
+  same `AuthVersion` check as access tokens. `switch-tenant` stores the workspace on the session, so a refresh
+  keeps it; if the membership is gone the session falls back to the personal scope.
+- **Rate limit.** `/auth/refresh` uses the `refresh` policy (`RateLimiting:Refresh`, 30 per minute per IP).
+- **Cleanup.** `AuthSessionCleanupWorker` deletes sessions that expired or were revoked more than
+  `CleanupRetentionDays` (30) ago.
+- **Upgrade.** Migration `AddRefreshTokenSessions` (both chains). Existing sessions have no refresh token
+  and end within 24 hours.
+
 ## Database Provider (issue #26)
 
 The backend defaults to **SQLite** (zero-setup, file `QontractDb.sqlite` next to the API). For
@@ -473,14 +515,16 @@ database's `UPPER` behavior, since new writes use .NET invariant normalization.
 
 ### CORS origins in production (issue #29 review)
 
-CORS behaviour (issue #12): in **Development** any origin is allowed (the
+CORS behaviour (issue #12): in **Development** any localhost origin is allowed (the
 Flutter web dev server picks a random localhost port); in **Production** only
 the origins listed in `Cors:Origins` are allowed, with credentials enabled.
 
-- The app authenticates via a JWT `Authorization: Bearer` header (no
-  cookies), and the native iOS/Android clients are not subject to CORS at
+- The app authenticates via a JWT `Authorization: Bearer` header; only the
+  web client's refresh token travels as an HttpOnly cookie (see
+  [Sessions](#sessions-and-refresh-tokens)), which is why CORS allows
+  credentials. The native iOS/Android clients are not subject to CORS at
   all (no `Origin` header) — only the **web** deployment needs a matching
-  origin.
+  origin. In Development only localhost origins are allowed (with credentials).
 - The `Cors:Origins` values in `appsettings.json` are localhost placeholders.
   When the web app gets a Linux Docker production host (qontract-app#34), add that origin
   (the scheme + host the browser will send, e.g. `https://web.qontract.example`)

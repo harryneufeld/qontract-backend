@@ -73,4 +73,22 @@ public class CorsIntegrationTests : IClassFixture<QontractWebApplicationFactory>
         response.StatusCode.Should().BeOneOf(HttpStatusCode.Unauthorized, HttpStatusCode.OK);
         response.Headers.Should().Contain(h => h.Key == "Access-Control-Allow-Origin");
     }
+
+    [Fact]
+    public async Task Preflight_FromLocalhost_ShouldAllowCredentialsForTheRefreshCookie()
+    {
+        var response = await _client.SendAsync(Preflight("http://localhost:5354"));
+
+        response.Headers.GetValues("Access-Control-Allow-Credentials").Should().ContainSingle("true");
+        // Credentials forbid the wildcard: the origin must be echoed back exactly.
+        response.Headers.GetValues("Access-Control-Allow-Origin").Should().ContainSingle("http://localhost:5354");
+    }
+
+    [Fact]
+    public async Task Preflight_FromForeignOrigin_ShouldNotBeAllowed()
+    {
+        var response = await _client.SendAsync(Preflight("https://evil.example.com"));
+
+        response.Headers.Contains("Access-Control-Allow-Origin").Should().BeFalse();
+    }
 }
