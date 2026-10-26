@@ -5,7 +5,9 @@
 # the root matched nothing and restored an empty directory).
 
 # --- Build stage -----------------------------------------------------------
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+# Pinned to the CVE-2026-111497 (Broccoli2Shell) fix: SDK 10.0.403 ships
+# runtime 10.0.14. Bump both tags together on later servicing releases.
+FROM mcr.microsoft.com/dotnet/sdk:10.0.403 AS build
 WORKDIR /src
 
 # Copy the solution + every project file first so the restore layer is
@@ -30,7 +32,7 @@ COPY . ./
 RUN dotnet publish Qontract.API/Qontract.API.csproj -c Release -o /app/publish
 
 # --- Runtime stage ---------------------------------------------------------
-FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:10.0.14 AS runtime
 WORKDIR /app
 ENV ASPNETCORE_URLS=http://+:8080
 COPY --from=build /app/publish .
