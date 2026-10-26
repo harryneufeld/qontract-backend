@@ -67,12 +67,17 @@ marker on the underlying local directory.
 ## 3. Publish, pull and start
 
 Merge the GHCR workflow first and wait for the **Backend container** workflow on
-`master` to finish. It runs the backend tests, builds the Linux amd64 Docker image
+`main` to finish. It runs the backend tests, builds the Linux amd64 Docker image
 and checks container readiness/schema startup before publishing
 `ghcr.io/harryneufeld/qontract-backend`. Pull requests only verify; they never
-publish. Manual runs publish only from `master`. Pushes to `master` publish the
-moving `master` tag; version tags such as `v1.0.0` publish that exact version tag.
-Every publication also has a `sha-FULL_COMMIT_SHA` tag. No `latest` tag is assumed.
+publish. Pushes to `main` publish the moving `main` tag; version tags such as
+`v1.0.0` publish that exact version tag. Every publication also has a
+`sha-FULL_COMMIT_SHA` tag. No `latest` tag is assumed.
+
+To test an unmerged branch on staging, run the workflow manually (Actions →
+**Backend container** → **Run workflow**, pick the branch). After the same
+verification it publishes only `sha-FULL_COMMIT_SHA` for that branch; the
+`main` and version tags are never moved by a manual run from another branch.
 
 The workflow uses GitHub's built-in `GITHUB_TOKEN` with package-write permission;
 no extra publishing password is required. A newly published GHCR package is
@@ -92,7 +97,7 @@ Paste the token at the password prompt. Existing packages may require granting
 this repository Actions access in package settings. See
 [GitHub's GHCR authentication guide](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry).
 
-Use `:master` for initial staging, or copy the immutable `@sha256:...` reference
+Use `:main` for initial staging, or copy the immutable `@sha256:...` reference
 from the successful publish job summary into `QONTRACT_IMAGE` for a controlled
 deployment. This workflow currently builds **Linux amd64**, suitable for x86-64
 hosts; ARM hosts need an additional build target before deployment.
