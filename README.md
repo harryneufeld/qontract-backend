@@ -115,7 +115,7 @@ Qontract.Tests/           integration and unit tests
 ## Contributing
 
 Issues and pull requests are welcome. Please open an issue to discuss larger
-changes first. Changes to `master` go through pull requests; run `dotnet test`
+changes first. Changes to `main` go through pull requests; run `dotnet test`
 before submitting.
 
 ## License
