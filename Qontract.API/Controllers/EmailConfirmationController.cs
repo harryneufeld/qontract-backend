@@ -1,6 +1,8 @@
 using System.ComponentModel.DataAnnotations;
 using System.Data.Common;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Options;
+using Qontract.Application.Models;
 using Qontract.API.Services;
 using Qontract.Application.Services;
 
@@ -11,8 +13,16 @@ namespace Qontract.API.Controllers;
 [Route("api/v{version:apiVersion}/auth")]
 [Route("api/auth")]
 [EnableRateLimiting("auth")]
-public class EmailConfirmationController(PasswordResetQueue queue, EmailConfirmationService confirmations, IAuthService auth, IConfiguration config) : ControllerBase
+public class EmailConfirmationController(PasswordResetQueue queue, EmailConfirmationService confirmations, IAuthService auth, IConfiguration config,
+    IOptions<AuthSessionOptions> sessionOptions) : ControllerBase
 {
+    private async Task<AuthDTO> StartSession(int userId, string? client, string? deviceName, CancellationToken cancellationToken)
+    {
+        var info = new SessionClientInfo(client, deviceName, Request.Headers.UserAgent.ToString());
+        var session = await auth.StartConfirmedSessionAsync(userId, cancellationToken, info);
+        return SessionCookies.Deliver(Response, session, SessionCookies.IsWeb(client), sessionOptions.Value);
+    }
+
     [HttpPost("resend-confirmation")]
     public IActionResult Resend(RequestEmailConfirmation dto)
     {
@@ -34,7 +44,7 @@ public class EmailConfirmationController(PasswordResetQueue queue, EmailConfirma
                 return BadRequest(new { message = "This link is invalid or expired. Please request a new link." });
             // The link proves the address just like the code does, so the app can continue without a second sign-in.
             return Ok(new { message = "Email address confirmed. You can now sign in.",
-                session = await auth.StartConfirmedSessionAsync(userId.Value, cancellationToken) });
+                session = await StartSession(userId.Value, dto.Client, dto.DeviceName, cancellationToken) });
         }
         catch (DbException)
         {
@@ -53,7 +63,7 @@ public class EmailConfirmationController(PasswordResetQueue queue, EmailConfirma
             if (userId is null)
                 return BadRequest(new { message = "This code is invalid or expired. Please request a new one." });
             return Ok(new { message = "Email address confirmed.",
-                session = await auth.StartConfirmedSessionAsync(userId.Value, cancellationToken) });
+                session = await StartSession(userId.Value, dto.Client, dto.DeviceName, cancellationToken) });
         }
         catch (DbException)
         {
@@ -72,9 +82,13 @@ public class CompleteEmailConfirmationCode
     public string Email { get; set; } = string.Empty;
     [Required, StringLength(6, MinimumLength = 6)]
     public string Code { get; set; } = string.Empty;
+    [MaxLength(16)] public string? Client { get; set; }
+    [MaxLength(100)] public string? DeviceName { get; set; }
 }
 public class CompleteEmailConfirmation
 {
     [Required, MaxLength(64)]
     public string Token { get; set; } = string.Empty;
+    [MaxLength(16)] public string? Client { get; set; }
+    [MaxLength(100)] public string? DeviceName { get; set; }
 }

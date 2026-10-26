@@ -11,13 +11,17 @@ public interface IAuthService
     Task<TwoFactorSetupDTO> SetupTwoFactorAsync(int userId, string password, CancellationToken ct = default);
     Task<string[]> EnableTwoFactorAsync(int userId, TwoFactorProofDTO proof, CancellationToken ct = default);
     Task DisableTwoFactorAsync(int userId, TwoFactorProofDTO proof, CancellationToken ct = default);
-    Task<Qontract.Application.Models.AuthDTO> LoginAsync(Qontract.Application.Models.LoginDTO dto, CancellationToken cancellationToken = default);
+    Task<Qontract.Application.Models.AuthDTO> LoginAsync(Qontract.Application.Models.LoginDTO dto, CancellationToken cancellationToken = default, string? userAgent = null);
     Task<string> HashPasswordAsync(string password);
     Task<Qontract.Application.Models.AuthUserDTO?> GetCurrentUserAsync(int userId, int tenantId, CancellationToken cancellationToken = default);
-    Task<AuthDTO> StartConfirmedSessionAsync(int userId, CancellationToken cancellationToken = default);
+    Task<AuthDTO> StartConfirmedSessionAsync(int userId, CancellationToken cancellationToken = default, SessionClientInfo? client = null);
     Task<Qontract.Application.Models.AuthUserDTO?> UpdateProfileAsync(int userId, int tenantId, Qontract.Application.Models.ProfileUpdateDTO dto, CancellationToken cancellationToken = default);
-    Task<AuthDTO> SwitchTenantAsync(int userId, int tenantId, CancellationToken cancellationToken = default, Guid? sessionId = null);
+    Task<AuthDTO> SwitchTenantAsync(int userId, int tenantId, CancellationToken cancellationToken = default, Guid? sessionId = null, SessionClientInfo? client = null);
     Task LogoutAsync(int userId, Guid sessionId, CancellationToken cancellationToken = default);
+    Task<AuthDTO?> RefreshAsync(string refreshToken, CancellationToken cancellationToken = default);
+    Task<List<SessionInfoDTO>> ListSessionsAsync(int userId, Guid currentSessionId, CancellationToken cancellationToken = default);
+    Task<bool> RevokeSessionAsync(int userId, Guid sessionId, CancellationToken cancellationToken = default);
+    Task<int> RevokeOtherSessionsAsync(int userId, Guid currentSessionId, CancellationToken cancellationToken = default);
     /// <summary>
     /// Self-service password change (app#11): verifies <paramref name="currentPassword"/>
     /// against the user's stored hash and, when it matches, replaces it with the hash

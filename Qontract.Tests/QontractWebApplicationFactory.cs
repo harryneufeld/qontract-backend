@@ -85,6 +85,15 @@ public class QontractWebApplicationFactory : WebApplicationFactory<Program>
                 services.Remove(workerDescriptor);
             }
 
+            // The session cleanup worker shares the connection the same way.
+            var sessionCleanupWorker = services.SingleOrDefault(d =>
+                d.ServiceType == typeof(IHostedService)
+                && d.ImplementationType == typeof(Qontract.API.Services.AuthSessionCleanupWorker));
+            if (sessionCleanupWorker != null)
+            {
+                services.Remove(sessionCleanupWorker);
+            }
+
             // Same for the recommendation worker; tests run the engine directly.
             var recommendationWorker = services.SingleOrDefault(d =>
                 d.ServiceType == typeof(IHostedService)
